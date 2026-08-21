@@ -1,0 +1,126 @@
+import { useEffect, useState } from 'react'
+import { api, Service } from '../lib/api'
+import { useJobs } from '../context/JobsContext'
+import { PlayIcon, RefreshIcon, SquareIcon } from '../components/Icons'
+
+interface Props {
+  refreshToken: number
+  bump: () => void
+}
+
+function statusBadge(status: string) {
+  const s = status.toLowerCase()
+  if (s === 'started') return 'badge-success'
+  if (s === 'error') return 'badge-error'
+  if (s === 'stopped' || s === 'none') return 'badge-ghost'
+  return 'badge-info'
+}
+
+export default function Services({ refreshToken, bump }: Props) {
+  const { runAction } = useJobs()
+  const [services, setServices] = useState<Service[]>([])
+  const [loading, setLoading] = useState(true)
+  const [rowBusy, setRowBusy] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  function load() {
+    setLoading(true)
+    setError(null)
+    api
+      .services()
+      .then(setServices)
+      .catch((e) => setError(String(e)))
+      .finally(() => setLoading(false))
+  }
+
+  useEffect(load, [refreshToken])
+
+  async function act(name: string, action: () => Promise<string>) {
+    setRowBusy(name)
+    await runAction(action)
+    setRowBusy(null)
+    load()
+    bump()
+  }
+
+  return (
+    <div className="p-6">
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h1 className="text-2xl font-bold">Services</h1>
+          <p className="text-base-content/60 text-sm">Background services managed by `brew services`.</p>
+        </div>
+        <button className="btn btn-sm" disabled={loading} onClick={load}>
+          <RefreshIcon className="size-4" /> Refresh
+        </button>
+      </div>
+
+      {error && <div className="alert alert-error alert-soft text-sm mb-4">{error}</div>}
+
+      {loading && services.length === 0 ? (
+        <div className="flex items-center gap-2 text-base-content/60">
+          <span className="loading loading-spinner loading-sm" /> Loading…
+        </div>
+      ) : services.length === 0 && !error ? (
+        <div className="text-center text-base-content/50 py-16">No services installed yet.</div>
+      ) : (
+        <div className="overflow-x-auto rounded-box border border-base-300">
+          <table className="table table-sm">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Status</th>
+                <th>User</th>
+                <th>PID</th>
+                <th className="text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {services.map((s) => (
+                <tr key={s.name} className="hover:bg-base-200">
+                  <td className="font-medium">{s.name}</td>
+                  <td>
+                    <span className={`badge badge-sm ${statusBadge(s.status)}`}>{s.status}</span>
+                  </td>
+                  <td className="text-xs text-base-content/60">{s.user}</td>
+                  <td className="font-mono text-xs">{s.pid || '—'}</td>
+                  <td>
+                    <div className="flex justify-end gap-1">
+                      {s.running ? (
+                        <button
+                          className="btn btn-xs btn-ghost"
+                          disabled={rowBusy === s.name}
+                          onClick={() => act(s.name, () => api.serviceStop(s.name))}
+                          title="Stop"
+                        >
+                          <SquareIcon className="size-4" />
+                        </button>
+                      ) : (
+                        <button
+                          className="btn btn-xs btn-ghost text-success"
+                          disabled={rowBusy === s.name}
+                          onClick={() => act(s.name, () => api.serviceStart(s.name))}
+                          title="Start"
+                        >
+                          <PlayIcon className="size-4" />
+                        </button>
+                      )}
+                      <button
+                        className="btn btn-xs btn-ghost"
+                        disabled={rowBusy === s.name}
+                        onClick={() => act(s.name, () => api.serviceRestart(s.name))}
+                        title="Restart"
+                      >
+                        <RefreshIcon className="size-4" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  )
+}
