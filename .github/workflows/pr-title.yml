@@ -1,0 +1,21 @@
+name: PR Title Check
+
+on:
+  pull_request_target:
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  pull-requests: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      # We squash-merge, so the PR title becomes the commit message on
+      # master -- release-please parses that history to decide the next
+      # version and changelog entry, so it has to be a valid Conventional
+      # Commit (feat:, fix:, feat!: / "BREAKING CHANGE:" for breaking
+      # changes, docs:, chore:, refactor:, etc).
+      - uses: amannn/action-semantic-pull-request@v5
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

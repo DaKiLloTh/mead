@@ -44,8 +44,20 @@ wails build
 ```
 
 Produces `build/bin/mead.app`. See `.github/workflows/ci.yml` for the same
-build running in CI on every push, and `.github/workflows/release.yml` for
-how tagged releases (`vX.Y.Z`) are built and attached to a GitHub Release.
+build running in CI on every push.
+
+## Releasing
+
+Releases are versioned and tagged automatically by
+[release-please](https://github.com/googleapis/release-please), driven by
+[Conventional Commits](https://www.conventionalcommits.org) in PR titles
+(enforced by `.github/workflows/pr-title.yml` — `feat:`, `fix:`, `feat!:` /
+a `BREAKING CHANGE:` footer for breaking changes, `docs:`, `chore:`, etc).
+Every merge to `master` updates a standing "Release PR" with the next
+version and changelog; merging *that* PR is what actually cuts the release
+— `.github/workflows/release.yml` then builds `mead.app`, zips it, builds a
+DMG installer, and attaches both to the GitHub Release release-please just
+created. Versions carry a `-pre-alpha.N` suffix until the project is stable.
 
 Release builds are unsigned (no Apple Developer ID in this project), so
 Gatekeeper will block a plain double-click — see the release notes on each
