@@ -1,4 +1,4 @@
-package main
+package brew
 
 import (
 	"context"
@@ -20,7 +20,7 @@ var masOutdatedRe = regexp.MustCompile(`^(\d+)\s+(.+?)\s+\(([^)]+)\s*->\s*([^)]+
 
 // MasList returns every Mac App Store app `mas` knows is installed.
 func MasList(ctx context.Context) ([]MasApp, error) {
-	out, err := runCmd(ctx, "mas", "list")
+	out, err := RunCmd(ctx, "mas", "list")
 	if err != nil {
 		return nil, err
 	}
@@ -39,7 +39,7 @@ func MasList(ctx context.Context) ([]MasApp, error) {
 
 // MasOutdated returns Mac App Store apps with an available update.
 func MasOutdated(ctx context.Context) ([]MasApp, error) {
-	out, err := runCmd(ctx, "mas", "outdated")
+	out, err := RunCmd(ctx, "mas", "outdated")
 	if err != nil {
 		return nil, err
 	}

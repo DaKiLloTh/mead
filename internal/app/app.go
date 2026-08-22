@@ -1,4 +1,7 @@
-package main
+// Package app is the Wails-bound orchestration/glue layer: the App struct
+// and every method exposed to the frontend. It calls into the brew, store,
+// jobs, and security packages to do the actual work.
+package app
 
 import (
 	"context"
@@ -10,6 +13,11 @@ import (
 	"time"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
+
+	"mead/internal/brew"
+	"mead/internal/jobs"
+	"mead/internal/security"
+	"mead/internal/store"
 )
 
 // gistURLRe matches a gist.github.com URL embedded in `brew gist-logs`
@@ -22,31 +30,31 @@ var gistURLRe = regexp.MustCompile(`https://gist\.github\.com/[A-Za-z0-9_/-]+`)
 // App struct
 type App struct {
 	ctx   context.Context
-	jobs  *JobManager
-	store *Store
+	jobs  *jobs.Manager
+	store *store.Store
 }
 
-// NewApp creates a new App application struct
-func NewApp() *App {
-	store, err := NewStore()
+// New creates a new App application struct.
+func New() *App {
+	st, err := store.NewStore()
 	if err != nil {
 		// Fall back to an in-memory, unpersisted store rather than failing
 		// startup over what's a nice-to-have (favorites/tags/history).
-		store = &Store{data: newUserData()}
+		st = store.NewInMemory()
 	}
-	return &App{jobs: NewJobManager(), store: store}
+	return &App{jobs: jobs.NewManager(), store: st}
 }
 
-// startup is called when the app starts. The context is saved
-// so we can call the runtime methods
-func (a *App) startup(ctx context.Context) {
+// Startup is called when the app starts. The context is saved so we can
+// call the runtime methods.
+func (a *App) Startup(ctx context.Context) {
 	a.ctx = ctx
-	a.jobs.setContext(ctx)
+	a.jobs.SetContext(ctx)
 }
 
 func (a *App) record(action, name string, isCask bool) func(success bool) {
 	return func(success bool) {
-		a.store.AppendHistory(HistoryEntry{
+		a.store.AppendHistory(store.HistoryEntry{
 			Time:    time.Now().Format(time.RFC3339),
 			Action:  action,
 			Name:    name,
@@ -58,56 +66,56 @@ func (a *App) record(action, name string, isCask bool) func(success bool) {
 
 // ---- read-only queries ----
 
-func (a *App) GetSystemInfo() (*SystemInfo, error) {
-	return GetSystemInfo(a.ctx)
+func (a *App) GetSystemInfo() (*brew.SystemInfo, error) {
+	return brew.GetSystemInfo(a.ctx)
 }
 
-func (a *App) ListInstalled() ([]BrewPackage, error) {
-	return ListInstalled(a.ctx)
+func (a *App) ListInstalled() ([]brew.BrewPackage, error) {
+	return brew.ListInstalled(a.ctx)
 }
 
-func (a *App) GetInfo(name string, isCask bool) (*BrewPackage, error) {
-	return GetInfo(a.ctx, name, isCask)
+func (a *App) GetInfo(name string, isCask bool) (*brew.BrewPackage, error) {
+	return brew.GetInfo(a.ctx, name, isCask)
 }
 
-func (a *App) Search(query string, desc bool) ([]SearchResult, error) {
-	return Search(a.ctx, query, desc)
+func (a *App) Search(query string, desc bool) ([]brew.SearchResult, error) {
+	return brew.Search(a.ctx, query, desc)
 }
 
-func (a *App) Outdated(greedy bool) ([]OutdatedPackage, error) {
-	return Outdated(a.ctx, greedy)
+func (a *App) Outdated(greedy bool) ([]brew.OutdatedPackage, error) {
+	return brew.Outdated(a.ctx, greedy)
 }
 
 func (a *App) Missing() ([]string, error) {
-	return Missing(a.ctx)
+	return brew.Missing(a.ctx)
 }
 
 func (a *App) Taps() ([]string, error) {
-	return Taps(a.ctx)
+	return brew.Taps(a.ctx)
 }
 
-func (a *App) Services() ([]Service, error) {
-	return Services(a.ctx)
+func (a *App) Services() ([]brew.Service, error) {
+	return brew.Services(a.ctx)
 }
 
 func (a *App) Leaves() ([]string, error) {
-	return Leaves(a.ctx)
+	return brew.Leaves(a.ctx)
 }
 
 func (a *App) Uses(name string) ([]string, error) {
-	return Uses(a.ctx, name)
+	return brew.Uses(a.ctx, name)
 }
 
 func (a *App) Deps(name string, isCask bool) (string, error) {
-	return Deps(a.ctx, name, isCask)
+	return brew.Deps(a.ctx, name, isCask)
 }
 
-func (a *App) GetCacheInfo() (*CacheInfo, error) {
-	return GetCacheInfo(a.ctx)
+func (a *App) GetCacheInfo() (*brew.CacheInfo, error) {
+	return brew.GetCacheInfo(a.ctx)
 }
 
 func (a *App) Config() (string, error) {
-	return Config(a.ctx)
+	return brew.Config(a.ctx)
 }
 
 // ---- streaming (long-running) actions; each returns a job id, and the
@@ -135,7 +143,7 @@ func (a *App) caskFlags() []string {
 }
 
 func (a *App) Install(name string, isCask bool) string {
-	if err := validName(name); err != nil {
+	if err := brew.ValidName(name); err != nil {
 		return a.jobs.Fail(fmt.Sprintf("Install %s", name), err.Error())
 	}
 	args := []string{"install"}
@@ -147,7 +155,7 @@ func (a *App) Install(name string, isCask bool) string {
 }
 
 func (a *App) Uninstall(name string, isCask bool, zap bool, force bool) string {
-	if err := validName(name); err != nil {
+	if err := brew.ValidName(name); err != nil {
 		return a.jobs.Fail(fmt.Sprintf("Uninstall %s", name), err.Error())
 	}
 	args := []string{"uninstall"}
@@ -174,7 +182,7 @@ func (a *App) Uninstall(name string, isCask bool, zap bool, force bool) string {
 }
 
 func (a *App) Reinstall(name string, isCask bool) string {
-	if err := validName(name); err != nil {
+	if err := brew.ValidName(name); err != nil {
 		return a.jobs.Fail(fmt.Sprintf("Reinstall %s", name), err.Error())
 	}
 	args := []string{"reinstall"}
@@ -186,7 +194,7 @@ func (a *App) Reinstall(name string, isCask bool) string {
 }
 
 func (a *App) Upgrade(name string, isCask bool) string {
-	if err := validName(name); err != nil {
+	if err := brew.ValidName(name); err != nil {
 		return a.jobs.Fail(fmt.Sprintf("Upgrade %s", name), err.Error())
 	}
 	args := []string{"upgrade"}
@@ -208,10 +216,10 @@ func (a *App) UpgradeAll(greedy bool) string {
 }
 
 // Update is the one job allowed to run brew's own auto-update machinery --
-// everywhere else we suppress it (see brewEnv) so a GUI click doesn't
+// everywhere else we suppress it (see brew.Env), so a GUI click doesn't
 // silently trigger a slow background update.
 func (a *App) Update() string {
-	return a.jobs.StartWithEnv("Update Homebrew", brewEnvAllowingAutoUpdate(), "update")
+	return a.jobs.StartWithEnv("Update Homebrew", brew.EnvAllowingAutoUpdate(), "update")
 }
 
 func (a *App) Cleanup(dryRun bool) string {
@@ -241,21 +249,21 @@ func (a *App) Doctor() string {
 }
 
 func (a *App) Pin(name string) string {
-	if err := validName(name); err != nil {
+	if err := brew.ValidName(name); err != nil {
 		return a.jobs.Fail(fmt.Sprintf("Pin %s", name), err.Error())
 	}
 	return a.jobs.StartTracked(fmt.Sprintf("Pin %s", name), a.record("pin", name, false), "pin", name)
 }
 
 func (a *App) Unpin(name string) string {
-	if err := validName(name); err != nil {
+	if err := brew.ValidName(name); err != nil {
 		return a.jobs.Fail(fmt.Sprintf("Unpin %s", name), err.Error())
 	}
 	return a.jobs.StartTracked(fmt.Sprintf("Unpin %s", name), a.record("unpin", name, false), "unpin", name)
 }
 
 func (a *App) Link(name string, overwrite bool) string {
-	if err := validName(name); err != nil {
+	if err := brew.ValidName(name); err != nil {
 		return a.jobs.Fail(fmt.Sprintf("Link %s", name), err.Error())
 	}
 	args := []string{"link"}
@@ -267,21 +275,21 @@ func (a *App) Link(name string, overwrite bool) string {
 }
 
 func (a *App) Unlink(name string) string {
-	if err := validName(name); err != nil {
+	if err := brew.ValidName(name); err != nil {
 		return a.jobs.Fail(fmt.Sprintf("Unlink %s", name), err.Error())
 	}
 	return a.jobs.StartTracked(fmt.Sprintf("Unlink %s", name), a.record("unlink", name, false), "unlink", name)
 }
 
 func (a *App) TapAdd(name string) string {
-	if err := validName(name); err != nil {
+	if err := brew.ValidName(name); err != nil {
 		return a.jobs.Fail(fmt.Sprintf("Tap %s", name), err.Error())
 	}
 	return a.jobs.StartTracked(fmt.Sprintf("Tap %s", name), a.record("tap", name, false), "tap", name)
 }
 
 func (a *App) TapRemove(name string) string {
-	if err := validName(name); err != nil {
+	if err := brew.ValidName(name); err != nil {
 		return a.jobs.Fail(fmt.Sprintf("Untap %s", name), err.Error())
 	}
 	return a.jobs.StartTracked(fmt.Sprintf("Untap %s", name), a.record("untap", name, false), "untap", name)
@@ -290,32 +298,32 @@ func (a *App) TapRemove(name string) string {
 // TapRemoveForce is offered as a retry when a plain untap fails because the
 // tap still has installed formulae from it.
 func (a *App) TapRemoveForce(name string) string {
-	if err := validName(name); err != nil {
+	if err := brew.ValidName(name); err != nil {
 		return a.jobs.Fail(fmt.Sprintf("Untap %s", name), err.Error())
 	}
 	return a.jobs.StartTracked(fmt.Sprintf("Force untap %s", name), a.record("untap", name, false), "untap", "--force", name)
 }
 
-func (a *App) TapInfo(name string) (*TapDetail, error) {
-	return TapInfo(a.ctx, name)
+func (a *App) TapInfo(name string) (*brew.TapDetail, error) {
+	return brew.TapInfo(a.ctx, name)
 }
 
 func (a *App) ServiceStart(name string) string {
-	if err := validName(name); err != nil {
+	if err := brew.ValidName(name); err != nil {
 		return a.jobs.Fail(fmt.Sprintf("Start service %s", name), err.Error())
 	}
 	return a.jobs.Start(fmt.Sprintf("Start service %s", name), "services", "start", name)
 }
 
 func (a *App) ServiceStop(name string) string {
-	if err := validName(name); err != nil {
+	if err := brew.ValidName(name); err != nil {
 		return a.jobs.Fail(fmt.Sprintf("Stop service %s", name), err.Error())
 	}
 	return a.jobs.Start(fmt.Sprintf("Stop service %s", name), "services", "stop", name)
 }
 
 func (a *App) ServiceRestart(name string) string {
-	if err := validName(name); err != nil {
+	if err := brew.ValidName(name); err != nil {
 		return a.jobs.Fail(fmt.Sprintf("Restart service %s", name), err.Error())
 	}
 	return a.jobs.Start(fmt.Sprintf("Restart service %s", name), "services", "restart", name)
@@ -331,28 +339,28 @@ func (a *App) CancelJob(id string) bool {
 
 // ---- user data: favorites, tags, notes, snoozes, history ----
 
-func (a *App) GetUserData() UserData {
+func (a *App) GetUserData() store.UserData {
 	return a.store.Snapshot()
 }
 
 func (a *App) ToggleFavorite(name string, isCask bool) error {
-	return a.store.ToggleFavorite(pkgKey(name, isCask))
+	return a.store.ToggleFavorite(store.PkgKey(name, isCask))
 }
 
 func (a *App) SetTags(name string, isCask bool, tags []string) error {
-	return a.store.SetTags(pkgKey(name, isCask), tags)
+	return a.store.SetTags(store.PkgKey(name, isCask), tags)
 }
 
 func (a *App) SetNote(name string, isCask bool, note string) error {
-	return a.store.SetNote(pkgKey(name, isCask), note)
+	return a.store.SetNote(store.PkgKey(name, isCask), note)
 }
 
 func (a *App) SnoozePackage(name string, isCask bool, days int) error {
-	return a.store.Snooze(pkgKey(name, isCask), time.Now().AddDate(0, 0, days))
+	return a.store.Snooze(store.PkgKey(name, isCask), time.Now().AddDate(0, 0, days))
 }
 
 func (a *App) UnsnoozePackage(name string, isCask bool) error {
-	return a.store.Unsnooze(pkgKey(name, isCask))
+	return a.store.Unsnooze(store.PkgKey(name, isCask))
 }
 
 func (a *App) ClearHistory() error {
@@ -370,15 +378,15 @@ func (a *App) ClearAllData() error {
 }
 
 func (a *App) RevealLocalDataFile() error {
-	return RevealInFinder(a.ctx, a.store.path)
+	return security.RevealInFinder(a.ctx, a.store.Path())
 }
 
 // ---- Homebrew's own analytics preference (distinct from the per-command
-// HOMEBREW_NO_ANALYTICS suppression in brewEnv, which only affects mead's
+// HOMEBREW_NO_ANALYTICS suppression in brew.Env, which only affects mead's
 // own invocations) ----
 
 func (a *App) AnalyticsState() (string, error) {
-	return runBrew(a.ctx, "analytics")
+	return brew.RunBrew(a.ctx, "analytics")
 }
 
 func (a *App) AnalyticsSetEnabled(enabled bool) string {
@@ -394,45 +402,45 @@ func (a *App) AnalyticsRegenerateUUID() string {
 
 // ---- security ----
 
-func (a *App) ScanVulnerabilities() ([]VulnResult, error) {
-	pkgs, err := ListInstalled(a.ctx)
+func (a *App) ScanVulnerabilities() ([]security.VulnResult, error) {
+	pkgs, err := brew.ListInstalled(a.ctx)
 	if err != nil {
 		return nil, err
 	}
-	return ScanVulnerabilities(a.ctx, pkgs)
+	return security.ScanVulnerabilities(a.ctx, pkgs)
 }
 
-func (a *App) InspectCaskSecurity(name string) (*SecurityInfo, error) {
-	pkg, err := GetInfo(a.ctx, name, true)
+func (a *App) InspectCaskSecurity(name string) (*security.SecurityInfo, error) {
+	pkg, err := brew.GetInfo(a.ctx, name, true)
 	if err != nil {
 		return nil, err
 	}
-	appPath := resolveCaskAppPath(pkg)
+	appPath := security.ResolveCaskAppPath(pkg)
 	if appPath == "" {
 		return nil, fmt.Errorf("couldn't find an installed .app for %s", name)
 	}
-	return InspectAppSecurity(a.ctx, appPath)
+	return security.InspectAppSecurity(a.ctx, appPath)
 }
 
 // RemoveQuarantine is synchronous (a single xattr call) so it's exposed as
 // a plain error-returning method rather than a streaming job. It takes a
 // cask name -- not a raw filesystem path -- and resolves the .app path
-// itself via resolveCaskAppPath, the same helper InspectCaskSecurity uses,
-// so the frontend can't point it at an arbitrary .app bundle that mead
+// itself via security.ResolveCaskAppPath, the same helper InspectCaskSecurity
+// uses, so the frontend can't point it at an arbitrary .app bundle that mead
 // doesn't actually manage.
 func (a *App) RemoveQuarantine(name string) error {
 	if name == "" {
 		return fmt.Errorf("no cask name given")
 	}
-	pkg, err := GetInfo(a.ctx, name, true)
+	pkg, err := brew.GetInfo(a.ctx, name, true)
 	if err != nil {
 		return err
 	}
-	appPath := resolveCaskAppPath(pkg)
+	appPath := security.ResolveCaskAppPath(pkg)
 	if appPath == "" {
 		return fmt.Errorf("couldn't find an installed .app for %s", name)
 	}
-	out, err := RemoveQuarantine(a.ctx, appPath)
+	out, err := security.RemoveQuarantine(a.ctx, appPath)
 	if err != nil {
 		if out != "" {
 			return fmt.Errorf("%s: %s", err.Error(), out)
@@ -446,42 +454,42 @@ func (a *App) RemoveQuarantine(name string) error {
 // snapshot, not a full Time Machine backup -- offered as an opt-in checkbox
 // before destructive operations (force-uninstall, Brewfile cleanup).
 func (a *App) CreateSnapshot() error {
-	return CreateLocalSnapshot(a.ctx)
+	return security.CreateLocalSnapshot(a.ctx)
 }
 
 // RevealPackage opens Finder at an installed package's location -- the .app
 // for a cask, or its Cellar keg directory for a formula.
 func (a *App) RevealPackage(name string, isCask bool) error {
-	pkg, err := GetInfo(a.ctx, name, isCask)
+	pkg, err := brew.GetInfo(a.ctx, name, isCask)
 	if err != nil {
 		return err
 	}
 	if isCask {
-		appPath := resolveCaskAppPath(pkg)
+		appPath := security.ResolveCaskAppPath(pkg)
 		if appPath == "" {
 			return fmt.Errorf("couldn't find an installed .app for %s", name)
 		}
-		return RevealInFinder(a.ctx, appPath)
+		return security.RevealInFinder(a.ctx, appPath)
 	}
 	if !pkg.Installed {
 		return fmt.Errorf("%s isn't installed", name)
 	}
-	prefixOut, err := runBrew(a.ctx, "--prefix")
+	prefixOut, err := brew.RunBrew(a.ctx, "--prefix")
 	if err != nil {
 		return err
 	}
 	kegPath := filepath.Join(strings.TrimSpace(prefixOut), "Cellar", name, pkg.InstalledVersion)
-	return RevealInFinder(a.ctx, kegPath)
+	return security.RevealInFinder(a.ctx, kegPath)
 }
 
 // GistLogs uploads a formula's most recent build/install logs to a GitHub
 // gist via `brew gist-logs`, for easy troubleshooting/support -- it's
 // quick enough to run synchronously rather than as a streaming job.
 func (a *App) GistLogs(name string) (string, error) {
-	if err := validName(name); err != nil {
+	if err := brew.ValidName(name); err != nil {
 		return "", err
 	}
-	out, err := runBrew(a.ctx, "gist-logs", name)
+	out, err := brew.RunBrew(a.ctx, "gist-logs", name)
 	if err != nil {
 		return "", err
 	}
@@ -493,8 +501,8 @@ func (a *App) GistLogs(name string) (string, error) {
 
 // ---- adopt & duplicates ----
 
-func (a *App) ScanAdoptableApps() ([]AdoptCandidate, error) {
-	return ScanAdoptableApps(a.ctx)
+func (a *App) ScanAdoptableApps() ([]brew.AdoptCandidate, error) {
+	return brew.ScanAdoptableApps(a.ctx)
 }
 
 // buildAdoptCaskArgs builds the `brew install --cask --adopt <name>`
@@ -510,29 +518,29 @@ func buildAdoptCaskArgs(name string, caskAppDir string) []string {
 // AdoptCask takes over management of an app that's already installed by
 // hand, using brew's own --adopt flag so it doesn't reinstall/overwrite it.
 func (a *App) AdoptCask(name string) string {
-	if err := validName(name); err != nil {
+	if err := brew.ValidName(name); err != nil {
 		return a.jobs.Fail(fmt.Sprintf("Adopt %s", name), err.Error())
 	}
 	args := buildAdoptCaskArgs(name, a.store.CaskAppDir())
 	return a.jobs.StartTracked(fmt.Sprintf("Adopt %s", name), a.record("adopt", name, true), args...)
 }
 
-func (a *App) FindDuplicateApps() ([]DuplicateApp, error) {
-	return FindDuplicateApps(a.ctx)
+func (a *App) FindDuplicateApps() ([]brew.DuplicateApp, error) {
+	return brew.FindDuplicateApps(a.ctx)
 }
 
 // ---- Mac App Store bridge (via the `mas` CLI) ----
 
 func (a *App) MasAvailable() bool {
-	return MasAvailable()
+	return brew.MasAvailable()
 }
 
-func (a *App) MasList() ([]MasApp, error) {
-	return MasList(a.ctx)
+func (a *App) MasList() ([]brew.MasApp, error) {
+	return brew.MasList(a.ctx)
 }
 
-func (a *App) MasOutdated() ([]MasApp, error) {
-	return MasOutdated(a.ctx)
+func (a *App) MasOutdated() ([]brew.MasApp, error) {
+	return brew.MasOutdated(a.ctx)
 }
 
 func (a *App) MasUpgrade(id string) string {
@@ -549,7 +557,7 @@ func (a *App) MasUpgradeAll() string {
 // ---- Brewfile import/export (native file dialogs) ----
 
 func (a *App) ExportBrewfileToFile() (string, error) {
-	content, err := runBrew(a.ctx, "bundle", "dump", "--force", "--file=-")
+	content, err := brew.RunBrew(a.ctx, "bundle", "dump", "--force", "--file=-")
 	if err != nil {
 		return "", err
 	}
@@ -590,15 +598,15 @@ func (a *App) PickBrewfile() (string, error) {
 }
 
 func (a *App) BundleCheck(path string) (string, error) {
-	return BundleCheck(a.ctx, path)
+	return brew.BundleCheck(a.ctx, path)
 }
 
 func (a *App) BundleList(path string) (string, error) {
-	return BundleList(a.ctx, path)
+	return brew.BundleList(a.ctx, path)
 }
 
-func (a *App) BundleCleanupPreview(path string) ([]BundleCleanupItem, error) {
-	return BundleCleanupPreview(a.ctx, path)
+func (a *App) BundleCleanupPreview(path string) ([]brew.BundleCleanupItem, error) {
+	return brew.BundleCleanupPreview(a.ctx, path)
 }
 
 func (a *App) BundleCleanup(path string) string {

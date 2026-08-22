@@ -1,9 +1,9 @@
-package main
+package store
 
 import "testing"
 
 // TestStoreEmptyPathIsUnpersistedNotBroken exercises the fallback path used
-// by NewApp when NewStore fails to initialize a real config directory: a
+// by app.New when NewStore fails to initialize a real config directory: a
 // Store constructed directly with an empty path (persistence disabled)
 // should still accept mutations and reflect them in memory, rather than
 // returning an error from every call because saveLocked unconditionally

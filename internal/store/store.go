@@ -1,4 +1,8 @@
-package main
+// Package store handles mead's own small, locally persisted blob of user
+// preferences -- favorites, tags, notes, snoozes, history, and app-level
+// settings -- that Homebrew itself has no concept of. It's self-contained
+// and has no dependency on the brew data layer.
+package store
 
 import (
 	"encoding/json"
@@ -18,7 +22,7 @@ type HistoryEntry struct {
 }
 
 // Settings holds mead's own app-level preferences (as opposed to Homebrew's,
-// which live in Homebrew's own config -- see the Analytics App methods).
+// which live in Homebrew's own config -- see the App's Analytics methods).
 type Settings struct {
 	CaskAppDir string `json:"caskAppDir"` // blank = brew's default (/Applications)
 }
@@ -53,13 +57,19 @@ type Store struct {
 	data *UserData
 }
 
-func pkgKey(name string, isCask bool) string {
+// PkgKey builds the stable string key used to address a package's
+// favorite/tag/note/snooze state, independent of whether it's a formula or
+// a cask (the two namespaces can otherwise collide on name, e.g. a formula
+// and cask both called "postgresql").
+func PkgKey(name string, isCask bool) string {
 	if isCask {
 		return "cask:" + name
 	}
 	return "formula:" + name
 }
 
+// NewStore opens (or creates) the on-disk store under the user's app-support
+// directory.
 func NewStore() (*Store, error) {
 	dir, err := os.UserConfigDir()
 	if err != nil {
@@ -72,6 +82,14 @@ func NewStore() (*Store, error) {
 	s := &Store{path: filepath.Join(appDir, "store.json"), data: newUserData()}
 	s.load()
 	return s, nil
+}
+
+// NewInMemory returns a Store with no backing file: mutations still take
+// effect in memory, they just aren't persisted to disk. Used as a fallback
+// when NewStore can't initialize a real config directory, so a nice-to-have
+// (favorites/tags/history) doesn't block app startup.
+func NewInMemory() *Store {
+	return &Store{data: newUserData()}
 }
 
 func (s *Store) load() {
@@ -115,6 +133,12 @@ func (s *Store) saveLocked() error {
 		return err
 	}
 	return os.WriteFile(s.path, raw, 0644)
+}
+
+// Path returns the on-disk location of the store's JSON file (empty for an
+// in-memory, unpersisted store).
+func (s *Store) Path() string {
+	return s.path
 }
 
 func (s *Store) Snapshot() UserData {
