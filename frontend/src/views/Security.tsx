@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { api, DuplicateApp, VulnResult } from '../lib/api'
 import { AlertIcon, CopyIcon, ExternalLinkIcon, ShieldIcon, WrenchIcon } from '../components/Icons'
+import ExternalLink from '../components/ExternalLink'
 
 type Tab = 'vulns' | 'duplicates' | 'missing'
 
@@ -76,9 +77,9 @@ export default function Security() {
         <div className="space-y-3">
           <p className="text-sm text-base-content/70">
             Checks installed formulae against{' '}
-            <a className="link" href="https://osv.dev" target="_blank" rel="noreferrer">
+            <ExternalLink className="link" href="https://osv.dev">
               OSV.dev
-            </a>
+            </ExternalLink>
             's public advisory database. Best-effort — casks aren't covered, and a clean scan doesn't guarantee
             there's nothing wrong, just nothing known.
           </p>
@@ -120,15 +121,13 @@ export default function Security() {
                           <td>
                             <div className="flex flex-wrap gap-1">
                               {v.vulnIds.map((id) => (
-                                <a
+                                <ExternalLink
                                   key={id}
                                   className="badge badge-sm badge-error badge-outline gap-1"
                                   href={`https://osv.dev/vulnerability/${id}`}
-                                  target="_blank"
-                                  rel="noreferrer"
                                 >
                                   {id} <ExternalLinkIcon className="size-3" />
-                                </a>
+                                </ExternalLink>
                               ))}
                             </div>
                           </td>
