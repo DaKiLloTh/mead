@@ -2,17 +2,39 @@ name: Release
 
 on:
   push:
-    tags:
-      - 'v*.*.*'
+    branches: [master]
 
 permissions:
   contents: write
+  pull-requests: write
 
 jobs:
-  build-and-release:
+  # Maintains a standing "Release PR" that accumulates the version bump and
+  # changelog computed from Conventional Commit-titled PRs merged since the
+  # last release. Merging *that* PR is the deliberate "cut a release now"
+  # action -- this job just keeps it up to date on every push to master.
+  release-please:
+    runs-on: ubuntu-latest
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
+    steps:
+      - uses: googleapis/release-please-action@v4
+        id: release
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+  # Only runs when the step above just merged the Release PR (i.e. this
+  # push to master *was* that merge) and actually cut a new tag + release.
+  build-and-upload:
+    needs: release-please
+    if: ${{ needs.release-please.outputs.release_created }}
     runs-on: macos-14
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.release-please.outputs.tag_name }}
 
       - uses: actions/setup-go@v5
         with:
@@ -32,7 +54,7 @@ jobs:
 
       - name: Zip app bundle
         working-directory: build/bin
-        run: ditto -c -k --sequesterRsrc --keepParent mead.app mead-${{ github.ref_name }}-macos-arm64.zip
+        run: ditto -c -k --sequesterRsrc --keepParent mead.app "mead-${{ needs.release-please.outputs.tag_name }}-macos-arm64.zip"
 
       - name: Install create-dmg
         run: brew install create-dmg
@@ -54,30 +76,35 @@ jobs:
             --icon "mead.app" 150 190 \
             --hide-extension "mead.app" \
             --app-drop-link 450 190 \
-            "mead-${{ github.ref_name }}-macos-arm64.dmg" \
+            "mead-${{ needs.release-please.outputs.tag_name }}-macos-arm64.dmg" \
             "mead.app"
 
-      - name: Create release
-        uses: softprops/action-gh-release@v2
-        with:
-          name: 'Pre-Alpha ${{ github.ref_name }}'
-          prerelease: true
-          files: |
-            build/bin/*.zip
-            build/bin/*.dmg
-          generate_release_notes: true
-          body: |
-            **Pre-alpha.** Expect rough edges and breaking changes between
-            releases until this graduates out of pre-alpha.
+      - name: Upload release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload "${{ needs.release-please.outputs.tag_name }}" \
+            build/bin/*.zip build/bin/*.dmg --clobber
 
-            **Unsigned build.** This isn't notarized with an Apple Developer ID,
-            so Gatekeeper will refuse to open it with a normal double-click.
-            After installing, either right-click `mead.app` → Open (and confirm
-            once), or run:
+      - name: Add Gatekeeper / install notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view "${{ needs.release-please.outputs.tag_name }}" --json body -q .body > /tmp/notes.md
+          cat >> /tmp/notes.md <<'EOF'
 
-            ```sh
-            xattr -dr com.apple.quarantine /Applications/mead.app
-            ```
+          ---
 
-            Requires [Homebrew](https://brew.sh) already installed. Apple Silicon
-            (arm64) only.
+          **Unsigned build.** This isn't notarized with an Apple Developer ID,
+          so Gatekeeper will refuse to open it with a normal double-click.
+          After installing, either right-click `mead.app` → Open (and confirm
+          once), or run:
+
+          ```sh
+          xattr -dr com.apple.quarantine /Applications/mead.app
+          ```
+
+          Requires [Homebrew](https://brew.sh) already installed. Apple Silicon
+          (arm64) only.
+          EOF
+          gh release edit "${{ needs.release-please.outputs.tag_name }}" --notes-file /tmp/notes.md
