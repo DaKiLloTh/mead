@@ -68,7 +68,7 @@ export default function Taps({ refreshToken, bump }: Props) {
     const job = await runAction(() => api.tapRemove(name))
     setRowBusy(null)
     if (job.status === 'error') {
-      setRemoveError((prev) => ({ ...prev, [name]: job.error || 'Untap failed — it may still have installed formulae from it.' }))
+      setRemoveError((prev) => ({ ...prev, [name]: job.error || 'Untap failed. It may still have installed formulae from it.' }))
       return
     }
     load()

@@ -4,22 +4,22 @@ A native Homebrew GUI for macOS, built with Go + [Wails](https://wails.io) + Rea
 
 ## Features
 
-- **Dashboard** — installed/outdated counts, a health tile (deprecated/disabled/pinned), one-click update/upgrade-all/doctor
-- **Installed** — browse formulae + casks, filter by type/outdated/favorites, bulk multi-select actions, per-row pin/upgrade/uninstall
-- **Search** — live `brew search` across formulae and casks, install inline
-- **Collections** — curated package bundles (Web Dev, DevOps, Data Science, …) installable in one click
-- **Updates** — per-item or bulk upgrade, snooze updates for a day/week/month
-- **Taps** / **Services** — add/remove taps, start/stop/restart `brew services`
-- **Adopt Existing Apps** — scans `/Applications` for apps that match a cask and adopts them via `brew install --cask --adopt`
-- **App Store** — Mac App Store apps via the `mas` CLI, with a one-click `brew install mas` when it's missing
-- **Security** — CVE scanning for installed formulae via [OSV.dev](https://osv.dev), duplicate-install detection, and per-cask Gatekeeper/code-signing inspection with quarantine-flag removal
-- **Maintenance** — `brew doctor`, cleanup (with dry-run + cache size), orphaned-dependency removal (`brew autoremove`), Brewfile import/export via native dialogs, raw `brew config`
-- **History** — a local activity log of everything mead has done
-- Favorites, tags, and private notes per package — all persisted locally
+- **Dashboard**: installed/outdated counts, a health tile (deprecated/disabled/pinned), one-click update/upgrade-all/doctor
+- **Installed**: browse formulae + casks, filter by type/outdated/favorites, bulk multi-select actions, per-row pin/upgrade/uninstall
+- **Search**: live `brew search` across formulae and casks, install inline
+- **Collections**: curated package bundles (Web Dev, DevOps, Data Science, …) installable in one click
+- **Updates**: per-item or bulk upgrade, snooze updates for a day/week/month
+- **Taps** / **Services**: add/remove taps, start/stop/restart `brew services`
+- **Adopt Existing Apps**: scans `/Applications` for apps that match a cask and adopts them via `brew install --cask --adopt`
+- **App Store**: Mac App Store apps via the `mas` CLI, with a one-click `brew install mas` when it's missing
+- **Security**: CVE scanning for installed formulae via [OSV.dev](https://osv.dev), duplicate-install detection, and per-cask Gatekeeper/code-signing inspection with quarantine-flag removal
+- **Maintenance**: `brew doctor`, cleanup (with dry-run + cache size), orphaned-dependency removal (`brew autoremove`), Brewfile import/export via native dialogs, raw `brew config`
+- **History**: a local activity log of everything mead has done
+- Favorites, tags, and private notes per package, all persisted locally
 - A live streaming console for every brew command, with cancel support
 
 Favorites, tags, notes, snoozes, and history are stored locally in
-`~/Library/Application Support/mead/store.json` — nothing leaves your machine
+`~/Library/Application Support/mead/store.json`. Nothing leaves your machine
 except the OSV.dev vulnerability lookups (formula name + version only).
 
 ## Requirements
@@ -51,15 +51,15 @@ build running in CI on every push.
 Releases are versioned and tagged automatically by
 [release-please](https://github.com/googleapis/release-please), driven by
 [Conventional Commits](https://www.conventionalcommits.org) in PR titles
-(enforced by `.github/workflows/pr-title.yml` — `feat:`, `fix:`, `feat!:` /
+(enforced by `.github/workflows/pr-title.yml`: `feat:`, `fix:`, `feat!:` /
 a `BREAKING CHANGE:` footer for breaking changes, `docs:`, `chore:`, etc).
 Every merge to `master` updates a standing "Release PR" with the next
-version and changelog; merging *that* PR is what actually cuts the release
-— `.github/workflows/release.yml` then marks the GitHub Release as a
-pre-release (title prefixed `Pre-Alpha`) — every release stays labeled
-pre-alpha until the project is stable — builds `mead.app`, zips it, builds a
+version and changelog. Merging *that* PR is what actually cuts the release.
+`.github/workflows/release.yml` then marks the GitHub Release as a
+pre-release (title prefixed `Pre-Alpha`, every release stays labeled
+pre-alpha until the project is stable), builds `mead.app`, zips it, builds a
 DMG installer, and attaches both to the release.
 
 Release builds are unsigned (no Apple Developer ID in this project), so
-Gatekeeper will block a plain double-click — see the release notes on each
+Gatekeeper will block a plain double-click. See the release notes on each
 [release](../../releases) for the one-line fix.
