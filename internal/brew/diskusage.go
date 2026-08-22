@@ -28,11 +28,13 @@ const defaultLargestInstalledLimit = 20
 // directory, sorted largest-first and capped at limit entries (a limit <= 0
 // falls back to defaultLargestInstalledLimit).
 //
-// Like GetCacheInfo, the sizes are best-effort: dirSize silently ignores any
-// filepath.Walk error it hits partway through a directory, so a size may be
-// a truncated undercount rather than exact. That's acceptable here -- this
-// report is a rough "what's biggest" ranking for deciding what to look at
-// uninstalling, not a byte-exact audit.
+// The sizes are best-effort: scanPackageDir reports a package directory
+// dirSize can't fully measure (e.g. a permission-denied subpath) as 0 rather
+// than failing the whole report. That's acceptable here -- this report is a
+// rough "what's biggest" ranking for deciding what to look at uninstalling,
+// not a byte-exact audit. (Contrast GetCacheInfo, which surfaces the same
+// dirSize error to the user instead of hiding it, because a wrong cache size
+// there is the whole point of the call.)
 func LargestInstalled(ctx context.Context, limit int) ([]PackageSize, error) {
 	_, cellar, caskroom, err := cellarAndCaskroomPaths(ctx)
 	if err != nil {
@@ -61,7 +63,13 @@ func scanPackageDir(dir string, isCask bool) []PackageSize {
 		if !e.IsDir() {
 			continue
 		}
-		size := dirSize(filepath.Join(dir, e.Name()))
+		size, err := dirSize(filepath.Join(dir, e.Name()))
+		if err != nil {
+			// Best-effort per the doc comment above: an unreadable package
+			// directory shouldn't abort the whole "largest installed"
+			// report, just show it as 0 instead of an exact size.
+			size = 0
+		}
 		out = append(out, PackageSize{
 			Name:      e.Name(),
 			IsCask:    isCask,
