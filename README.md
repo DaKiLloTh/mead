@@ -1,19 +1,52 @@
-# README
+# mead
 
-## About
+A native Homebrew GUI for macOS, built with Go + [Wails](https://wails.io) + React.
 
-This is the official Wails React-TS template.
+## Features
 
-You can configure the project by editing `wails.json`. More information about the project settings can be found
-here: https://wails.io/docs/reference/project-config
+- **Dashboard** — installed/outdated counts, a health tile (deprecated/disabled/pinned), one-click update/upgrade-all/doctor
+- **Installed** — browse formulae + casks, filter by type/outdated/favorites, bulk multi-select actions, per-row pin/upgrade/uninstall
+- **Search** — live `brew search` across formulae and casks, install inline
+- **Collections** — curated package bundles (Web Dev, DevOps, Data Science, …) installable in one click
+- **Updates** — per-item or bulk upgrade, snooze updates for a day/week/month
+- **Taps** / **Services** — add/remove taps, start/stop/restart `brew services`
+- **Adopt Existing Apps** — scans `/Applications` for apps that match a cask and adopts them via `brew install --cask --adopt`
+- **App Store** — Mac App Store apps via the `mas` CLI, with a one-click `brew install mas` when it's missing
+- **Security** — CVE scanning for installed formulae via [OSV.dev](https://osv.dev), duplicate-install detection, and per-cask Gatekeeper/code-signing inspection with quarantine-flag removal
+- **Maintenance** — `brew doctor`, cleanup (with dry-run + cache size), orphaned-dependency removal (`brew autoremove`), Brewfile import/export via native dialogs, raw `brew config`
+- **History** — a local activity log of everything mead has done
+- Favorites, tags, and private notes per package — all persisted locally
+- A live streaming console for every brew command, with cancel support
 
-## Live Development
+Favorites, tags, notes, snoozes, and history are stored locally in
+`~/Library/Application Support/mead/store.json` — nothing leaves your machine
+except the OSV.dev vulnerability lookups (formula name + version only).
 
-To run in live development mode, run `wails dev` in the project directory. This will run a Vite development
-server that will provide very fast hot reload of your frontend changes. If you want to develop in a browser
-and have access to your Go methods, there is also a dev server that runs on http://localhost:34115. Connect
-to this in your browser, and you can call your Go code from devtools.
+## Requirements
+
+- [Homebrew](https://brew.sh) already installed
+- macOS on Apple Silicon (arm64)
+
+## Development
+
+```sh
+wails dev
+```
+
+Runs a Vite dev server with hot reload. A dev bridge also runs at
+`http://localhost:34115` if you want to drive the Go bindings from a regular
+browser tab's devtools.
 
 ## Building
 
-To build a redistributable, production mode package, use `wails build`.
+```sh
+wails build
+```
+
+Produces `build/bin/mead.app`. See `.github/workflows/ci.yml` for the same
+build running in CI on every push, and `.github/workflows/release.yml` for
+how tagged releases (`vX.Y.Z`) are built and attached to a GitHub Release.
+
+Release builds are unsigned (no Apple Developer ID in this project), so
+Gatekeeper will block a plain double-click — see the release notes on each
+[release](../../releases) for the one-line fix.
