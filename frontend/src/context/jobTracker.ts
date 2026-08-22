@@ -75,10 +75,6 @@ export class JobTracker {
     this.now = callbacks.now ?? (() => Date.now())
   }
 
-  getJobs(): JobState[] {
-    return this.jobs
-  }
-
   clearFinished(): void {
     this.setJobs(this.jobs.filter((j) => j.status === 'running'))
   }
