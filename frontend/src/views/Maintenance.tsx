@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
-import { api, BundleCleanupItem, CacheInfo } from '../lib/api'
+import { api, BundleCleanupItem, CacheInfo, PackageSize } from '../lib/api'
 import { useJobs } from '../context/JobsContext'
 import { useConfirm } from '../context/ConfirmContext'
-import { BeakerIcon, CheckIcon, DownloadIcon, ImportIcon, TrashIcon, WrenchIcon } from '../components/Icons'
+import { BeakerIcon, CheckIcon, DownloadIcon, ImportIcon, RefreshIcon, TrashIcon, WrenchIcon } from '../components/Icons'
 
 type Tab = 'doctor' | 'cleanup' | 'brewfile' | 'config'
 
@@ -15,6 +15,8 @@ export default function Maintenance() {
   const [doctorRunning, setDoctorRunning] = useState(false)
 
   const [cache, setCache] = useState<CacheInfo | null>(null)
+  const [largest, setLargest] = useState<PackageSize[] | null>(null)
+  const [largestLoading, setLargestLoading] = useState(false)
   const [cleanupOutput, setCleanupOutput] = useState<string[] | null>(null)
   const [cleanupRunning, setCleanupRunning] = useState<'preview' | 'real' | 'autoremove' | 'autoremove-preview' | null>(null)
 
@@ -36,7 +38,19 @@ export default function Maintenance() {
 
   useEffect(() => {
     api.cacheInfo().then(setCache).catch(() => {})
+    loadLargest()
   }, [])
+
+  async function loadLargest() {
+    setLargestLoading(true)
+    try {
+      setLargest(await api.largestInstalledPackages())
+    } catch {
+      // best-effort report; leave whatever was previously loaded in place
+    } finally {
+      setLargestLoading(false)
+    }
+  }
 
   async function runAutoremove(dryRun: boolean) {
     setCleanupRunning(dryRun ? 'autoremove-preview' : 'autoremove')
@@ -212,6 +226,64 @@ export default function Maintenance() {
               </div>
             </div>
           )}
+
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-base-content/70">
+                Largest installed packages — see what's taking up the most disk space.
+              </p>
+              <button className="btn btn-xs" disabled={largestLoading} onClick={loadLargest}>
+                {largestLoading ? (
+                  <span className="loading loading-spinner loading-xs" />
+                ) : (
+                  <RefreshIcon className="size-3.5" />
+                )}
+                Refresh
+              </button>
+            </div>
+            {largestLoading && largest === null && (
+              <div className="flex items-center gap-2 text-base-content/60">
+                <span className="loading loading-spinner loading-sm" /> Scanning…
+              </div>
+            )}
+            {largest && largest.length > 0 && (
+              <div className="overflow-x-auto rounded-box border border-base-300">
+                <table className="table table-sm table-fixed">
+                  <colgroup>
+                    <col />
+                    <col className="w-24" />
+                    <col className="w-28" />
+                  </colgroup>
+                  <thead>
+                    <tr>
+                      <th>Name</th>
+                      <th>Type</th>
+                      <th className="text-right">Size</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {largest.map((p) => (
+                      <tr key={`${p.isCask ? 'c' : 'f'}:${p.name}`} className="hover:bg-base-200">
+                        <td className="font-medium truncate">{p.name}</td>
+                        <td>
+                          <span className={`badge badge-sm badge-outline ${p.isCask ? 'badge-accent' : 'badge-primary'}`}>
+                            {p.isCask ? 'cask' : 'formula'}
+                          </span>
+                        </td>
+                        <td className="text-right font-mono text-xs">{p.sizeHuman}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            {largest && largest.length === 0 && (
+              <div className="text-xs text-base-content/50">No installed packages found.</div>
+            )}
+          </div>
+
+          <div className="divider my-1" />
+
           <p className="text-sm text-base-content/70">
             Removes old versions of installed formulae and casks, and clears the download cache.
           </p>

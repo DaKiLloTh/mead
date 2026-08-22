@@ -17,6 +17,7 @@ export type MasApp = brew.MasApp
 export type Collection = brew.Collection
 export type TapDetail = brew.TapDetail
 export type BundleCleanupItem = brew.BundleCleanupItem
+export type PackageSize = brew.PackageSize
 
 export const api = {
   getSystemInfo: () => App.GetSystemInfo(),
@@ -32,6 +33,7 @@ export const api = {
   uses: (name: string) => App.Uses(name),
   deps: (name: string, isCask: boolean) => App.Deps(name, isCask),
   cacheInfo: () => App.GetCacheInfo(),
+  largestInstalledPackages: () => App.LargestInstalledPackages(),
   config: () => App.Config(),
 
   install: (name: string, isCask: boolean) => App.Install(name, isCask),

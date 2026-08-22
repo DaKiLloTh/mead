@@ -566,6 +566,20 @@ func BundleCleanupPreview(ctx context.Context, path string) ([]BundleCleanupItem
 	return items, nil
 }
 
+// cellarAndCaskroomPaths resolves brew's install prefix and derives the
+// Cellar (formulae) and Caskroom (casks) directories beneath it. This is the
+// one place that logic lives -- GetSystemInfo and LargestInstalled both call
+// it rather than re-deriving `<prefix>/Cellar` and `<prefix>/Caskroom`
+// independently.
+func cellarAndCaskroomPaths(ctx context.Context) (prefix, cellar, caskroom string, err error) {
+	prefixOut, err := RunBrew(ctx, "--prefix")
+	if err != nil {
+		return "", "", "", err
+	}
+	prefix = strings.TrimSpace(prefixOut)
+	return prefix, filepath.Join(prefix, "Cellar"), filepath.Join(prefix, "Caskroom"), nil
+}
+
 // GetSystemInfo assembles a dashboard summary.
 func GetSystemInfo(ctx context.Context) (*SystemInfo, error) {
 	path, err := ResolveBrewPath()
@@ -574,15 +588,14 @@ func GetSystemInfo(ctx context.Context) (*SystemInfo, error) {
 	}
 	versionOut, _ := RunBrew(ctx, "--version")
 	version := strings.TrimSpace(strings.SplitN(versionOut, "\n", 2)[0])
-	prefixOut, _ := RunBrew(ctx, "--prefix")
-	prefix := strings.TrimSpace(prefixOut)
+	prefix, cellar, caskroom, _ := cellarAndCaskroomPaths(ctx)
 
 	base := &SystemInfo{
 		BrewPath:    path,
 		BrewVersion: version,
 		Prefix:      prefix,
-		Cellar:      filepath.Join(prefix, "Cellar"),
-		Caskroom:    filepath.Join(prefix, "Caskroom"),
+		Cellar:      cellar,
+		Caskroom:    caskroom,
 	}
 
 	pkgs, pkgsErr := ListInstalled(ctx)
