@@ -117,7 +117,14 @@ export default function Updates({ refreshToken, bump }: Props) {
         </div>
       ) : (
         <div className="overflow-x-auto rounded-box border border-base-300">
-          <table className="table table-sm">
+          <table className="table table-sm table-fixed">
+            <colgroup>
+              <col />
+              <col className="w-24" />
+              <col className="w-40" />
+              <col className="w-28" />
+              <col className="w-40" />
+            </colgroup>
             <thead>
               <tr>
                 <th>Name</th>
@@ -130,14 +137,18 @@ export default function Updates({ refreshToken, bump }: Props) {
             <tbody>
               {list.map((p) => (
                 <tr key={`${p.isCask ? 'c' : 'f'}:${p.name}`} className="hover:bg-base-200">
-                  <td className="font-medium">{p.name}</td>
+                  <td className="font-medium truncate">{p.name}</td>
                   <td>
                     <span className={`badge badge-sm badge-outline ${p.isCask ? 'badge-accent' : 'badge-primary'}`}>
                       {p.isCask ? 'cask' : 'formula'}
                     </span>
                   </td>
-                  <td className="font-mono text-xs">{p.installedVersions.join(', ')}</td>
-                  <td className="font-mono text-xs text-warning">{p.currentVersion}</td>
+                  <td className="font-mono text-xs truncate" title={p.installedVersions.join(', ')}>
+                    {p.installedVersions.join(', ')}
+                  </td>
+                  <td className="font-mono text-xs text-warning truncate" title={p.currentVersion}>
+                    {p.currentVersion}
+                  </td>
                   <td className="text-right">
                     <div className="flex justify-end gap-1">
                       {showSnoozed ? (

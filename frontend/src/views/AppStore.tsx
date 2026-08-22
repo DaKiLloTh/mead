@@ -100,7 +100,12 @@ export default function AppStore() {
           </div>
 
           <div className="overflow-x-auto rounded-box border border-base-300">
-            <table className="table table-sm">
+            <table className="table table-sm table-fixed">
+              <colgroup>
+                <col />
+                <col className="w-56" />
+                <col className="w-24" />
+              </colgroup>
               <thead>
                 <tr>
                   <th>Name</th>
@@ -111,8 +116,8 @@ export default function AppStore() {
               <tbody>
                 {apps.map((app) => (
                   <tr key={app.id} className="hover:bg-base-200">
-                    <td className="font-medium">{app.name}</td>
-                    <td className="font-mono text-xs">
+                    <td className="font-medium truncate">{app.name}</td>
+                    <td className="font-mono text-xs break-words">
                       {app.installedVersion}
                       {outdatedIds.has(app.id) && (
                         <>

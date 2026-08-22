@@ -78,7 +78,14 @@ export default function Services({ refreshToken, bump }: Props) {
         <div className="text-center text-base-content/50 py-16">No services installed yet.</div>
       ) : (
         <div className="overflow-x-auto rounded-box border border-base-300">
-          <table className="table table-sm">
+          <table className="table table-sm table-fixed">
+            <colgroup>
+              <col />
+              <col className="w-28" />
+              <col className="w-32" />
+              <col className="w-20" />
+              <col className="w-28" />
+            </colgroup>
             <thead>
               <tr>
                 <th>Name</th>
@@ -91,12 +98,14 @@ export default function Services({ refreshToken, bump }: Props) {
             <tbody>
               {services.map((s) => (
                 <tr key={s.name} className="hover:bg-base-200">
-                  <td className="font-medium">{s.name}</td>
+                  <td className="font-medium truncate">{s.name}</td>
                   <td>
                     <span className={`badge badge-sm ${statusBadge(s.status)}`}>{s.status}</span>
                   </td>
-                  <td className="text-xs text-base-content/60">{s.user}</td>
-                  <td className="font-mono text-xs">{s.pid || '—'}</td>
+                  <td className="text-xs text-base-content/60 truncate" title={s.user}>
+                    {s.user}
+                  </td>
+                  <td className="font-mono text-xs truncate">{s.pid || '—'}</td>
                   <td>
                     <div className="flex justify-end gap-1">
                       {s.running ? (
