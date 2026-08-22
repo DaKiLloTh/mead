@@ -30,7 +30,7 @@ export type ViewKey =
   | 'history'
   | 'settings'
 
-interface NavItem {
+export interface NavItem {
   key: ViewKey
   label: string
   icon: (p: { className?: string }) => ReactElement
@@ -70,6 +70,11 @@ const groups: NavGroup[] = [
     ],
   },
 ]
+
+const settingsItem: NavItem = { key: 'settings', label: 'Settings', icon: GearIcon }
+
+/** Every navigable view, in display order (sidebar groups, then Settings). */
+export const navItems: NavItem[] = [...groups.flatMap((g) => g.items), settingsItem]
 
 interface Props {
   view: ViewKey
@@ -120,8 +125,8 @@ export default function Sidebar({ view, onSelect, outdatedCount }: Props) {
               onSelect('settings')
             }}
           >
-            <GearIcon className="size-4" />
-            Settings
+            <settingsItem.icon className="size-4" />
+            {settingsItem.label}
           </a>
         </li>
       </ul>

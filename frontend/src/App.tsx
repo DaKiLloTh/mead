@@ -5,6 +5,7 @@ import { UserDataProvider } from './context/UserDataContext'
 import Sidebar, { type ViewKey } from './components/Sidebar'
 import JobConsole from './components/JobConsole'
 import Toasts from './components/Toasts'
+import CommandPalette from './components/CommandPalette'
 import Dashboard from './views/Dashboard'
 import Installed from './views/Installed'
 import Search from './views/Search'
@@ -57,6 +58,10 @@ function AppShell() {
         <div className="flex-1 min-w-0 flex flex-col">
           <div className="drag-region h-9 shrink-0 flex items-center px-6">
             <span className="text-sm font-medium text-base-content/60">{titles[view]}</span>
+            <span className="ml-auto flex items-center gap-1 text-base-content/40">
+              <kbd className="kbd kbd-xs">⌘</kbd>
+              <kbd className="kbd kbd-xs">K</kbd>
+            </span>
           </div>
           <div className="flex-1 min-h-0 overflow-y-auto">
             {view === 'dashboard' && <Dashboard onNavigate={setView} refreshToken={refreshToken} />}
@@ -77,6 +82,7 @@ function AppShell() {
       </div>
       <JobConsole />
       <Toasts />
+      <CommandPalette onNavigate={setView} bump={bump} />
     </div>
   )
 }
