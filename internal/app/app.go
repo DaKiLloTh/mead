@@ -129,6 +129,20 @@ func (a *App) Config() (string, error) {
 // ---- streaming (long-running) actions; each returns a job id, and the
 // frontend subscribes to job:start / job:output / job:done events ----
 
+// caskAppDirFlag returns the `--appdir=<dir>` flag for a configured cask
+// install directory, or nil if none is configured (blank meaning "use
+// brew's default"). Shared by caskFlagsFor (which always forces --cask
+// alongside it) and buildCollectionInstallArgs (which appends it without
+// --cask, since a collection install must not force every package to
+// resolve as a cask) so the appdir-flag format is defined in exactly one
+// place.
+func caskAppDirFlag(caskAppDir string) []string {
+	if caskAppDir == "" {
+		return nil
+	}
+	return []string{"--appdir=" + caskAppDir}
+}
+
 // caskFlagsFor is the pure core of caskFlags: given a cask-appdir setting
 // (blank meaning "use brew's default"), it returns the flags to append for
 // a command that installs/reinstalls/upgrades a single cask -- forcing
@@ -137,9 +151,7 @@ func (a *App) Config() (string, error) {
 // without an *App/*Store.
 func caskFlagsFor(caskAppDir string) []string {
 	flags := []string{"--cask"}
-	if caskAppDir != "" {
-		flags = append(flags, "--appdir="+caskAppDir)
-	}
+	flags = append(flags, caskAppDirFlag(caskAppDir)...)
 	return flags
 }
 

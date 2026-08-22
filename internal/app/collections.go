@@ -16,17 +16,15 @@ func (a *App) GetCollections() []brew.Collection {
 // install (see caskFlagsFor) this must NOT force --cask -- doing so would
 // make brew try to resolve every name in the command as a cask, breaking
 // any formula packages in the same collection. If the collection contains
-// at least one cask and the user has configured a custom cask install
-// directory, --appdir is still appended so those casks land there instead
-// of brew's default. Pure so it's directly unit testable.
+// at least one cask, the shared caskAppDirFlag helper appends --appdir (if
+// the user has configured a custom cask install directory) so those casks
+// land there instead of brew's default. Pure so it's directly unit testable.
 func buildCollectionInstallArgs(pkgs []brew.CollectionPackage, caskAppDir string) []string {
 	args := []string{"install"}
-	if caskAppDir != "" {
-		for _, p := range pkgs {
-			if p.IsCask {
-				args = append(args, "--appdir="+caskAppDir)
-				break
-			}
+	for _, p := range pkgs {
+		if p.IsCask {
+			args = append(args, caskAppDirFlag(caskAppDir)...)
+			break
 		}
 	}
 	for _, p := range pkgs {

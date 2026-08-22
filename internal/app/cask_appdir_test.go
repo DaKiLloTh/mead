@@ -24,6 +24,25 @@ func containsAppDirFlag(args []string) bool {
 	return false
 }
 
+func TestCaskAppDirFlag(t *testing.T) {
+	t.Run("no custom dir", func(t *testing.T) {
+		got := caskAppDirFlag("")
+		if len(got) != 0 {
+			t.Errorf("expected no flag, got %v", got)
+		}
+	})
+
+	t.Run("custom dir", func(t *testing.T) {
+		got := caskAppDirFlag("/Users/me/Applications")
+		if !containsFlag(got, "--appdir=/Users/me/Applications") {
+			t.Errorf("expected --appdir=/Users/me/Applications in %v", got)
+		}
+		if len(got) != 1 {
+			t.Errorf("expected exactly one flag, got %v", got)
+		}
+	})
+}
+
 func TestCaskFlagsFor(t *testing.T) {
 	t.Run("no custom dir", func(t *testing.T) {
 		got := caskFlagsFor("")
