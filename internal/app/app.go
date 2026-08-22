@@ -5,6 +5,7 @@ package app
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -379,6 +380,61 @@ func (a *App) ClearAllData() error {
 
 func (a *App) RevealLocalDataFile() error {
 	return security.RevealInFinder(a.ctx, a.store.Path())
+}
+
+// ---- user data backup/restore (native file dialogs, same pattern as the
+// Brewfile export/import below) ----
+
+// ExportUserDataToFile writes the current UserData (favorites, tags, notes,
+// snoozes, history, and settings) as pretty-printed JSON -- the same shape
+// already persisted to disk -- to a file the user picks via a native save
+// dialog. Returns the chosen path, or "" if the user cancelled.
+func (a *App) ExportUserDataToFile() (string, error) {
+	raw, err := json.MarshalIndent(a.store.Snapshot(), "", "  ")
+	if err != nil {
+		return "", err
+	}
+	path, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
+		Title:           "Export mead data",
+		DefaultFilename: "mead-data.json",
+	})
+	if err != nil {
+		return "", err
+	}
+	if path == "" {
+		return "", nil // user cancelled
+	}
+	if err := os.WriteFile(path, raw, 0644); err != nil {
+		return "", err
+	}
+	return path, nil
+}
+
+// PickUserDataFile opens a native file picker and returns the chosen path
+// (empty string if cancelled), so the frontend can confirm the destructive
+// replace *after* the user has actually picked a file, before calling
+// ImportUserDataFromFile.
+func (a *App) PickUserDataFile() (string, error) {
+	return runtime.OpenFileDialog(a.ctx, runtime.OpenDialogOptions{
+		Title: "Select a mead data export",
+	})
+}
+
+// ImportUserDataFromFile reads and parses the JSON file at path and
+// replaces the store's favorites/tags/notes/snoozes/history with it (see
+// Store.Import for what happens to Settings, and for the well-formedness
+// check). A malformed or unrelated JSON file is rejected with an error
+// and never touches existing state.
+func (a *App) ImportUserDataFromFile(path string) error {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	var data store.UserData
+	if err := json.Unmarshal(raw, &data); err != nil {
+		return fmt.Errorf("not a valid JSON file: %w", err)
+	}
+	return a.store.Import(data)
 }
 
 // ---- Homebrew's own analytics preference (distinct from the per-command

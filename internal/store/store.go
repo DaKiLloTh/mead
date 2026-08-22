@@ -6,6 +6,7 @@ package store
 
 import (
 	"encoding/json"
+	"fmt"
 	"maps"
 	"os"
 	"path/filepath"
@@ -251,5 +252,55 @@ func (s *Store) ClearAll() error {
 	settings := s.data.Settings
 	s.data = newUserData()
 	s.data.Settings = settings
+	return s.saveLocked()
+}
+
+// looksLikeUserData reports whether data appears to be a genuine UserData
+// export rather than unrelated/garbage JSON that happened to unmarshal
+// without error (e.g. `{}`, or some other JSON object entirely). A real
+// export -- built from Snapshot, which always initializes its maps and
+// slice rather than leaving them nil -- serializes them as `{}`/`[]`, never
+// omits them, so every collection field comes back non-nil after
+// Unmarshal. Garbage or unrelated JSON leaves them all nil.
+func looksLikeUserData(data UserData) bool {
+	return data.Favorites != nil || data.Tags != nil || data.Notes != nil || data.Snoozed != nil || data.History != nil
+}
+
+// Import replaces the store's favorites, tags, notes, snoozes, and history
+// with the contents of an imported backup (as produced by Snapshot/Export),
+// but -- mirroring ClearAll's reasoning -- leaves the current app-level
+// Settings (e.g. the cask install directory) untouched: restoring someone
+// else's backup, or an older one of your own, replacing a machine-local
+// preference like that would be surprising.
+//
+// Rejects data that doesn't look like a genuine UserData export (see
+// looksLikeUserData) and leaves existing state completely untouched in
+// that case.
+func (s *Store) Import(data UserData) error {
+	if !looksLikeUserData(data) {
+		return fmt.Errorf("that file doesn't look like a mead data export")
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	nd := data
+	if nd.Favorites == nil {
+		nd.Favorites = map[string]bool{}
+	}
+	if nd.Tags == nil {
+		nd.Tags = map[string][]string{}
+	}
+	if nd.Notes == nil {
+		nd.Notes = map[string]string{}
+	}
+	if nd.Snoozed == nil {
+		nd.Snoozed = map[string]string{}
+	}
+	if nd.History == nil {
+		nd.History = []HistoryEntry{}
+	}
+	nd.Settings = s.data.Settings // keep current Settings, not the imported ones
+
+	s.data = &nd
 	return s.saveLocked()
 }

@@ -106,6 +106,11 @@ export const api = {
   // settings
   setCaskAppDir: (dir: string) => App.SetCaskAppDir(dir),
   clearAllData: () => App.ClearAllData(),
+
+  // user data backup/restore
+  exportUserDataToFile: () => App.ExportUserDataToFile(),
+  pickUserDataFile: () => App.PickUserDataFile(),
+  importUserDataFromFile: (path: string) => App.ImportUserDataFromFile(path),
   analyticsState: () => App.AnalyticsState(),
   analyticsSetEnabled: (enabled: boolean) => App.AnalyticsSetEnabled(enabled),
   analyticsRegenerateUUID: () => App.AnalyticsRegenerateUUID(),
