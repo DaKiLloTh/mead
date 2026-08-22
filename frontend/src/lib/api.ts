@@ -70,7 +70,7 @@ export const api = {
   // security
   scanVulnerabilities: () => App.ScanVulnerabilities(),
   inspectCaskSecurity: (name: string) => App.InspectCaskSecurity(name),
-  removeQuarantine: (appPath: string) => App.RemoveQuarantine(appPath),
+  removeQuarantine: (name: string) => App.RemoveQuarantine(name),
 
   // adopt & duplicates
   scanAdoptableApps: () => App.ScanAdoptableApps(),

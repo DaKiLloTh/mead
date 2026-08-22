@@ -107,9 +107,9 @@ export default function PackageDetailModal({ target, onClose, onChanged }: Props
   }
 
   async function doRemoveQuarantine() {
-    if (!security) return
+    if (!security || !target) return
     try {
-      await api.removeQuarantine(security.appPath)
+      await api.removeQuarantine(target.name)
       setSecurity(null)
       void loadSecurity()
     } catch (e) {
