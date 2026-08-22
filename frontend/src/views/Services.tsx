@@ -105,7 +105,7 @@ export default function Services({ refreshToken, bump }: Props) {
                   <td className="text-xs text-base-content/60 truncate" title={s.user}>
                     {s.user}
                   </td>
-                  <td className="font-mono text-xs truncate">{s.pid || '—'}</td>
+                  <td className="font-mono text-xs truncate">{s.pid || '-'}</td>
                   <td>
                     <div className="flex justify-end gap-1">
                       {s.running ? (

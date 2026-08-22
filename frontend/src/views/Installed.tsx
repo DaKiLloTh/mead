@@ -4,7 +4,7 @@ import { useJobs } from '../context/JobsContext'
 import { useConfirm } from '../context/ConfirmContext'
 import { useUserData } from '../context/UserDataContext'
 import PackageDetailModal, { DetailTarget } from '../components/PackageDetailModal'
-import { ArrowUpCircleIcon, PinIcon, SearchIcon, StarIcon, TrashIcon } from '../components/Icons'
+import { ArrowUpCircleIcon, PinIcon, RefreshIcon, SearchIcon, StarIcon, TrashIcon } from '../components/Icons'
 
 type Filter = 'all' | 'formula' | 'cask' | 'outdated' | 'favorites'
 
@@ -24,6 +24,7 @@ export default function Installed({ refreshToken, bump }: Props) {
   const [pkgs, setPkgs] = useState<BrewPackage[]>([])
   const [leaves, setLeaves] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [filter, setFilter] = useState<Filter>('all')
   const [query, setQuery] = useState('')
   const [detail, setDetail] = useState<DetailTarget | null>(null)
@@ -33,11 +34,13 @@ export default function Installed({ refreshToken, bump }: Props) {
 
   function load() {
     setLoading(true)
+    setError(null)
     Promise.all([api.listInstalled(), api.leaves().catch(() => [])])
       .then(([p, l]) => {
         setPkgs(p)
         setLeaves(new Set(l))
       })
+      .catch((e) => setError(String(e)))
       .finally(() => setLoading(false))
   }
 
@@ -152,7 +155,9 @@ export default function Installed({ refreshToken, bump }: Props) {
       <div className="flex items-center justify-between mb-4 gap-4">
         <div>
           <h1 className="text-2xl font-bold">Installed</h1>
-          <p className="text-base-content/60 text-sm">{pkgs.length} packages installed</p>
+          <p className="text-base-content/60 text-sm">
+            {error ? "Couldn't load installed packages." : `${pkgs.length} packages installed`}
+          </p>
         </div>
         <label className="input input-sm w-64">
           <SearchIcon className="size-4 opacity-50" />
@@ -212,7 +217,17 @@ export default function Installed({ refreshToken, bump }: Props) {
         )}
       </div>
 
-      {loading && pkgs.length === 0 ? (
+      {error ? (
+        <div className="alert alert-error alert-soft">
+          <div>
+            <div className="font-medium">Couldn't load installed packages</div>
+            <p className="text-sm mt-1">{error}</p>
+          </div>
+          <button className="btn btn-sm" onClick={load}>
+            <RefreshIcon className="size-4" /> Try again
+          </button>
+        </div>
+      ) : loading && pkgs.length === 0 ? (
         <div className="flex items-center gap-2 text-base-content/60">
           <span className="loading loading-spinner loading-sm" /> Loading…
         </div>

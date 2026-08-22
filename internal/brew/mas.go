@@ -4,6 +4,8 @@ import (
 	"context"
 	"regexp"
 	"strings"
+
+	"mead/internal/system"
 )
 
 // MasAvailable reports whether the `mas` CLI (github.com/mas-cli/mas) is on
@@ -19,7 +21,7 @@ var masOutdatedRe = regexp.MustCompile(`^(\d+)\s+(.+?)\s+\(([^)]+)\s*->\s*([^)]+
 
 // MasList returns every Mac App Store app `mas` knows is installed.
 func MasList(ctx context.Context) ([]MasApp, error) {
-	out, err := RunCmd(ctx, "mas", "list")
+	out, err := system.RunCmd(ctx, "mas", "list")
 	if err != nil {
 		return nil, err
 	}
@@ -38,7 +40,7 @@ func MasList(ctx context.Context) ([]MasApp, error) {
 
 // MasOutdated returns Mac App Store apps with an available update.
 func MasOutdated(ctx context.Context) ([]MasApp, error) {
-	out, err := RunCmd(ctx, "mas", "outdated")
+	out, err := system.RunCmd(ctx, "mas", "outdated")
 	if err != nil {
 		return nil, err
 	}

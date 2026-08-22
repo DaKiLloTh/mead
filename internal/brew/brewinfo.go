@@ -139,7 +139,7 @@ func caskToPackage(c map[string]interface{}) BrewPackage {
 		Dependencies:  []string{},
 		ConflictsWith: []string{},
 	}
-	if names := mGetStringSlice(c, "name"); len(names) > 0 {
+	if names := mGetStringSlice(c, "name"); len(names) > 0 && strings.TrimSpace(names[0]) != "" {
 		p.FullName = names[0]
 	}
 	if caveats := c["caveats"]; caveats != nil {
@@ -483,22 +483,46 @@ func GetCacheInfo(ctx context.Context) (*CacheInfo, error) {
 		return nil, err
 	}
 	path := strings.TrimSpace(pathOut)
-	size := dirSize(path)
+	size, err := dirSize(path)
+	if err != nil {
+		return nil, fmt.Errorf("measuring cache size at %s: %w", path, err)
+	}
 	return &CacheInfo{Path: path, SizeBytes: size, SizeHuman: humanBytes(size)}, nil
 }
 
-func dirSize(path string) int64 {
+// dirSize returns the total size in bytes of all files under path, walking
+// recursively.
+//
+// A root that doesn't exist at all is treated as a healthy, empty result
+// (0, nil) rather than an error -- that's the normal state of, say, brew's
+// download cache on a fresh install that's never downloaded anything, and
+// callers like GetCacheInfo should show "0 B", not an error banner, for it.
+// Any other failure (permission denied on the root or on a subpath partway
+// through the walk, an I/O error, etc) is returned rather than silently
+// swallowed, so a caller never mistakes a truncated partial total for the
+// true size.
+func dirSize(path string) (int64, error) {
+	if _, err := os.Stat(path); err != nil {
+		if os.IsNotExist(err) {
+			return 0, nil
+		}
+		return 0, err
+	}
+
 	var total int64
-	_ = filepath.Walk(path, func(_ string, info os.FileInfo, err error) error {
+	err := filepath.Walk(path, func(_ string, info os.FileInfo, err error) error {
 		if err != nil {
-			return nil
+			return err
 		}
 		if !info.IsDir() {
 			total += info.Size()
 		}
 		return nil
 	})
-	return total
+	if err != nil {
+		return 0, err
+	}
+	return total, nil
 }
 
 func humanBytes(b int64) string {

@@ -2,7 +2,7 @@ import { useEffect, useState, type SyntheticEvent } from 'react'
 import { api, TapDetail } from '../lib/api'
 import { useJobs } from '../context/JobsContext'
 import { useConfirm } from '../context/ConfirmContext'
-import { ChevronDownIcon, ExternalLinkIcon, TapIcon, TrashIcon } from '../components/Icons'
+import { ChevronDownIcon, ExternalLinkIcon, RefreshIcon, TapIcon, TrashIcon } from '../components/Icons'
 import ExternalLink from '../components/ExternalLink'
 
 interface Props {
@@ -15,6 +15,7 @@ export default function Taps({ refreshToken, bump }: Props) {
   const confirm = useConfirm()
   const [taps, setTaps] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [newTap, setNewTap] = useState('')
   const [adding, setAdding] = useState(false)
   const [rowBusy, setRowBusy] = useState<string | null>(null)
@@ -25,9 +26,11 @@ export default function Taps({ refreshToken, bump }: Props) {
 
   function load() {
     setLoading(true)
+    setError(null)
     api
       .taps()
       .then(setTaps)
+      .catch((e) => setError(String(e)))
       .finally(() => setLoading(false))
   }
 
@@ -69,7 +72,7 @@ export default function Taps({ refreshToken, bump }: Props) {
     const job = await runAction(() => api.tapRemove(name))
     setRowBusy(null)
     if (job.status === 'error') {
-      setRemoveError((prev) => ({ ...prev, [name]: job.error || 'Untap failed — it may still have installed formulae from it.' }))
+      setRemoveError((prev) => ({ ...prev, [name]: job.error || 'Untap failed. It may still have installed formulae from it.' }))
       return
     }
     load()
@@ -115,6 +118,16 @@ export default function Taps({ refreshToken, bump }: Props) {
       {loading ? (
         <div className="flex items-center gap-2 text-base-content/60">
           <span className="loading loading-spinner loading-sm" /> Loading…
+        </div>
+      ) : error ? (
+        <div className="alert alert-error alert-soft">
+          <div>
+            <div className="font-medium">Couldn't load taps</div>
+            <p className="text-sm mt-1">{error}</p>
+          </div>
+          <button className="btn btn-sm" onClick={load}>
+            <RefreshIcon className="size-4" /> Try again
+          </button>
         </div>
       ) : (
         <ul className="menu bg-base-200 rounded-box w-full">

@@ -11,13 +11,17 @@ export default function Adopt({ bump }: Props) {
   const { runAction } = useJobs()
   const [candidates, setCandidates] = useState<AdoptCandidate[] | null>(null)
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const [adopting, setAdopting] = useState<string | null>(null)
 
   async function scan() {
     setLoading(true)
+    setError(null)
     try {
       const results = await api.scanAdoptableApps()
       setCandidates(results)
+    } catch (e) {
+      setError(String(e))
     } finally {
       setLoading(false)
     }
@@ -46,15 +50,24 @@ export default function Adopt({ bump }: Props) {
 
       {loading && (
         <p className="text-sm text-base-content/50">
-          Checking each app against Homebrew's cask index — this can take a little while.
+          Checking each app against Homebrew's cask index. This can take a little while.
         </p>
+      )}
+
+      {error && !loading && (
+        <div className="alert alert-error alert-soft text-sm mb-4">
+          <div>
+            <div className="font-medium">Scan failed</div>
+            <p className="text-sm mt-1">{error}</p>
+          </div>
+        </div>
       )}
 
       {candidates && !loading && (
         <>
           {candidates.length === 0 ? (
             <div className="alert alert-success alert-soft text-sm">
-              Nothing to adopt — everything matched is already Homebrew-managed (or nothing matched a known cask).
+              Nothing to adopt. Everything matched is already Homebrew-managed (or nothing matched a known cask).
             </div>
           ) : (
             <div className="overflow-x-auto rounded-box border border-base-300">

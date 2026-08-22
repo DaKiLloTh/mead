@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api, MasApp } from '../lib/api'
 import { useJobs } from '../context/JobsContext'
-import { ArrowUpCircleIcon, DownloadIcon, StoreIcon } from '../components/Icons'
+import { ArrowUpCircleIcon, DownloadIcon, RefreshIcon, StoreIcon } from '../components/Icons'
 import ExternalLink from '../components/ExternalLink'
 
 export default function AppStore() {
@@ -10,11 +10,13 @@ export default function AppStore() {
   const [apps, setApps] = useState<MasApp[]>([])
   const [outdated, setOutdated] = useState<MasApp[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [rowBusy, setRowBusy] = useState<string | null>(null)
   const [installingMas, setInstallingMas] = useState(false)
 
   function load() {
     setLoading(true)
+    setError(null)
     api
       .masAvailable()
       .then(async (ok) => {
@@ -24,6 +26,7 @@ export default function AppStore() {
         setApps(list)
         setOutdated(out)
       })
+      .catch((e) => setError(String(e)))
       .finally(() => setLoading(false))
   }
 
@@ -58,7 +61,19 @@ export default function AppStore() {
         </div>
       )}
 
-      {!loading && available === false && (
+      {!loading && error && (
+        <div className="alert alert-error alert-soft">
+          <div>
+            <div className="font-medium">Couldn't check the App Store</div>
+            <p className="text-sm mt-1">{error}</p>
+          </div>
+          <button className="btn btn-sm" onClick={load}>
+            <RefreshIcon className="size-4" /> Try again
+          </button>
+        </div>
+      )}
+
+      {!loading && !error && available === false && (
         <div className="card bg-base-200">
           <div className="card-body">
             <h2 className="card-title text-base">
@@ -81,7 +96,7 @@ export default function AppStore() {
         </div>
       )}
 
-      {!loading && available && (
+      {!loading && !error && available && (
         <>
           <div className="flex items-center justify-between mb-3">
             <p className="text-sm text-base-content/60">
