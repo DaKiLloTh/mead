@@ -564,7 +564,7 @@ func GetSystemInfo(ctx context.Context) (*SystemInfo, error) {
 	prefixOut, _ := runBrew(ctx, "--prefix")
 	prefix := strings.TrimSpace(prefixOut)
 
-	info := &SystemInfo{
+	base := &SystemInfo{
 		BrewPath:    path,
 		BrewVersion: version,
 		Prefix:      prefix,
@@ -572,28 +572,47 @@ func GetSystemInfo(ctx context.Context) (*SystemInfo, error) {
 		Caskroom:    filepath.Join(prefix, "Caskroom"),
 	}
 
-	pkgs, err := ListInstalled(ctx)
-	if err == nil {
-		for _, p := range pkgs {
-			if p.IsCask {
-				info.InstalledCask++
-			} else {
-				info.InstalledForm++
-			}
-			if p.Deprecated {
-				info.DeprecatedCount++
-			}
-			if p.Disabled {
-				info.DisabledCount++
-			}
-			if p.Pinned {
-				info.PinnedCount++
-			}
+	pkgs, pkgsErr := ListInstalled(ctx)
+	outdated, outdatedErr := Outdated(ctx, false)
+
+	return buildSystemInfo(base, pkgs, pkgsErr, outdated, outdatedErr)
+}
+
+// buildSystemInfo is the pure decision logic behind GetSystemInfo: given the
+// already-populated base fields (brew path/version/prefix/etc, which come
+// from I/O that GetSystemInfo performs) plus the results (or errors) of the
+// ListInstalled and Outdated sub-calls, it decides what SystemInfo or error
+// to hand back.
+//
+// It deliberately returns an error instead of a fabricated zero-value
+// SystemInfo when a sub-call fails - a transient brew failure must not be
+// indistinguishable from "0 formulae installed, 0 casks installed, 0
+// outdated", which is what a genuinely empty, healthy system looks like.
+func buildSystemInfo(base *SystemInfo, installed []BrewPackage, installedErr error, outdated []OutdatedPackage, outdatedErr error) (*SystemInfo, error) {
+	if installedErr != nil {
+		return nil, fmt.Errorf("listing installed packages: %w", installedErr)
+	}
+	if outdatedErr != nil {
+		return nil, fmt.Errorf("checking outdated packages: %w", outdatedErr)
+	}
+
+	info := *base
+	for _, p := range installed {
+		if p.IsCask {
+			info.InstalledCask++
+		} else {
+			info.InstalledForm++
+		}
+		if p.Deprecated {
+			info.DeprecatedCount++
+		}
+		if p.Disabled {
+			info.DisabledCount++
+		}
+		if p.Pinned {
+			info.PinnedCount++
 		}
 	}
-	outdated, err := Outdated(ctx, false)
-	if err == nil {
-		info.OutdatedCount = len(outdated)
-	}
-	return info, nil
+	info.OutdatedCount = len(outdated)
+	return &info, nil
 }
