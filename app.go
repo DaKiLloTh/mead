@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
@@ -64,8 +65,8 @@ func (a *App) GetInfo(name string, isCask bool) (*BrewPackage, error) {
 	return GetInfo(a.ctx, name, isCask)
 }
 
-func (a *App) Search(query string) ([]SearchResult, error) {
-	return Search(a.ctx, query)
+func (a *App) Search(query string, desc bool) ([]SearchResult, error) {
+	return Search(a.ctx, query, desc)
 }
 
 func (a *App) Outdated(greedy bool) ([]OutdatedPackage, error) {
@@ -107,19 +108,30 @@ func (a *App) Config() (string, error) {
 // ---- streaming (long-running) actions; each returns a job id, and the
 // frontend subscribes to job:start / job:output / job:done events ----
 
+// caskFlags returns the flags to append for a cask-touching command,
+// including --appdir if the user has set a custom cask install directory in
+// Settings.
+func (a *App) caskFlags() []string {
+	flags := []string{"--cask"}
+	if dir := a.store.CaskAppDir(); dir != "" {
+		flags = append(flags, "--appdir="+dir)
+	}
+	return flags
+}
+
 func (a *App) Install(name string, isCask bool) string {
 	if err := validName(name); err != nil {
 		return a.jobs.Fail(fmt.Sprintf("Install %s", name), err.Error())
 	}
 	args := []string{"install"}
 	if isCask {
-		args = append(args, "--cask")
+		args = append(args, a.caskFlags()...)
 	}
 	args = append(args, name)
 	return a.jobs.StartTracked(fmt.Sprintf("Install %s", name), a.record("install", name, isCask), args...)
 }
 
-func (a *App) Uninstall(name string, isCask bool, zap bool) string {
+func (a *App) Uninstall(name string, isCask bool, zap bool, force bool) string {
 	if err := validName(name); err != nil {
 		return a.jobs.Fail(fmt.Sprintf("Uninstall %s", name), err.Error())
 	}
@@ -130,10 +142,18 @@ func (a *App) Uninstall(name string, isCask bool, zap bool) string {
 			args = append(args, "--zap")
 		}
 	}
+	if force {
+		args = append(args, "--force")
+	}
 	args = append(args, name)
 	title := fmt.Sprintf("Uninstall %s", name)
-	if zap {
+	switch {
+	case zap && force:
+		title = fmt.Sprintf("Uninstall %s (all versions, and its data)", name)
+	case zap:
 		title = fmt.Sprintf("Uninstall %s (and its data)", name)
+	case force:
+		title = fmt.Sprintf("Uninstall %s (all versions)", name)
 	}
 	return a.jobs.StartTracked(title, a.record("uninstall", name, isCask), args...)
 }
@@ -144,7 +164,7 @@ func (a *App) Reinstall(name string, isCask bool) string {
 	}
 	args := []string{"reinstall"}
 	if isCask {
-		args = append(args, "--cask")
+		args = append(args, a.caskFlags()...)
 	}
 	args = append(args, name)
 	return a.jobs.StartTracked(fmt.Sprintf("Reinstall %s", name), a.record("reinstall", name, isCask), args...)
@@ -156,7 +176,7 @@ func (a *App) Upgrade(name string, isCask bool) string {
 	}
 	args := []string{"upgrade"}
 	if isCask {
-		args = append(args, "--cask")
+		args = append(args, a.caskFlags()...)
 	}
 	args = append(args, name)
 	return a.jobs.StartTracked(fmt.Sprintf("Upgrade %s", name), a.record("upgrade", name, isCask), args...)
@@ -219,6 +239,25 @@ func (a *App) Unpin(name string) string {
 	return a.jobs.StartTracked(fmt.Sprintf("Unpin %s", name), a.record("unpin", name, false), "unpin", name)
 }
 
+func (a *App) Link(name string, overwrite bool) string {
+	if err := validName(name); err != nil {
+		return a.jobs.Fail(fmt.Sprintf("Link %s", name), err.Error())
+	}
+	args := []string{"link"}
+	if overwrite {
+		args = append(args, "--overwrite", "--force")
+	}
+	args = append(args, name)
+	return a.jobs.StartTracked(fmt.Sprintf("Link %s", name), a.record("link", name, false), args...)
+}
+
+func (a *App) Unlink(name string) string {
+	if err := validName(name); err != nil {
+		return a.jobs.Fail(fmt.Sprintf("Unlink %s", name), err.Error())
+	}
+	return a.jobs.StartTracked(fmt.Sprintf("Unlink %s", name), a.record("unlink", name, false), "unlink", name)
+}
+
 func (a *App) TapAdd(name string) string {
 	if err := validName(name); err != nil {
 		return a.jobs.Fail(fmt.Sprintf("Tap %s", name), err.Error())
@@ -231,6 +270,19 @@ func (a *App) TapRemove(name string) string {
 		return a.jobs.Fail(fmt.Sprintf("Untap %s", name), err.Error())
 	}
 	return a.jobs.StartTracked(fmt.Sprintf("Untap %s", name), a.record("untap", name, false), "untap", name)
+}
+
+// TapRemoveForce is offered as a retry when a plain untap fails because the
+// tap still has installed formulae from it.
+func (a *App) TapRemoveForce(name string) string {
+	if err := validName(name); err != nil {
+		return a.jobs.Fail(fmt.Sprintf("Untap %s", name), err.Error())
+	}
+	return a.jobs.StartTracked(fmt.Sprintf("Force untap %s", name), a.record("untap", name, false), "untap", "--force", name)
+}
+
+func (a *App) TapInfo(name string) (*TapDetail, error) {
+	return TapInfo(a.ctx, name)
 }
 
 func (a *App) ServiceStart(name string) string {
@@ -252,6 +304,10 @@ func (a *App) ServiceRestart(name string) string {
 		return a.jobs.Fail(fmt.Sprintf("Restart service %s", name), err.Error())
 	}
 	return a.jobs.Start(fmt.Sprintf("Restart service %s", name), "services", "restart", name)
+}
+
+func (a *App) ServicesCleanup() string {
+	return a.jobs.Start("Clean up unused services", "services", "cleanup")
 }
 
 func (a *App) CancelJob(id string) bool {
@@ -286,6 +342,39 @@ func (a *App) UnsnoozePackage(name string, isCask bool) error {
 
 func (a *App) ClearHistory() error {
 	return a.store.ClearHistory()
+}
+
+func (a *App) SetCaskAppDir(dir string) error {
+	return a.store.SetCaskAppDir(strings.TrimSpace(dir))
+}
+
+// ClearAllData wipes favorites/tags/notes/snoozes/history but keeps
+// app-level Settings (e.g. the cask install directory).
+func (a *App) ClearAllData() error {
+	return a.store.ClearAll()
+}
+
+func (a *App) RevealLocalDataFile() error {
+	return RevealInFinder(a.ctx, a.store.path)
+}
+
+// ---- Homebrew's own analytics preference (distinct from the per-command
+// HOMEBREW_NO_ANALYTICS suppression in brewEnv, which only affects mead's
+// own invocations) ----
+
+func (a *App) AnalyticsState() (string, error) {
+	return runBrew(a.ctx, "analytics")
+}
+
+func (a *App) AnalyticsSetEnabled(enabled bool) string {
+	if enabled {
+		return a.jobs.Start("Enable Homebrew analytics", "analytics", "on")
+	}
+	return a.jobs.Start("Disable Homebrew analytics", "analytics", "off")
+}
+
+func (a *App) AnalyticsRegenerateUUID() string {
+	return a.jobs.Start("Regenerate analytics ID", "analytics", "regenerate-uuid")
 }
 
 // ---- security ----
@@ -324,6 +413,38 @@ func (a *App) RemoveQuarantine(appPath string) error {
 		return err
 	}
 	return nil
+}
+
+// CreateSnapshot is a synchronous safety net -- an instant local APFS
+// snapshot, not a full Time Machine backup -- offered as an opt-in checkbox
+// before destructive operations (force-uninstall, Brewfile cleanup).
+func (a *App) CreateSnapshot() error {
+	return CreateLocalSnapshot(a.ctx)
+}
+
+// RevealPackage opens Finder at an installed package's location -- the .app
+// for a cask, or its Cellar keg directory for a formula.
+func (a *App) RevealPackage(name string, isCask bool) error {
+	pkg, err := GetInfo(a.ctx, name, isCask)
+	if err != nil {
+		return err
+	}
+	if isCask {
+		appPath := resolveCaskAppPath(pkg)
+		if appPath == "" {
+			return fmt.Errorf("couldn't find an installed .app for %s", name)
+		}
+		return RevealInFinder(a.ctx, appPath)
+	}
+	if !pkg.Installed {
+		return fmt.Errorf("%s isn't installed", name)
+	}
+	prefixOut, err := runBrew(a.ctx, "--prefix")
+	if err != nil {
+		return err
+	}
+	kegPath := filepath.Join(strings.TrimSpace(prefixOut), "Cellar", name, pkg.InstalledVersion)
+	return RevealInFinder(a.ctx, kegPath)
 }
 
 // GistLogs uploads a formula's most recent build/install logs to a GitHub
@@ -421,4 +542,27 @@ func (a *App) ImportBrewfile() string {
 		return a.jobs.Fail("Import Brewfile", "cancelled")
 	}
 	return a.jobs.Start("Import Brewfile", "bundle", "install", "--file="+path)
+}
+
+// PickBrewfile opens a native file picker and returns the chosen path (empty
+// string if cancelled), for the Check/List/Cleanup flows below which all
+// operate against a single Brewfile the user selects once.
+func (a *App) PickBrewfile() (string, error) {
+	return runtime.OpenFileDialog(a.ctx, runtime.OpenDialogOptions{Title: "Select a Brewfile"})
+}
+
+func (a *App) BundleCheck(path string) (string, error) {
+	return BundleCheck(a.ctx, path)
+}
+
+func (a *App) BundleList(path string) (string, error) {
+	return BundleList(a.ctx, path)
+}
+
+func (a *App) BundleCleanupPreview(path string) ([]BundleCleanupItem, error) {
+	return BundleCleanupPreview(a.ctx, path)
+}
+
+func (a *App) BundleCleanup(path string) string {
+	return a.jobs.Start("Brewfile cleanup", "bundle", "cleanup", "--force", "--file="+path)
 }

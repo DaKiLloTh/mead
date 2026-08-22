@@ -2,6 +2,7 @@ import type { ReactElement } from 'react'
 import {
   ClockIcon,
   DashboardIcon,
+  GearIcon,
   GridIcon,
   ImportIcon,
   LayersIcon,
@@ -27,6 +28,7 @@ export type ViewKey =
   | 'security'
   | 'maintenance'
   | 'history'
+  | 'settings'
 
 interface NavItem {
   key: ViewKey
@@ -108,6 +110,21 @@ export default function Sidebar({ view, onSelect, outdatedCount }: Props) {
           })}
         </ul>
       ))}
+      <div className="flex-1" />
+      <ul className="menu p-2 gap-0.5">
+        <li>
+          <a
+            className={view === 'settings' ? 'menu-active' : ''}
+            onClick={(e) => {
+              e.preventDefault()
+              onSelect('settings')
+            }}
+          >
+            <GearIcon className="size-4" />
+            Settings
+          </a>
+        </li>
+      </ul>
     </div>
   )
 }

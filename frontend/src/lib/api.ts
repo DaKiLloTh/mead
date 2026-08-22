@@ -16,15 +16,18 @@ export type DuplicateApp = main.DuplicateApp
 export type MasApp = main.MasApp
 export type Collection = main.Collection
 export type CollectionPackage = main.CollectionPackage
+export type TapDetail = main.TapDetail
+export type BundleCleanupItem = main.BundleCleanupItem
 
 export const api = {
   getSystemInfo: () => App.GetSystemInfo(),
   listInstalled: () => App.ListInstalled(),
   getInfo: (name: string, isCask: boolean) => App.GetInfo(name, isCask),
-  search: (query: string) => App.Search(query),
+  search: (query: string, desc = false) => App.Search(query, desc),
   outdated: (greedy = false) => App.Outdated(greedy),
   missing: () => App.Missing(),
   taps: () => App.Taps(),
+  tapInfo: (name: string) => App.TapInfo(name),
   services: () => App.Services(),
   leaves: () => App.Leaves(),
   uses: (name: string) => App.Uses(name),
@@ -33,7 +36,7 @@ export const api = {
   config: () => App.Config(),
 
   install: (name: string, isCask: boolean) => App.Install(name, isCask),
-  uninstall: (name: string, isCask: boolean, zap = false) => App.Uninstall(name, isCask, zap),
+  uninstall: (name: string, isCask: boolean, zap = false, force = false) => App.Uninstall(name, isCask, zap, force),
   reinstall: (name: string, isCask: boolean) => App.Reinstall(name, isCask),
   upgrade: (name: string, isCask: boolean) => App.Upgrade(name, isCask),
   upgradeAll: (greedy = false) => App.UpgradeAll(greedy),
@@ -42,11 +45,15 @@ export const api = {
   doctor: () => App.Doctor(),
   pin: (name: string) => App.Pin(name),
   unpin: (name: string) => App.Unpin(name),
+  link: (name: string, overwrite = false) => App.Link(name, overwrite),
+  unlink: (name: string) => App.Unlink(name),
   tapAdd: (name: string) => App.TapAdd(name),
   tapRemove: (name: string) => App.TapRemove(name),
+  tapRemoveForce: (name: string) => App.TapRemoveForce(name),
   serviceStart: (name: string) => App.ServiceStart(name),
   serviceStop: (name: string) => App.ServiceStop(name),
   serviceRestart: (name: string) => App.ServiceRestart(name),
+  servicesCleanup: () => App.ServicesCleanup(),
   cancelJob: (id: string) => App.CancelJob(id),
 
   autoremove: (dryRun: boolean) => App.Autoremove(dryRun),
@@ -84,8 +91,25 @@ export const api = {
   // brewfile
   exportBrewfileToFile: () => App.ExportBrewfileToFile(),
   importBrewfile: () => App.ImportBrewfile(),
+  pickBrewfile: () => App.PickBrewfile(),
+  bundleCheck: (path: string) => App.BundleCheck(path),
+  bundleList: (path: string) => App.BundleList(path),
+  bundleCleanupPreview: (path: string) => App.BundleCleanupPreview(path),
+  bundleCleanup: (path: string) => App.BundleCleanup(path),
 
   gistLogs: (name: string) => App.GistLogs(name),
+
+  // reveal / snapshot
+  revealPackage: (name: string, isCask: boolean) => App.RevealPackage(name, isCask),
+  revealLocalDataFile: () => App.RevealLocalDataFile(),
+  createSnapshot: () => App.CreateSnapshot(),
+
+  // settings
+  setCaskAppDir: (dir: string) => App.SetCaskAppDir(dir),
+  clearAllData: () => App.ClearAllData(),
+  analyticsState: () => App.AnalyticsState(),
+  analyticsSetEnabled: (enabled: boolean) => App.AnalyticsSetEnabled(enabled),
+  analyticsRegenerateUUID: () => App.AnalyticsRegenerateUUID(),
 }
 
 export function pkgKey(name: string, isCask: boolean): string {

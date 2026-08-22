@@ -31,7 +31,7 @@ interface Props {
 type Tab = 'overview' | 'deps' | 'security'
 
 export default function PackageDetailModal({ target, onClose, onChanged }: Props) {
-  const { runAction } = useJobs()
+  const { runAction, notify } = useJobs()
   const confirm = useConfirm()
   const userData = useUserData()
   const [pkg, setPkg] = useState<BrewPackage | null>(null)
@@ -134,17 +134,40 @@ export default function PackageDetailModal({ target, onClose, onChanged }: Props
   }
 
   async function doUninstall() {
-    if (!target) return
-    const { ok, checked: zap } = await confirm({
+    if (!target || !pkg) return
+    const checkboxes: { label: string }[] = []
+    const zapIdx = target.isCask ? checkboxes.push({ label: 'Also remove app data (preferences, caches, support files)' }) - 1 : -1
+    const forceIdx = checkboxes.push({ label: 'Remove all installed versions' }) - 1
+    const snapshotIdx = checkboxes.push({ label: 'Create a local safety snapshot first (Time Machine)' }) - 1
+
+    const zapTrashPaths = pkg.zapTrashPaths ?? []
+    const body =
+      target.isCask && zapTrashPaths.length > 0
+        ? `This removes the package (and its keg/app) from your system. Checking "remove app data" also trashes:\n${zapTrashPaths.join('\n')}`
+        : 'This removes the package (and its keg/app) from your system.'
+
+    const { ok, checked } = await confirm({
       title: `Uninstall ${target.name}?`,
-      body: 'This removes the package (and its keg/app) from your system.',
+      body,
       confirmLabel: 'Uninstall',
       danger: true,
-      checkbox: target.isCask ? { label: 'Also remove app data (preferences, caches, support files)' } : undefined,
+      checkboxes,
     })
     if (!ok) return
+    const zap = zapIdx >= 0 && checked[zapIdx]
+    const force = checked[forceIdx]
+    const snapshot = checked[snapshotIdx]
+
     setBusy(true)
-    await runAction(() => api.uninstall(target.name, target.isCask, zap))
+    if (snapshot) {
+      try {
+        await api.createSnapshot()
+        notify('success', 'Local snapshot created')
+      } catch (e) {
+        notify('error', String(e))
+      }
+    }
+    await runAction(() => api.uninstall(target.name, target.isCask, zap, force))
     setBusy(false)
     refresh()
   }
@@ -163,6 +186,23 @@ export default function PackageDetailModal({ target, onClose, onChanged }: Props
     await runAction(() => (pkg.pinned ? api.unpin(target.name) : api.pin(target.name)))
     setBusy(false)
     refresh()
+  }
+
+  async function doLinkToggle() {
+    if (!target || !pkg) return
+    setBusy(true)
+    await runAction(() => (pkg.linked ? api.unlink(target.name) : api.link(target.name, true)))
+    setBusy(false)
+    refresh()
+  }
+
+  async function doReveal() {
+    if (!target) return
+    try {
+      await api.revealPackage(target.name, target.isCask)
+    } catch (e) {
+      notify('error', String(e))
+    }
   }
 
   const tags = target ? userData.tagsFor(target.name, target.isCask) : []
@@ -220,8 +260,12 @@ export default function PackageDetailModal({ target, onClose, onChanged }: Props
                   {pkg.installed && <span className="badge badge-sm badge-success badge-outline">installed</span>}
                   {pkg.outdated && <span className="badge badge-sm badge-warning badge-outline">outdated</span>}
                   {pkg.pinned && <span className="badge badge-sm badge-outline">pinned</span>}
+                  {!pkg.isCask && pkg.installed && !pkg.linked && (
+                    <span className="badge badge-sm badge-warning badge-outline">unlinked</span>
+                  )}
                   {pkg.deprecated && <span className="badge badge-sm badge-error badge-outline">deprecated</span>}
                   {pkg.kegOnly && <span className="badge badge-sm badge-ghost">keg-only</span>}
+                  {pkg.isCask && pkg.autoUpdates && <span className="badge badge-sm badge-ghost">auto-updates</span>}
                   {tags.map((t) => (
                     <span key={t} className="badge badge-sm badge-neutral gap-1">
                       {t}
@@ -258,6 +302,11 @@ export default function PackageDetailModal({ target, onClose, onChanged }: Props
                 >
                   Homepage <ExternalLinkIcon className="size-3" />
                 </a>
+              )}
+              {pkg.installed && (
+                <button className="link link-hover" onClick={doReveal}>
+                  Reveal in Finder
+                </button>
               )}
             </div>
 
@@ -314,7 +363,7 @@ export default function PackageDetailModal({ target, onClose, onChanged }: Props
                 {pkg.caveats && (
                   <div className="alert alert-warning alert-soft text-xs whitespace-pre-wrap">{pkg.caveats}</div>
                 )}
-                {pkg.isCask && !pkg.installed && pkg.artifacts.length > 0 && (
+                {pkg.isCask && !pkg.installed && (pkg.artifacts?.length ?? 0) > 0 && (
                   <div>
                     <div className="font-medium text-xs uppercase text-base-content/50 mb-1">
                       What this installs
@@ -344,12 +393,24 @@ export default function PackageDetailModal({ target, onClose, onChanged }: Props
                     )}
                   </div>
                 )}
-                {pkg.dependencies.length > 0 && (
+                {(pkg.dependencies?.length ?? 0) > 0 && (
                   <div>
                     <div className="font-medium text-xs uppercase text-base-content/50 mb-1">Depends on</div>
                     <div className="flex flex-wrap gap-1">
                       {pkg.dependencies.map((d) => (
                         <span key={d} className="badge badge-ghost badge-sm">
+                          {d}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {(pkg.conflictsWith?.length ?? 0) > 0 && (
+                  <div>
+                    <div className="font-medium text-xs uppercase text-base-content/50 mb-1">Conflicts with</div>
+                    <div className="flex flex-wrap gap-1">
+                      {pkg.conflictsWith.map((d) => (
+                        <span key={d} className="badge badge-error badge-outline badge-sm">
                           {d}
                         </span>
                       ))}
@@ -422,6 +483,11 @@ export default function PackageDetailModal({ target, onClose, onChanged }: Props
             )}
 
             <div className="modal-action">
+              {!pkg.isCask && pkg.installed && (
+                <button className="btn btn-sm" disabled={busy} onClick={doLinkToggle}>
+                  <RefreshIcon className="size-4" /> {pkg.linked ? 'Unlink' : 'Link'}
+                </button>
+              )}
               {!pkg.isCask && pkg.installed && (
                 <button className="btn btn-sm" disabled={busy} onClick={doPinToggle}>
                   <PinIcon className="size-4" /> {pkg.pinned ? 'Unpin' : 'Pin'}

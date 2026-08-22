@@ -11,12 +11,12 @@ interface ConfirmOptions {
   confirmLabel?: string
   cancelLabel?: string
   danger?: boolean
-  checkbox?: ConfirmCheckbox
+  checkboxes?: ConfirmCheckbox[]
 }
 
 interface ConfirmResult {
   ok: boolean
-  checked: boolean
+  checked: boolean[]
 }
 
 interface PendingConfirm extends ConfirmOptions {
@@ -33,10 +33,10 @@ export function useConfirm() {
 
 export function ConfirmProvider({ children }: { children: React.ReactNode }) {
   const [pending, setPending] = useState<PendingConfirm | null>(null)
-  const [checked, setChecked] = useState(false)
+  const [checked, setChecked] = useState<boolean[]>([])
 
   const confirm = useCallback((opts: ConfirmOptions) => {
-    setChecked(opts.checkbox?.defaultChecked ?? false)
+    setChecked((opts.checkboxes ?? []).map((c) => c.defaultChecked ?? false))
     return new Promise<ConfirmResult>((resolve) => {
       setPending({ ...opts, resolve })
     })
@@ -54,17 +54,23 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
         <div className="modal-box">
           <h3 className="font-bold text-lg">{pending?.title}</h3>
           {pending?.body && <p className="py-3 text-sm text-base-content/70">{pending.body}</p>}
-          {pending?.checkbox && (
-            <label className="label cursor-pointer justify-start gap-2 mt-1">
+          {pending?.checkboxes?.map((cb, i) => (
+            <label key={i} className="label cursor-pointer justify-start gap-2 mt-1">
               <input
                 type="checkbox"
                 className="checkbox checkbox-sm"
-                checked={checked}
-                onChange={(e) => setChecked(e.target.checked)}
+                checked={checked[i] ?? false}
+                onChange={(e) =>
+                  setChecked((prev) => {
+                    const next = [...prev]
+                    next[i] = e.target.checked
+                    return next
+                  })
+                }
               />
-              <span className="label-text">{pending.checkbox.label}</span>
+              <span className="label-text">{cb.label}</span>
             </label>
-          )}
+          ))}
           <div className="modal-action">
             <button className="btn" onClick={() => close(false)}>
               {pending?.cancelLabel ?? 'Cancel'}

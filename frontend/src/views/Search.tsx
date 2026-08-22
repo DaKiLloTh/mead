@@ -20,6 +20,7 @@ export default function Search({ refreshToken, bump }: Props) {
   const [detail, setDetail] = useState<DetailTarget | null>(null)
   const [installedKeys, setInstalledKeys] = useState<Set<string>>(new Set())
   const [rowBusy, setRowBusy] = useState<string | null>(null)
+  const [searchDesc, setSearchDesc] = useState(false)
 
   useEffect(() => {
     api
@@ -37,13 +38,13 @@ export default function Search({ refreshToken, bump }: Props) {
     setLoading(true)
     const handle = setTimeout(() => {
       api
-        .search(q)
+        .search(q, searchDesc)
         .then(setResults)
         .catch(() => setResults([]))
         .finally(() => setLoading(false))
     }, 300)
     return () => clearTimeout(handle)
-  }, [query])
+  }, [query, searchDesc])
 
   const filtered = useMemo(() => {
     if (!results) return []
@@ -78,6 +79,16 @@ export default function Search({ refreshToken, bump }: Props) {
           onChange={(e) => setQuery(e.target.value)}
         />
         {loading && <span className="loading loading-spinner loading-xs" />}
+      </label>
+
+      <label className="label cursor-pointer gap-2 text-sm w-fit mb-4">
+        <input
+          type="checkbox"
+          className="checkbox checkbox-sm"
+          checked={searchDesc}
+          onChange={(e) => setSearchDesc(e.target.checked)}
+        />
+        <span className="label-text">Search descriptions too</span>
       </label>
 
       {results && (

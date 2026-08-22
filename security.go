@@ -180,3 +180,33 @@ func resolveCaskAppPath(pkg *BrewPackage) string {
 	}
 	return ""
 }
+
+// CreateLocalSnapshot creates an instant local APFS snapshot of the boot
+// volume via `tmutil localsnapshot` -- a lightweight safety net before a
+// destructive operation. It does not require an external Time Machine disk;
+// restoring from it is a normal macOS flow (Finder > right-click a folder >
+// "Browse Time Machine snapshots...", or Recovery Mode), which mead doesn't
+// reimplement.
+func CreateLocalSnapshot(ctx context.Context) error {
+	out, err := runCmd(ctx, "tmutil", "localsnapshot")
+	if err != nil {
+		msg := strings.TrimSpace(out)
+		if msg == "" {
+			msg = err.Error()
+		}
+		return fmt.Errorf("couldn't create a local snapshot: %s", msg)
+	}
+	return nil
+}
+
+// RevealInFinder opens Finder with the given path selected, via `open -R`.
+func RevealInFinder(ctx context.Context, path string) error {
+	if path == "" {
+		return fmt.Errorf("no path to reveal")
+	}
+	if _, err := os.Stat(path); err != nil {
+		return fmt.Errorf("not found: %s", path)
+	}
+	_, err := runCmd(ctx, "open", "-R", path)
+	return err
+}

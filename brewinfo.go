@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 )
@@ -85,19 +86,20 @@ func decodeInfoV2(data []byte) ([]BrewPackage, error) {
 
 func formulaToPackage(f map[string]interface{}) BrewPackage {
 	p := BrewPackage{
-		Name:         mGetString(f, "name"),
-		FullName:     mGetString(f, "full_name"),
-		IsCask:       false,
-		Tap:          mGetString(f, "tap"),
-		Desc:         mGetString(f, "desc"),
-		Homepage:     mGetString(f, "homepage"),
-		License:      mGetString(f, "license"),
-		Outdated:     mGetBool(f, "outdated"),
-		Pinned:       mGetBool(f, "pinned"),
-		Deprecated:   mGetBool(f, "deprecated"),
-		Disabled:     mGetBool(f, "disabled"),
-		KegOnly:      mGetBool(f, "keg_only"),
-		Dependencies: mGetStringSlice(f, "dependencies"),
+		Name:          mGetString(f, "name"),
+		FullName:      mGetString(f, "full_name"),
+		IsCask:        false,
+		Tap:           mGetString(f, "tap"),
+		Desc:          mGetString(f, "desc"),
+		Homepage:      mGetString(f, "homepage"),
+		License:       mGetString(f, "license"),
+		Outdated:      mGetBool(f, "outdated"),
+		Pinned:        mGetBool(f, "pinned"),
+		Deprecated:    mGetBool(f, "deprecated"),
+		Disabled:      mGetBool(f, "disabled"),
+		KegOnly:       mGetBool(f, "keg_only"),
+		Dependencies:  mGetStringSlice(f, "dependencies"),
+		ConflictsWith: mGetStringSlice(f, "conflicts_with"),
 	}
 	if caveats := f["caveats"]; caveats != nil {
 		if s, ok := caveats.(string); ok {
@@ -115,23 +117,27 @@ func formulaToPackage(f map[string]interface{}) BrewPackage {
 			p.InstalledAsDependency = mGetBool(last, "installed_as_dependency")
 		}
 	}
+	if linkedKeg := mGetString(f, "linked_keg"); linkedKeg != "" {
+		p.Linked = linkedKeg == p.InstalledVersion
+	}
 	return p
 }
 
 func caskToPackage(c map[string]interface{}) BrewPackage {
 	p := BrewPackage{
-		Name:         mGetString(c, "token"),
-		FullName:     mGetString(c, "full_token"),
-		IsCask:       true,
-		Tap:          mGetString(c, "tap"),
-		Desc:         mGetString(c, "desc"),
-		Homepage:     mGetString(c, "homepage"),
-		Version:      mGetString(c, "version"),
-		Outdated:     mGetBool(c, "outdated"),
-		Deprecated:   mGetBool(c, "deprecated"),
-		Disabled:     mGetBool(c, "disabled"),
-		AutoUpdates:  mGetBool(c, "auto_updates"),
-		Dependencies: []string{},
+		Name:          mGetString(c, "token"),
+		FullName:      mGetString(c, "full_token"),
+		IsCask:        true,
+		Tap:           mGetString(c, "tap"),
+		Desc:          mGetString(c, "desc"),
+		Homepage:      mGetString(c, "homepage"),
+		Version:       mGetString(c, "version"),
+		Outdated:      mGetBool(c, "outdated"),
+		Deprecated:    mGetBool(c, "deprecated"),
+		Disabled:      mGetBool(c, "disabled"),
+		AutoUpdates:   mGetBool(c, "auto_updates"),
+		Dependencies:  []string{},
+		ConflictsWith: []string{},
 	}
 	if names := mGetStringSlice(c, "name"); len(names) > 0 {
 		p.FullName = names[0]
@@ -151,14 +157,19 @@ func caskToPackage(c map[string]interface{}) BrewPackage {
 		p.Dependencies = append(p.Dependencies, mGetStringSlice(dependsOn, "formula")...)
 		p.Dependencies = append(p.Dependencies, mGetStringSlice(dependsOn, "cask")...)
 	}
-	p.Artifacts, p.AppPaths = parseCaskArtifacts(mGetArr(c, "artifacts"))
+	p.Artifacts, p.AppPaths, p.ZapTrashPaths = parseCaskArtifacts(mGetArr(c, "artifacts"))
 	return p
 }
 
 // parseCaskArtifacts turns brew's heterogeneous "artifacts" array into
-// human-readable labels and, separately, any /Applications/*.app paths it
-// installs (used for security inspection and quarantine removal).
-func parseCaskArtifacts(artifacts []interface{}) (labels []string, appPaths []string) {
+// human-readable labels, any /Applications/*.app paths it installs (used for
+// security inspection and quarantine removal), and the paths its `zap`
+// stanza would trash on uninstall --zap (shown to the user before they
+// opt into that).
+func parseCaskArtifacts(artifacts []interface{}) (labels []string, appPaths []string, zapPaths []string) {
+	labels = []string{}
+	appPaths = []string{}
+	zapPaths = []string{}
 	for _, raw := range artifacts {
 		entry, ok := raw.(map[string]interface{})
 		if !ok {
@@ -183,10 +194,18 @@ func parseCaskArtifacts(artifacts []interface{}) (labels []string, appPaths []st
 				for _, name := range interfaceStringSlice(val) {
 					labels = append(labels, "Man page: "+name)
 				}
+			case "zap":
+				if zapArr, ok := val.([]interface{}); ok {
+					for _, ze := range zapArr {
+						if zm, ok := ze.(map[string]interface{}); ok {
+							zapPaths = append(zapPaths, mGetStringSlice(zm, "trash")...)
+						}
+					}
+				}
 			}
 		}
 	}
-	return labels, appPaths
+	return labels, appPaths, zapPaths
 }
 
 // interfaceStringSlice normalizes a JSON value that may be a bare string or
@@ -250,31 +269,49 @@ func GetInfo(ctx context.Context, name string, isCask bool) (*BrewPackage, error
 }
 
 // Search runs `brew search` for both formulae and casks and merges results.
-func Search(ctx context.Context, query string) ([]SearchResult, error) {
+func Search(ctx context.Context, query string, desc bool) ([]SearchResult, error) {
 	q := strings.TrimSpace(query)
 	if q == "" {
 		return []SearchResult{}, nil
 	}
 	results := []SearchResult{}
+	seen := map[string]bool{}
 
-	formulaLines, err := runBrewLines(ctx, "search", "--formula", q)
-	if err == nil {
-		for _, l := range formulaLines {
+	add := func(lines []string, isCask bool) {
+		for _, l := range lines {
 			if isSearchNoise(l) {
 				continue
 			}
-			results = append(results, SearchResult{Name: l, IsCask: false})
+			name := l
+			if desc {
+				// `--desc` lines look like "name: description text"
+				if i := strings.Index(l, ":"); i >= 0 {
+					name = strings.TrimSpace(l[:i])
+				}
+			}
+			key := pkgKey(name, isCask)
+			if seen[key] {
+				continue
+			}
+			seen[key] = true
+			results = append(results, SearchResult{Name: name, IsCask: isCask})
 		}
 	}
 
-	caskLines, err := runBrewLines(ctx, "search", "--cask", q)
-	if err == nil {
-		for _, l := range caskLines {
-			if isSearchNoise(l) {
-				continue
-			}
-			results = append(results, SearchResult{Name: l, IsCask: true})
-		}
+	formulaArgs := []string{"search", "--formula"}
+	caskArgs := []string{"search", "--cask"}
+	if desc {
+		formulaArgs = append(formulaArgs, "--desc")
+		caskArgs = append(caskArgs, "--desc")
+	}
+	formulaArgs = append(formulaArgs, q)
+	caskArgs = append(caskArgs, q)
+
+	if lines, err := runBrewLines(ctx, formulaArgs...); err == nil {
+		add(lines, false)
+	}
+	if lines, err := runBrewLines(ctx, caskArgs...); err == nil {
+		add(lines, true)
 	}
 
 	return results, nil
@@ -332,6 +369,34 @@ func Outdated(ctx context.Context, greedy bool) ([]OutdatedPackage, error) {
 // Taps lists installed taps.
 func Taps(ctx context.Context) ([]string, error) {
 	return runBrewLines(ctx, "tap")
+}
+
+// TapInfo fetches detail (remote URL, formula/cask counts) for a single tap.
+func TapInfo(ctx context.Context, name string) (*TapDetail, error) {
+	if err := validName(name); err != nil {
+		return nil, err
+	}
+	out, err := runBrew(ctx, "tap-info", "--json", name)
+	if err != nil {
+		return nil, err
+	}
+	var raw []map[string]interface{}
+	if err := json.Unmarshal([]byte(out), &raw); err != nil {
+		return nil, fmt.Errorf("parsing brew tap-info output: %w", err)
+	}
+	if len(raw) == 0 {
+		return nil, fmt.Errorf("no such tap: %s", name)
+	}
+	t := raw[0]
+	return &TapDetail{
+		Name:         mGetString(t, "name"),
+		Installed:    mGetBool(t, "installed"),
+		Official:     mGetBool(t, "official"),
+		Remote:       mGetString(t, "remote"),
+		FormulaCount: len(mGetArr(t, "formula_names")),
+		CaskCount:    len(mGetArr(t, "cask_tokens")),
+		LastCommit:   mGetString(t, "last_commit"),
+	}, nil
 }
 
 // Services lists brew services.
@@ -439,6 +504,53 @@ func humanBytes(b int64) string {
 // Config returns the raw `brew config` diagnostic text.
 func Config(ctx context.Context) (string, error) {
 	return runBrew(ctx, "config")
+}
+
+// BundleCheck reports whether a Brewfile's dependencies are all installed.
+func BundleCheck(ctx context.Context, path string) (string, error) {
+	out, err := runBrew(ctx, "bundle", "check", "--verbose", "--file="+path)
+	if err != nil {
+		// `bundle check` exits non-zero when unsatisfied; that's the answer,
+		// not a failure to report.
+		return out, nil
+	}
+	return out, nil
+}
+
+// BundleList lists everything a Brewfile declares.
+func BundleList(ctx context.Context, path string) (string, error) {
+	return runBrew(ctx, "bundle", "list", "--all", "--file="+path)
+}
+
+// bundleCleanupSectionRe matches the section headers `brew bundle cleanup`
+// prints before each group of names, e.g. "Would uninstall casks:".
+var bundleCleanupSectionRe = regexp.MustCompile(`^Would uninstall (formulae|casks):$`)
+
+// BundleCleanupPreview runs `brew bundle cleanup` *without* --force, which
+// only ever prints what would be removed, and parses that into a structured
+// list instead of leaving the frontend to render raw CLI text.
+func BundleCleanupPreview(ctx context.Context, path string) ([]BundleCleanupItem, error) {
+	out, err := runBrew(ctx, "bundle", "cleanup", "--file="+path)
+	if err != nil {
+		return nil, err
+	}
+	items := []BundleCleanupItem{}
+	isCask := false
+	for _, line := range strings.Split(out, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		if m := bundleCleanupSectionRe.FindStringSubmatch(line); m != nil {
+			isCask = m[1] == "casks"
+			continue
+		}
+		if strings.HasPrefix(line, "Run `brew bundle cleanup") {
+			continue
+		}
+		items = append(items, BundleCleanupItem{Name: line, IsCask: isCask})
+	}
+	return items, nil
 }
 
 // GetSystemInfo assembles a dashboard summary.

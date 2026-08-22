@@ -24,6 +24,9 @@ type BrewPackage struct {
 	AutoUpdates           bool     `json:"autoUpdates"`
 	Artifacts             []string `json:"artifacts"`
 	AppPaths              []string `json:"appPaths"`
+	Linked                bool     `json:"linked"`
+	ConflictsWith         []string `json:"conflictsWith"`
+	ZapTrashPaths         []string `json:"zapTrashPaths"`
 }
 
 // SearchResult is a lightweight entry returned by `brew search`.
@@ -54,6 +57,17 @@ type Service struct {
 // Tap represents an installed tap.
 type Tap struct {
 	Name string `json:"name"`
+}
+
+// TapDetail is the result of `brew tap-info --json`.
+type TapDetail struct {
+	Name         string `json:"name"`
+	Installed    bool   `json:"installed"`
+	Official     bool   `json:"official"`
+	Remote       string `json:"remote"`
+	FormulaCount int    `json:"formulaCount"`
+	CaskCount    int    `json:"caskCount"`
+	LastCommit   string `json:"lastCommit"`
 }
 
 // CacheInfo describes brew's download cache.
@@ -152,6 +166,13 @@ type Collection struct {
 }
 
 type CollectionPackage struct {
+	Name   string `json:"name"`
+	IsCask bool   `json:"isCask"`
+}
+
+// BundleCleanupItem is one entry from a `brew bundle cleanup` dry-run
+// preview -- something installed that isn't listed in the Brewfile.
+type BundleCleanupItem struct {
 	Name   string `json:"name"`
 	IsCask bool   `json:"isCask"`
 }

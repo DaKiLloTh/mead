@@ -5,7 +5,6 @@ import { UserDataProvider } from './context/UserDataContext'
 import Sidebar, { type ViewKey } from './components/Sidebar'
 import JobConsole from './components/JobConsole'
 import Toasts from './components/Toasts'
-import SettingsMenu from './components/SettingsMenu'
 import Dashboard from './views/Dashboard'
 import Installed from './views/Installed'
 import Search from './views/Search'
@@ -18,6 +17,7 @@ import AppStore from './views/AppStore'
 import Security from './views/Security'
 import Maintenance from './views/Maintenance'
 import History from './views/History'
+import Settings from './views/Settings'
 import { api } from './lib/api'
 
 const titles: Record<ViewKey, string> = {
@@ -33,6 +33,7 @@ const titles: Record<ViewKey, string> = {
   security: 'Security',
   maintenance: 'Maintenance',
   history: 'History',
+  settings: 'Settings',
 }
 
 function AppShell() {
@@ -54,11 +55,8 @@ function AppShell() {
       <div className="flex flex-1 min-h-0">
         <Sidebar view={view} onSelect={setView} outdatedCount={outdatedCount} />
         <div className="flex-1 min-w-0 flex flex-col">
-          <div className="drag-region h-9 shrink-0 flex items-center justify-between px-6">
+          <div className="drag-region h-9 shrink-0 flex items-center px-6">
             <span className="text-sm font-medium text-base-content/60">{titles[view]}</span>
-            <span className="no-drag">
-              <SettingsMenu />
-            </span>
           </div>
           <div className="flex-1 min-h-0 overflow-y-auto">
             {view === 'dashboard' && <Dashboard onNavigate={setView} refreshToken={refreshToken} />}
@@ -73,6 +71,7 @@ function AppShell() {
             {view === 'security' && <Security />}
             {view === 'maintenance' && <Maintenance />}
             {view === 'history' && <History />}
+            {view === 'settings' && <Settings />}
           </div>
         </div>
       </div>

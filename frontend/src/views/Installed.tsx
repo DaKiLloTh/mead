@@ -79,16 +79,16 @@ export default function Installed({ refreshToken, bump }: Props) {
   const selectedPkgs = filtered.filter((p) => selected.has(rowKey(p)))
 
   async function quickUninstall(p: BrewPackage) {
-    const { ok, checked: zap } = await confirm({
+    const { ok, checked } = await confirm({
       title: `Uninstall ${p.name}?`,
       body: 'This removes the package from your system.',
       danger: true,
       confirmLabel: 'Uninstall',
-      checkbox: p.isCask ? { label: 'Also remove app data (preferences, caches, support files)' } : undefined,
+      checkboxes: p.isCask ? [{ label: 'Also remove app data (preferences, caches, support files)' }] : [],
     })
     if (!ok) return
     setRowBusy(p.name)
-    await runAction(() => api.uninstall(p.name, p.isCask, zap))
+    await runAction(() => api.uninstall(p.name, p.isCask, checked[0] ?? false))
     setRowBusy(null)
     load()
     bump()
@@ -104,14 +104,15 @@ export default function Installed({ refreshToken, bump }: Props) {
 
   async function bulkUninstall() {
     const anyCasks = selectedPkgs.some((p) => p.isCask)
-    const { ok, checked: zap } = await confirm({
+    const { ok, checked } = await confirm({
       title: `Uninstall ${selectedPkgs.length} packages?`,
       body: selectedPkgs.map((p) => p.name).join(', '),
       danger: true,
       confirmLabel: 'Uninstall all',
-      checkbox: anyCasks ? { label: 'Also remove app data for any casks (preferences, caches, support files)' } : undefined,
+      checkboxes: anyCasks ? [{ label: 'Also remove app data for any casks (preferences, caches, support files)' }] : [],
     })
     if (!ok) return
+    const zap = checked[0] ?? false
     setBulkBusy(true)
     for (const p of selectedPkgs) {
       await runAction(() => api.uninstall(p.name, p.isCask, zap))
@@ -269,6 +270,10 @@ export default function Installed({ refreshToken, bump }: Props) {
                         {p.outdated && <span className="badge badge-sm badge-warning">outdated</span>}
                         {p.pinned && <span className="badge badge-sm badge-ghost">pinned</span>}
                         {!p.isCask && leaves.has(p.name) && <span className="badge badge-sm badge-ghost">leaf</span>}
+                        {!p.isCask && !p.linked && (
+                          <span className="badge badge-sm badge-warning badge-outline">unlinked</span>
+                        )}
+                        {p.isCask && p.autoUpdates && <span className="badge badge-sm badge-ghost">auto-updates</span>}
                       </div>
                     </td>
                     <td>

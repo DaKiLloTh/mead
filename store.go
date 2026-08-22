@@ -17,6 +17,12 @@ type HistoryEntry struct {
 	Success bool   `json:"success"`
 }
 
+// Settings holds mead's own app-level preferences (as opposed to Homebrew's,
+// which live in Homebrew's own config -- see the Analytics App methods).
+type Settings struct {
+	CaskAppDir string `json:"caskAppDir"` // blank = brew's default (/Applications)
+}
+
 // UserData is the small, locally persisted blob of user preferences that
 // Homebrew itself has no concept of (favorites, tags, notes, snoozes, and
 // a log of what mead has done).
@@ -26,6 +32,7 @@ type UserData struct {
 	Notes     map[string]string   `json:"notes"`
 	Snoozed   map[string]string   `json:"snoozed"` // key -> RFC3339 "snoozed until"
 	History   []HistoryEntry      `json:"history"`
+	Settings  Settings            `json:"settings"`
 }
 
 func newUserData() *UserData {
@@ -35,6 +42,7 @@ func newUserData() *UserData {
 		Notes:     map[string]string{},
 		Snoozed:   map[string]string{},
 		History:   []HistoryEntry{},
+		Settings:  Settings{},
 	}
 }
 
@@ -112,6 +120,7 @@ func (s *Store) Snapshot() UserData {
 		Notes:     map[string]string{},
 		Snoozed:   map[string]string{},
 		History:   append([]HistoryEntry{}, s.data.History...),
+		Settings:  s.data.Settings,
 	}
 	for k, v := range s.data.Favorites {
 		cp.Favorites[k] = v
@@ -191,5 +200,30 @@ func (s *Store) ClearHistory() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.data.History = []HistoryEntry{}
+	return s.saveLocked()
+}
+
+func (s *Store) SetCaskAppDir(dir string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.data.Settings.CaskAppDir = dir
+	return s.saveLocked()
+}
+
+func (s *Store) CaskAppDir() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.data.Settings.CaskAppDir
+}
+
+// ClearAll resets everything mead has persisted locally (favorites, tags,
+// notes, snoozes, history) but keeps app-level Settings, since "clear my
+// data" shouldn't also reset preferences like the cask install directory.
+func (s *Store) ClearAll() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	settings := s.data.Settings
+	s.data = newUserData()
+	s.data.Settings = settings
 	return s.saveLocked()
 }

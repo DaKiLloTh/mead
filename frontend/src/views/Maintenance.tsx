@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react'
-import { api, CacheInfo } from '../lib/api'
+import { api, BundleCleanupItem, CacheInfo } from '../lib/api'
 import { useJobs } from '../context/JobsContext'
-import { BeakerIcon, DownloadIcon, ImportIcon, TrashIcon, WrenchIcon } from '../components/Icons'
+import { useConfirm } from '../context/ConfirmContext'
+import { BeakerIcon, CheckIcon, DownloadIcon, ImportIcon, TrashIcon, WrenchIcon } from '../components/Icons'
 
 type Tab = 'doctor' | 'cleanup' | 'brewfile' | 'config'
 
 export default function Maintenance() {
-  const { runAction } = useJobs()
+  const { runAction, notify } = useJobs()
+  const confirm = useConfirm()
   const [tab, setTab] = useState<Tab>('doctor')
 
   const [doctorOutput, setDoctorOutput] = useState<string[] | null>(null)
@@ -22,6 +24,15 @@ export default function Maintenance() {
   const [exporting, setExporting] = useState(false)
   const [exportedPath, setExportedPath] = useState<string | null>(null)
   const [importing, setImporting] = useState(false)
+
+  const [bundlePath, setBundlePath] = useState<string | null>(null)
+  const [bundleCheckResult, setBundleCheckResult] = useState<string | null>(null)
+  const [bundleCheckLoading, setBundleCheckLoading] = useState(false)
+  const [bundleListResult, setBundleListResult] = useState<string | null>(null)
+  const [bundleListLoading, setBundleListLoading] = useState(false)
+  const [cleanupPreview, setCleanupPreview] = useState<BundleCleanupItem[] | null>(null)
+  const [cleanupPreviewLoading, setCleanupPreviewLoading] = useState(false)
+  const [cleanupRunningReal, setCleanupRunningReal] = useState(false)
 
   useEffect(() => {
     api.cacheInfo().then(setCache).catch(() => {})
@@ -50,6 +61,73 @@ export default function Maintenance() {
     setImporting(true)
     await runAction(() => api.importBrewfile())
     setImporting(false)
+  }
+
+  async function pickBundlePath() {
+    const path = await api.pickBrewfile()
+    if (!path) return
+    setBundlePath(path)
+    setBundleCheckResult(null)
+    setBundleListResult(null)
+    setCleanupPreview(null)
+  }
+
+  async function doBundleCheck() {
+    if (!bundlePath) return
+    setBundleCheckLoading(true)
+    try {
+      setBundleCheckResult(await api.bundleCheck(bundlePath))
+    } catch (e) {
+      setBundleCheckResult(String(e))
+    } finally {
+      setBundleCheckLoading(false)
+    }
+  }
+
+  async function doBundleList() {
+    if (!bundlePath) return
+    setBundleListLoading(true)
+    try {
+      setBundleListResult(await api.bundleList(bundlePath))
+    } catch (e) {
+      setBundleListResult(String(e))
+    } finally {
+      setBundleListLoading(false)
+    }
+  }
+
+  async function doCleanupPreview() {
+    if (!bundlePath) return
+    setCleanupPreviewLoading(true)
+    try {
+      setCleanupPreview(await api.bundleCleanupPreview(bundlePath))
+    } finally {
+      setCleanupPreviewLoading(false)
+    }
+  }
+
+  async function doCleanupReal() {
+    if (!bundlePath || !cleanupPreview || cleanupPreview.length === 0) return
+    const { ok, checked } = await confirm({
+      title: `Remove ${cleanupPreview.length} package${cleanupPreview.length === 1 ? '' : 's'}?`,
+      body: `Not listed in the selected Brewfile:\n${cleanupPreview.map((i) => i.name).join(', ')}`,
+      confirmLabel: 'Remove',
+      danger: true,
+      checkboxes: [{ label: 'Create a local safety snapshot first (Time Machine)' }],
+    })
+    if (!ok) return
+    if (checked[0]) {
+      try {
+        await api.createSnapshot()
+        notify('success', 'Local snapshot created')
+      } catch (e) {
+        notify('error', String(e))
+      }
+    }
+    setCleanupRunningReal(true)
+    await runAction(() => api.bundleCleanup(bundlePath))
+    setCleanupRunningReal(false)
+    setCleanupPreview(null)
   }
 
   async function runDoctor() {
@@ -191,6 +269,86 @@ export default function Maintenance() {
               {importing ? <span className="loading loading-spinner loading-xs" /> : <ImportIcon className="size-4" />}
               Import Brewfile…
             </button>
+          </div>
+
+          <div className="divider my-1" />
+
+          <div>
+            <p className="text-sm text-base-content/70 mb-2">
+              Check whether a Brewfile is satisfied, see everything it declares, or preview removing anything
+              installed that isn't in it.
+            </p>
+            <div className="flex items-center gap-2 mb-3">
+              <button className="btn btn-sm" onClick={pickBundlePath}>
+                {bundlePath ? 'Change Brewfile…' : 'Select a Brewfile…'}
+              </button>
+              {bundlePath && <span className="font-mono text-xs text-base-content/60 truncate">{bundlePath}</span>}
+            </div>
+
+            {bundlePath && (
+              <div className="space-y-3">
+                <div className="flex flex-wrap gap-2">
+                  <button className="btn btn-xs" disabled={bundleCheckLoading} onClick={doBundleCheck}>
+                    {bundleCheckLoading && <span className="loading loading-spinner loading-xs" />} Check
+                  </button>
+                  <button className="btn btn-xs" disabled={bundleListLoading} onClick={doBundleList}>
+                    {bundleListLoading && <span className="loading loading-spinner loading-xs" />} List contents
+                  </button>
+                  <button className="btn btn-xs" disabled={cleanupPreviewLoading} onClick={doCleanupPreview}>
+                    {cleanupPreviewLoading && <span className="loading loading-spinner loading-xs" />} Preview cleanup
+                  </button>
+                </div>
+
+                {bundleCheckResult && (
+                  <div
+                    className={`alert alert-soft text-xs ${bundleCheckResult.includes('satisfied') ? 'alert-success' : 'alert-warning'}`}
+                  >
+                    {bundleCheckResult.includes('satisfied') && <CheckIcon className="size-4" />}
+                    <span className="whitespace-pre-wrap">{bundleCheckResult}</span>
+                  </div>
+                )}
+
+                {bundleListResult && (
+                  <pre className="mockup-code text-xs overflow-x-auto max-h-64">
+                    <code className="whitespace-pre px-4">{bundleListResult}</code>
+                  </pre>
+                )}
+
+                {cleanupPreview && (
+                  <div>
+                    {cleanupPreview.length === 0 ? (
+                      <div className="alert alert-success alert-soft text-xs">
+                        Nothing to remove — everything installed is in the Brewfile.
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <div className="text-xs text-base-content/60">
+                          Not in the Brewfile — would be removed:
+                        </div>
+                        <div className="flex flex-wrap gap-1">
+                          {cleanupPreview.map((item) => (
+                            <span
+                              key={`${item.isCask ? 'c' : 'f'}:${item.name}`}
+                              className={`badge badge-sm badge-outline ${item.isCask ? 'badge-accent' : 'badge-primary'}`}
+                            >
+                              {item.name}
+                            </span>
+                          ))}
+                        </div>
+                        <button className="btn btn-xs btn-error" disabled={cleanupRunningReal} onClick={doCleanupReal}>
+                          {cleanupRunningReal ? (
+                            <span className="loading loading-spinner loading-xs" />
+                          ) : (
+                            <TrashIcon className="size-3.5" />
+                          )}
+                          Remove {cleanupPreview.length} package{cleanupPreview.length === 1 ? '' : 's'}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}

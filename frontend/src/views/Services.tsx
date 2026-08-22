@@ -22,6 +22,7 @@ export default function Services({ refreshToken, bump }: Props) {
   const [loading, setLoading] = useState(true)
   const [rowBusy, setRowBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [cleaningUp, setCleaningUp] = useState(false)
 
   function load() {
     setLoading(true)
@@ -43,6 +44,13 @@ export default function Services({ refreshToken, bump }: Props) {
     bump()
   }
 
+  async function cleanup() {
+    setCleaningUp(true)
+    await runAction(() => api.servicesCleanup())
+    setCleaningUp(false)
+    load()
+  }
+
   return (
     <div className="p-6">
       <div className="flex items-center justify-between mb-4">
@@ -50,9 +58,14 @@ export default function Services({ refreshToken, bump }: Props) {
           <h1 className="text-2xl font-bold">Services</h1>
           <p className="text-base-content/60 text-sm">Background services managed by `brew services`.</p>
         </div>
-        <button className="btn btn-sm" disabled={loading} onClick={load}>
-          <RefreshIcon className="size-4" /> Refresh
-        </button>
+        <div className="flex gap-2">
+          <button className="btn btn-sm" disabled={cleaningUp} onClick={cleanup}>
+            {cleaningUp && <span className="loading loading-spinner loading-xs" />} Clean up unused
+          </button>
+          <button className="btn btn-sm" disabled={loading} onClick={load}>
+            <RefreshIcon className="size-4" /> Refresh
+          </button>
+        </div>
       </div>
 
       {error && <div className="alert alert-error alert-soft text-sm mb-4">{error}</div>}

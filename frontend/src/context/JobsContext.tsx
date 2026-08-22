@@ -30,6 +30,7 @@ interface JobsContextValue {
   toasts: Toast[]
   dismissToast: (id: string) => void
   runAction: (action: () => Promise<string>) => Promise<JobState>
+  notify: (type: Toast['type'], message: string) => void
   consoleOpen: boolean
   setConsoleOpen: (open: boolean) => void
   selectedJobId: string | null
@@ -150,6 +151,7 @@ export function JobsProvider({ children }: { children: React.ReactNode }) {
     toasts,
     dismissToast,
     runAction,
+    notify: pushToast,
     consoleOpen,
     setConsoleOpen,
     selectedJobId,

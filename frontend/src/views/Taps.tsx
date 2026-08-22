@@ -1,8 +1,8 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { api } from '../lib/api'
+import { api, TapDetail } from '../lib/api'
 import { useJobs } from '../context/JobsContext'
 import { useConfirm } from '../context/ConfirmContext'
-import { TapIcon, TrashIcon } from '../components/Icons'
+import { ChevronDownIcon, ExternalLinkIcon, TapIcon, TrashIcon } from '../components/Icons'
 
 interface Props {
   refreshToken: number
@@ -17,6 +17,10 @@ export default function Taps({ refreshToken, bump }: Props) {
   const [newTap, setNewTap] = useState('')
   const [adding, setAdding] = useState(false)
   const [rowBusy, setRowBusy] = useState<string | null>(null)
+  const [expanded, setExpanded] = useState<string | null>(null)
+  const [detail, setDetail] = useState<TapDetail | null>(null)
+  const [detailLoading, setDetailLoading] = useState(false)
+  const [removeError, setRemoveError] = useState<Record<string, string>>({})
 
   function load() {
     setLoading(true)
@@ -40,12 +44,49 @@ export default function Taps({ refreshToken, bump }: Props) {
     bump()
   }
 
+  async function toggleExpand(name: string) {
+    if (expanded === name) {
+      setExpanded(null)
+      return
+    }
+    setExpanded(name)
+    setDetail(null)
+    setDetailLoading(true)
+    try {
+      const d = await api.tapInfo(name)
+      setDetail(d)
+    } finally {
+      setDetailLoading(false)
+    }
+  }
+
   async function removeTap(name: string) {
     const { ok } = await confirm({ title: `Remove tap ${name}?`, danger: true, confirmLabel: 'Remove' })
     if (!ok) return
     setRowBusy(name)
-    await runAction(() => api.tapRemove(name))
+    setRemoveError((prev) => ({ ...prev, [name]: '' }))
+    const job = await runAction(() => api.tapRemove(name))
     setRowBusy(null)
+    if (job.status === 'error') {
+      setRemoveError((prev) => ({ ...prev, [name]: job.error || 'Untap failed — it may still have installed formulae from it.' }))
+      return
+    }
+    load()
+    bump()
+  }
+
+  async function forceRemoveTap(name: string) {
+    const { ok } = await confirm({
+      title: `Force-remove tap ${name}?`,
+      body: 'This untaps it even though it still has installed formulae from it. Those formulae stay installed but become untracked.',
+      danger: true,
+      confirmLabel: 'Force remove',
+    })
+    if (!ok) return
+    setRowBusy(name)
+    await runAction(() => api.tapRemoveForce(name))
+    setRowBusy(null)
+    setRemoveError((prev) => ({ ...prev, [name]: '' }))
     load()
     bump()
   }
@@ -78,16 +119,57 @@ export default function Taps({ refreshToken, bump }: Props) {
         <ul className="menu bg-base-200 rounded-box w-full">
           {taps.map((t) => (
             <li key={t}>
-              <div className="flex items-center justify-between">
-                <span className="font-mono text-sm">{t}</span>
-                <button
-                  className="btn btn-xs btn-ghost text-error"
-                  disabled={rowBusy === t}
-                  onClick={() => removeTap(t)}
-                  title="Untap"
-                >
-                  <TrashIcon className="size-4" />
-                </button>
+              <div className="flex flex-col items-stretch !p-0">
+                <div className="flex items-center justify-between px-3 py-2">
+                  <button className="flex items-center gap-1.5 font-mono text-sm" onClick={() => toggleExpand(t)}>
+                    <ChevronDownIcon className={`size-3.5 transition-transform ${expanded === t ? '' : '-rotate-90'}`} />
+                    {t}
+                  </button>
+                  <button
+                    className="btn btn-xs btn-ghost text-error"
+                    disabled={rowBusy === t}
+                    onClick={() => removeTap(t)}
+                    title="Untap"
+                  >
+                    <TrashIcon className="size-4" />
+                  </button>
+                </div>
+                {expanded === t && (
+                  <div className="px-3 pb-3 text-xs text-base-content/60">
+                    {detailLoading ? (
+                      <span className="flex items-center gap-2">
+                        <span className="loading loading-spinner loading-xs" /> Loading…
+                      </span>
+                    ) : detail ? (
+                      <div className="space-y-0.5">
+                        {detail.remote && (
+                          <div className="flex items-center gap-1">
+                            <a className="link inline-flex items-center gap-1" href={detail.remote} target="_blank" rel="noreferrer">
+                              {detail.remote} <ExternalLinkIcon className="size-3" />
+                            </a>
+                          </div>
+                        )}
+                        <div>
+                          {detail.formulaCount} formulae · {detail.caskCount} casks
+                          {detail.official && ' · official'}
+                        </div>
+                        {detail.lastCommit && <div>Last commit: {detail.lastCommit}</div>}
+                      </div>
+                    ) : (
+                      <span>No detail available.</span>
+                    )}
+                  </div>
+                )}
+                {removeError[t] && (
+                  <div className="px-3 pb-3">
+                    <div className="alert alert-warning alert-soft text-xs flex items-center justify-between gap-2">
+                      <span>{removeError[t]}</span>
+                      <button className="btn btn-xs" onClick={() => forceRemoveTap(t)}>
+                        Force untap
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </li>
           ))}
