@@ -93,7 +93,7 @@ func ScanVulnerabilities(ctx context.Context, pkgs []brew.BrewPackage) ([]VulnRe
 		}
 		return results, nil
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		results := make([]VulnResult, len(targets))
