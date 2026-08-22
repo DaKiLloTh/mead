@@ -51,24 +51,31 @@ func (jm *JobManager) Fail(title, errMsg string) string {
 // output to the frontend as job:output events, and returns the job id
 // immediately so the caller (App method) can hand it back to JS.
 func (jm *JobManager) Start(title string, args ...string) string {
-	return jm.start(title, false, nil, args...)
+	return jm.start(title, false, nil, nil, args...)
 }
 
 // StartLenient behaves like Start, but a non-zero exit code is still
 // reported as Success so the UI doesn't flag it as a failure (e.g. `brew
 // doctor` exits 1 merely to signal it found something worth mentioning).
 func (jm *JobManager) StartLenient(title string, args ...string) string {
-	return jm.start(title, true, nil, args...)
+	return jm.start(title, true, nil, nil, args...)
 }
 
 // StartTracked behaves like Start, but additionally invokes onDone with the
 // final success flag once the job finishes — used to record history entries
 // without threading that concern through every call site.
 func (jm *JobManager) StartTracked(title string, onDone func(success bool), args ...string) string {
-	return jm.start(title, false, onDone, args...)
+	return jm.start(title, false, nil, onDone, args...)
 }
 
-func (jm *JobManager) start(title string, lenient bool, onDone func(success bool), args ...string) string {
+// StartWithEnv behaves like Start, but replaces the default brewEnv() with
+// env -- used only by the explicit "Update Homebrew" action, which is the
+// one place we actually want brew's auto-update behavior to run.
+func (jm *JobManager) StartWithEnv(title string, env []string, args ...string) string {
+	return jm.start(title, false, env, nil, args...)
+}
+
+func (jm *JobManager) start(title string, lenient bool, env []string, onDone func(success bool), args ...string) string {
 	id := newJobID()
 
 	path, err := resolveBrewPath()
@@ -82,7 +89,11 @@ func (jm *JobManager) start(title string, lenient bool, onDone func(success bool
 	}
 
 	cmd := exec.Command(path, args...)
-	cmd.Env = brewEnv()
+	if env != nil {
+		cmd.Env = env
+	} else {
+		cmd.Env = brewEnv()
+	}
 	cmd.Stdin = nil
 
 	stdout, err1 := cmd.StdoutPipe()

@@ -55,7 +55,23 @@ func resolveBrewPath() (string, error) {
 }
 
 // brewEnv returns a stable, non-interactive environment for brew subprocesses.
+// Without HOMEBREW_NO_AUTO_UPDATE, any brew command can silently trigger a
+// full `brew update` first if it's been a while -- surprising and slow for a
+// GUI where updating should be an explicit, visible action. We suppress that
+// everywhere except the one job that IS an explicit update.
 func brewEnv() []string {
+	return append(baseEnv(),
+		"HOMEBREW_NO_COLOR=1",
+		"HOMEBREW_NO_EMOJI=1",
+		"NONINTERACTIVE=1",
+		"HOMEBREW_NO_ANALYTICS=1",
+		"HOMEBREW_NO_AUTO_UPDATE=1",
+	)
+}
+
+// brewEnvAllowingAutoUpdate is brewEnv() without the auto-update suppression,
+// for the one job that should actually be allowed to update Homebrew itself.
+func brewEnvAllowingAutoUpdate() []string {
 	return append(baseEnv(),
 		"HOMEBREW_NO_COLOR=1",
 		"HOMEBREW_NO_EMOJI=1",

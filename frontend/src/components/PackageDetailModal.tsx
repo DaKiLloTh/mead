@@ -9,6 +9,7 @@ import {
   DownloadIcon,
   ExternalLinkIcon,
   PinIcon,
+  RefreshIcon,
   ShieldIcon,
   StarIcon,
   TagIcon,
@@ -134,15 +135,24 @@ export default function PackageDetailModal({ target, onClose, onChanged }: Props
 
   async function doUninstall() {
     if (!target) return
-    const ok = await confirm({
+    const { ok, checked: zap } = await confirm({
       title: `Uninstall ${target.name}?`,
       body: 'This removes the package (and its keg/app) from your system.',
       confirmLabel: 'Uninstall',
       danger: true,
+      checkbox: target.isCask ? { label: 'Also remove app data (preferences, caches, support files)' } : undefined,
     })
     if (!ok) return
     setBusy(true)
-    await runAction(() => api.uninstall(target.name, target.isCask))
+    await runAction(() => api.uninstall(target.name, target.isCask, zap))
+    setBusy(false)
+    refresh()
+  }
+
+  async function doReinstall() {
+    if (!target) return
+    setBusy(true)
+    await runAction(() => api.reinstall(target.name, target.isCask))
     setBusy(false)
     refresh()
   }
@@ -420,6 +430,11 @@ export default function PackageDetailModal({ target, onClose, onChanged }: Props
               {pkg.installed && pkg.outdated && (
                 <button className="btn btn-sm btn-warning" disabled={busy} onClick={doUpgrade}>
                   <ArrowUpCircleIcon className="size-4" /> Upgrade
+                </button>
+              )}
+              {pkg.installed && (
+                <button className="btn btn-sm" disabled={busy} onClick={doReinstall}>
+                  <RefreshIcon className="size-4" /> Reinstall
                 </button>
               )}
               {pkg.installed ? (

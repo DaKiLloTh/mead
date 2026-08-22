@@ -23,16 +23,17 @@ export default function Updates({ refreshToken, bump }: Props) {
   const [rowBusy, setRowBusy] = useState<string | null>(null)
   const [upgradingAll, setUpgradingAll] = useState(false)
   const [showSnoozed, setShowSnoozed] = useState(false)
+  const [greedy, setGreedy] = useState(false)
 
   function load() {
     setLoading(true)
     api
-      .outdated()
+      .outdated(greedy)
       .then(setItems)
       .finally(() => setLoading(false))
   }
 
-  useEffect(load, [refreshToken])
+  useEffect(load, [refreshToken, greedy])
 
   const { visible, snoozed } = useMemo(() => {
     const visible: OutdatedPackage[] = []
@@ -58,7 +59,7 @@ export default function Updates({ refreshToken, bump }: Props) {
 
   async function upgradeAll() {
     setUpgradingAll(true)
-    await runAction(() => api.upgradeAll())
+    await runAction(() => api.upgradeAll(greedy))
     setUpgradingAll(false)
     load()
     bump()
@@ -78,7 +79,16 @@ export default function Updates({ refreshToken, bump }: Props) {
             {snoozed.length > 0 && ` · ${snoozed.length} snoozed`}
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2">
+          <label className="label cursor-pointer gap-2 text-sm">
+            <input
+              type="checkbox"
+              className="checkbox checkbox-sm"
+              checked={greedy}
+              onChange={(e) => setGreedy(e.target.checked)}
+            />
+            <span className="label-text">Include auto-updating casks</span>
+          </label>
           {snoozed.length > 0 && (
             <button className="btn btn-sm btn-ghost" onClick={() => setShowSnoozed((s) => !s)}>
               <ClockIcon className="size-4" /> {showSnoozed ? 'Show active' : `Show snoozed (${snoozed.length})`}

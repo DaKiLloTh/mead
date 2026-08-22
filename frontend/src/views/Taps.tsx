@@ -41,7 +41,7 @@ export default function Taps({ refreshToken, bump }: Props) {
   }
 
   async function removeTap(name: string) {
-    const ok = await confirm({ title: `Remove tap ${name}?`, danger: true, confirmLabel: 'Remove' })
+    const { ok } = await confirm({ title: `Remove tap ${name}?`, danger: true, confirmLabel: 'Remove' })
     if (!ok) return
     setRowBusy(name)
     await runAction(() => api.tapRemove(name))

@@ -1,11 +1,55 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useJobs } from '../context/JobsContext'
 import { duration } from '../lib/format'
+import { api } from '../lib/api'
 
 function StatusIcon({ status }: { status: 'running' | 'success' | 'error' }) {
   if (status === 'running') return <span className="loading loading-spinner loading-xs text-primary" />
   if (status === 'success') return <span className="status status-success" />
   return <span className="status status-error" />
+}
+
+const gistableTitleRe = /^(?:Install|Upgrade|Reinstall) (\S+)/
+
+function GistLogsButton({ title }: { title: string }) {
+  const m = gistableTitleRe.exec(title)
+  const [state, setState] = useState<'idle' | 'loading' | { url: string } | { error: string }>('idle')
+
+  if (!m) return null
+  const name = m[1]
+
+  async function create() {
+    setState('loading')
+    try {
+      const url = await api.gistLogs(name)
+      setState({ url })
+    } catch (e) {
+      setState({ error: String(e) })
+    }
+  }
+
+  if (state === 'idle') {
+    return (
+      <button className="btn btn-ghost btn-xs" onClick={create}>
+        Create gist with logs
+      </button>
+    )
+  }
+  if (state === 'loading') {
+    return (
+      <span className="btn btn-ghost btn-xs" aria-disabled>
+        <span className="loading loading-spinner loading-xs" /> Uploading…
+      </span>
+    )
+  }
+  if ('url' in state) {
+    return (
+      <a className="link link-primary text-xs" href={state.url} target="_blank" rel="noreferrer">
+        {state.url}
+      </a>
+    )
+  }
+  return <span className="text-error text-xs">{state.error}</span>
 }
 
 export default function JobConsole() {
@@ -72,6 +116,7 @@ export default function JobConsole() {
                     Cancel
                   </button>
                 )}
+                {selected.status === 'error' && <GistLogsButton title={selected.title} />}
               </div>
             )}
             <div ref={bodyRef} className="flex-1 overflow-y-auto bg-neutral text-neutral-content font-mono text-xs p-3">

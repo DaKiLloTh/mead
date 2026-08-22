@@ -14,7 +14,7 @@ export default function History() {
   useEffect(load, [])
 
   async function clear() {
-    const ok = await confirm({ title: 'Clear activity history?', confirmLabel: 'Clear', danger: true })
+    const { ok } = await confirm({ title: 'Clear activity history?', confirmLabel: 'Clear', danger: true })
     if (!ok) return
     await api.clearHistory()
     load()

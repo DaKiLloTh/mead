@@ -22,7 +22,8 @@ export const api = {
   listInstalled: () => App.ListInstalled(),
   getInfo: (name: string, isCask: boolean) => App.GetInfo(name, isCask),
   search: (query: string) => App.Search(query),
-  outdated: () => App.Outdated(),
+  outdated: (greedy = false) => App.Outdated(greedy),
+  missing: () => App.Missing(),
   taps: () => App.Taps(),
   services: () => App.Services(),
   leaves: () => App.Leaves(),
@@ -32,9 +33,10 @@ export const api = {
   config: () => App.Config(),
 
   install: (name: string, isCask: boolean) => App.Install(name, isCask),
-  uninstall: (name: string, isCask: boolean) => App.Uninstall(name, isCask),
+  uninstall: (name: string, isCask: boolean, zap = false) => App.Uninstall(name, isCask, zap),
+  reinstall: (name: string, isCask: boolean) => App.Reinstall(name, isCask),
   upgrade: (name: string, isCask: boolean) => App.Upgrade(name, isCask),
-  upgradeAll: () => App.UpgradeAll(),
+  upgradeAll: (greedy = false) => App.UpgradeAll(greedy),
   update: () => App.Update(),
   cleanup: (dryRun: boolean) => App.Cleanup(dryRun),
   doctor: () => App.Doctor(),
@@ -82,6 +84,8 @@ export const api = {
   // brewfile
   exportBrewfileToFile: () => App.ExportBrewfileToFile(),
   importBrewfile: () => App.ImportBrewfile(),
+
+  gistLogs: (name: string) => App.GistLogs(name),
 }
 
 export function pkgKey(name: string, isCask: boolean): string {

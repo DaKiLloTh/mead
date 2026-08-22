@@ -292,8 +292,12 @@ func isSearchNoise(l string) bool {
 }
 
 // Outdated returns outdated formulae and casks.
-func Outdated(ctx context.Context) ([]OutdatedPackage, error) {
-	out, err := runBrew(ctx, "outdated", "--json=v2")
+func Outdated(ctx context.Context, greedy bool) ([]OutdatedPackage, error) {
+	args := []string{"outdated", "--json=v2"}
+	if greedy {
+		args = append(args, "--greedy")
+	}
+	out, err := runBrew(ctx, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -371,6 +375,12 @@ func Uses(ctx context.Context, name string) ([]string, error) {
 		return nil, err
 	}
 	return runBrewLines(ctx, "uses", "--installed", name)
+}
+
+// Missing lists installed formulae with a dependency that isn't installed
+// (e.g. an interrupted install, or a manually removed dependency).
+func Missing(ctx context.Context) ([]string, error) {
+	return runBrewLines(ctx, "missing")
 }
 
 // Deps returns the raw dependency tree text for a package.
@@ -469,7 +479,7 @@ func GetSystemInfo(ctx context.Context) (*SystemInfo, error) {
 			}
 		}
 	}
-	outdated, err := Outdated(ctx)
+	outdated, err := Outdated(ctx, false)
 	if err == nil {
 		info.OutdatedCount = len(outdated)
 	}

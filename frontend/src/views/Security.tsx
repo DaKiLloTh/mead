@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { api, DuplicateApp, VulnResult } from '../lib/api'
-import { AlertIcon, CopyIcon, ExternalLinkIcon, ShieldIcon } from '../components/Icons'
+import { AlertIcon, CopyIcon, ExternalLinkIcon, ShieldIcon, WrenchIcon } from '../components/Icons'
 
-type Tab = 'vulns' | 'duplicates'
+type Tab = 'vulns' | 'duplicates' | 'missing'
 
 export default function Security() {
   const [tab, setTab] = useState<Tab>('vulns')
@@ -12,6 +12,9 @@ export default function Security() {
 
   const [dupes, setDupes] = useState<DuplicateApp[] | null>(null)
   const [dupesLoading, setDupesLoading] = useState(false)
+
+  const [missing, setMissing] = useState<string[] | null>(null)
+  const [missingLoading, setMissingLoading] = useState(false)
 
   async function scanVulns() {
     setVulnsLoading(true)
@@ -30,6 +33,16 @@ export default function Security() {
       setDupes(results)
     } finally {
       setDupesLoading(false)
+    }
+  }
+
+  async function scanMissing() {
+    setMissingLoading(true)
+    try {
+      const results = await api.missing()
+      setMissing(results)
+    } finally {
+      setMissingLoading(false)
     }
   }
 
@@ -53,6 +66,9 @@ export default function Security() {
           onClick={() => setTab('duplicates')}
         >
           <CopyIcon className="size-3.5 mr-1" /> Duplicates
+        </button>
+        <button role="tab" className={`tab ${tab === 'missing' ? 'tab-active' : ''}`} onClick={() => setTab('missing')}>
+          <WrenchIcon className="size-3.5 mr-1" /> Missing deps
         </button>
       </div>
 
@@ -157,6 +173,31 @@ export default function Security() {
                     </tbody>
                   </table>
                 </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {tab === 'missing' && (
+        <div className="space-y-3">
+          <p className="text-sm text-base-content/70">
+            Checks installed formulae for a dependency that's supposed to be installed but isn't -- usually the sign
+            of an interrupted install or a manually removed dependency.
+          </p>
+          <button className="btn btn-sm btn-primary" disabled={missingLoading} onClick={scanMissing}>
+            {missingLoading ? <span className="loading loading-spinner loading-xs" /> : <WrenchIcon className="size-4" />}
+            Check for missing dependencies
+          </button>
+
+          {missing && (
+            <div className="mt-2">
+              {missing.length === 0 ? (
+                <div className="alert alert-success alert-soft text-sm">Nothing missing.</div>
+              ) : (
+                <pre className="mockup-code text-xs overflow-x-auto max-h-96">
+                  <code className="whitespace-pre px-4">{missing.join('\n')}</code>
+                </pre>
               )}
             </div>
           )}

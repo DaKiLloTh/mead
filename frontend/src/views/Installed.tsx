@@ -79,15 +79,16 @@ export default function Installed({ refreshToken, bump }: Props) {
   const selectedPkgs = filtered.filter((p) => selected.has(rowKey(p)))
 
   async function quickUninstall(p: BrewPackage) {
-    const ok = await confirm({
+    const { ok, checked: zap } = await confirm({
       title: `Uninstall ${p.name}?`,
       body: 'This removes the package from your system.',
       danger: true,
       confirmLabel: 'Uninstall',
+      checkbox: p.isCask ? { label: 'Also remove app data (preferences, caches, support files)' } : undefined,
     })
     if (!ok) return
     setRowBusy(p.name)
-    await runAction(() => api.uninstall(p.name, p.isCask))
+    await runAction(() => api.uninstall(p.name, p.isCask, zap))
     setRowBusy(null)
     load()
     bump()
@@ -102,16 +103,18 @@ export default function Installed({ refreshToken, bump }: Props) {
   }
 
   async function bulkUninstall() {
-    const ok = await confirm({
+    const anyCasks = selectedPkgs.some((p) => p.isCask)
+    const { ok, checked: zap } = await confirm({
       title: `Uninstall ${selectedPkgs.length} packages?`,
       body: selectedPkgs.map((p) => p.name).join(', '),
       danger: true,
       confirmLabel: 'Uninstall all',
+      checkbox: anyCasks ? { label: 'Also remove app data for any casks (preferences, caches, support files)' } : undefined,
     })
     if (!ok) return
     setBulkBusy(true)
     for (const p of selectedPkgs) {
-      await runAction(() => api.uninstall(p.name, p.isCask))
+      await runAction(() => api.uninstall(p.name, p.isCask, zap))
     }
     setBulkBusy(false)
     setSelected(new Set())
