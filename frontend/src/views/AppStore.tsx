@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
+import { Trans, useTranslation } from 'react-i18next'
 import { api, MasApp } from '../lib/api'
 import { useJobs } from '../context/JobsContext'
 import { ArrowUpCircleIcon, DownloadIcon, RefreshIcon, StoreIcon } from '../components/Icons'
 import ExternalLink from '../components/ExternalLink'
 
 export default function AppStore() {
+  const { t } = useTranslation()
   const { runAction } = useJobs()
   const [available, setAvailable] = useState<boolean | null>(null)
   const [apps, setApps] = useState<MasApp[]>([])
@@ -50,25 +52,26 @@ export default function AppStore() {
 
   return (
     <div className="p-6 max-w-3xl">
-      <h1 className="text-2xl font-bold mb-1">App Store</h1>
+      <h1 className="text-2xl font-bold mb-1">{t('appstore.title')}</h1>
       <p className="text-base-content/60 text-sm mb-4">
-        Mac App Store apps, managed alongside Homebrew via the <span className="font-mono">mas</span> CLI.
+        <Trans i18nKey="appstore.subtitle" components={{ cli: <span className="font-mono" /> }} />
       </p>
 
       {loading && (
         <div className="flex items-center gap-2 text-base-content/60">
-          <span className="loading loading-spinner loading-sm" /> Checking for the <span className="font-mono">mas</span> CLI…
+          <span className="loading loading-spinner loading-sm" />{' '}
+          <Trans i18nKey="appstore.checkingForMas" components={{ cli: <span className="font-mono" /> }} />
         </div>
       )}
 
       {!loading && error && (
         <div className="alert alert-error alert-soft">
           <div>
-            <div className="font-medium">Couldn't check the App Store</div>
+            <div className="font-medium">{t('appstore.errorTitle')}</div>
             <p className="text-sm mt-1">{error}</p>
           </div>
           <button className="btn btn-sm" onClick={load}>
-            <RefreshIcon className="size-4" /> Try again
+            <RefreshIcon className="size-4" /> {t('common.tryAgain')}
           </button>
         </div>
       )}
@@ -77,19 +80,19 @@ export default function AppStore() {
         <div className="card bg-base-200">
           <div className="card-body">
             <h2 className="card-title text-base">
-              <StoreIcon className="size-5" /> Install the <span className="font-mono">mas</span> CLI
+              <StoreIcon className="size-5" />{' '}
+              <Trans i18nKey="appstore.installMasTitle" components={{ cli: <span className="font-mono" /> }} />
             </h2>
             <p className="text-sm text-base-content/70">
-              App Store integration needs{' '}
-              <ExternalLink className="link" href="https://github.com/mas-cli/mas">
-                mas
-              </ExternalLink>
-              , which is itself a Homebrew formula. Install it and this page will pick up your Mac App Store apps.
+              <Trans
+                i18nKey="appstore.installMasDescription"
+                components={{ link: <ExternalLink className="link" href="https://github.com/mas-cli/mas">mas</ExternalLink> }}
+              />
             </p>
             <div className="card-actions mt-2">
               <button className="btn btn-sm btn-primary" disabled={installingMas} onClick={installMas}>
                 {installingMas ? <span className="loading loading-spinner loading-xs" /> : <DownloadIcon className="size-4" />}
-                brew install mas
+                {t('appstore.installMasButton')}
               </button>
             </div>
           </div>
@@ -100,7 +103,7 @@ export default function AppStore() {
         <>
           <div className="flex items-center justify-between mb-3">
             <p className="text-sm text-base-content/60">
-              {apps.length} apps · {outdated.length} outdated
+              {t('appstore.countsSummary', { appCount: apps.length, outdatedCount: outdated.length })}
             </p>
             {outdated.length > 0 && (
               <button
@@ -110,7 +113,7 @@ export default function AppStore() {
                   load()
                 }}
               >
-                <ArrowUpCircleIcon className="size-4" /> Upgrade all
+                <ArrowUpCircleIcon className="size-4" /> {t('common.upgradeAll')}
               </button>
             )}
           </div>
@@ -124,9 +127,9 @@ export default function AppStore() {
               </colgroup>
               <thead>
                 <tr>
-                  <th>Name</th>
-                  <th>Version</th>
-                  <th className="text-right">Actions</th>
+                  <th>{t('appstore.colName')}</th>
+                  <th>{t('appstore.colVersion')}</th>
+                  <th className="text-right">{t('appstore.colActions')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -145,7 +148,7 @@ export default function AppStore() {
                     <td className="text-right">
                       {outdatedIds.has(app.id) && (
                         <button className="btn btn-xs btn-primary" disabled={rowBusy === app.id} onClick={() => upgrade(app.id)}>
-                          {rowBusy === app.id ? <span className="loading loading-spinner loading-xs" /> : 'Upgrade'}
+                          {rowBusy === app.id ? <span className="loading loading-spinner loading-xs" /> : t('common.upgrade')}
                         </button>
                       )}
                     </td>
@@ -154,7 +157,7 @@ export default function AppStore() {
                 {apps.length === 0 && (
                   <tr>
                     <td colSpan={3} className="text-center text-base-content/50 py-8">
-                      No Mac App Store apps found.
+                      {t('appstore.noApps')}
                     </td>
                   </tr>
                 )}

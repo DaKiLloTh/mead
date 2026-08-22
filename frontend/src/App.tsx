@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { JobsProvider } from './context/JobsContext'
 import { ConfirmProvider } from './context/ConfirmContext'
 import { UserDataProvider } from './context/UserDataContext'
@@ -22,23 +23,24 @@ import History from './views/History'
 import Settings from './views/Settings'
 import { api } from './lib/api'
 
-const titles: Record<ViewKey, string> = {
-  dashboard: 'Dashboard',
-  installed: 'Installed',
-  search: 'Search',
-  collections: 'Collections',
-  updates: 'Updates',
-  taps: 'Taps',
-  services: 'Services',
-  adopt: 'Adopt Existing Apps',
-  appstore: 'App Store',
-  security: 'Security',
-  maintenance: 'Maintenance',
-  history: 'History',
-  settings: 'Settings',
+const viewTitleKeys: Record<ViewKey, string> = {
+  dashboard: 'app.viewTitles.dashboard',
+  installed: 'app.viewTitles.installed',
+  search: 'app.viewTitles.search',
+  collections: 'app.viewTitles.collections',
+  updates: 'app.viewTitles.updates',
+  taps: 'app.viewTitles.taps',
+  services: 'app.viewTitles.services',
+  adopt: 'app.viewTitles.adopt',
+  appstore: 'app.viewTitles.appstore',
+  security: 'app.viewTitles.security',
+  maintenance: 'app.viewTitles.maintenance',
+  history: 'app.viewTitles.history',
+  settings: 'app.viewTitles.settings',
 }
 
 function AppShell() {
+  const { t } = useTranslation()
   const [view, setView] = useState<ViewKey>('dashboard')
   const [refreshToken, setRefreshToken] = useState(0)
   const [outdatedCount, setOutdatedCount] = useState(0)
@@ -66,7 +68,7 @@ function AppShell() {
         <Sidebar view={view} onSelect={setView} outdatedCount={outdatedCount} />
         <div className="flex-1 min-w-0 flex flex-col">
           <div className="drag-region h-9 shrink-0 flex items-center px-6">
-            <span className="text-sm font-medium text-base-content/60">{titles[view]}</span>
+            <span className="text-sm font-medium text-base-content/60">{t(viewTitleKeys[view])}</span>
             <span className="ml-auto flex items-center gap-1 text-base-content/40">
               <kbd className="kbd kbd-xs">⌘</kbd>
               <kbd className="kbd kbd-xs">K</kbd>

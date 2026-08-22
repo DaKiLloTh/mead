@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useJobs } from '../context/JobsContext'
 import { duration } from '../lib/format'
 import { api } from '../lib/api'
@@ -13,6 +14,7 @@ function StatusIcon({ status }: { status: 'running' | 'success' | 'error' }) {
 const gistableTitleRe = /^(?:Install|Upgrade|Reinstall) (\S+)/
 
 function GistLogsButton({ title }: { title: string }) {
+  const { t } = useTranslation()
   const m = gistableTitleRe.exec(title)
   const [state, setState] = useState<'idle' | 'loading' | { url: string } | { error: string }>('idle')
 
@@ -32,14 +34,14 @@ function GistLogsButton({ title }: { title: string }) {
   if (state === 'idle') {
     return (
       <button className="btn btn-ghost btn-xs" onClick={create}>
-        Create gist with logs
+        {t('jobConsole.createGist')}
       </button>
     )
   }
   if (state === 'loading') {
     return (
       <span className="btn btn-ghost btn-xs" aria-disabled>
-        <span className="loading loading-spinner loading-xs" /> Uploading…
+        <span className="loading loading-spinner loading-xs" /> {t('jobConsole.uploading')}
       </span>
     )
   }
@@ -54,6 +56,7 @@ function GistLogsButton({ title }: { title: string }) {
 }
 
 export default function JobConsole() {
+  const { t } = useTranslation()
   const {
     jobs,
     activeCount,
@@ -85,8 +88,8 @@ export default function JobConsole() {
           className="flex items-center gap-2 flex-1 min-w-0 h-full hover:bg-base-200 transition-colors -mx-3 px-3"
           onClick={() => setConsoleOpen(!consoleOpen)}
         >
-          <span className="font-medium">Activity</span>
-          {activeCount > 0 && <span className="badge badge-primary badge-sm">{activeCount} running</span>}
+          <span className="font-medium">{t('jobConsole.activity')}</span>
+          {activeCount > 0 && <span className="badge badge-primary badge-sm">{t('jobConsole.running', { count: activeCount })}</span>}
           <span className="flex-1" />
           {selected && (
             <span className="text-base-content/60 truncate max-w-xs">{selected.title}</span>
@@ -96,7 +99,7 @@ export default function JobConsole() {
         {activeCount === 0 && (
           <button
             className="btn btn-ghost btn-xs btn-circle shrink-0"
-            title="Close"
+            title={t('jobConsole.closeTooltip')}
             onClick={clearFinishedJobs}
           >
             ✕
@@ -126,15 +129,15 @@ export default function JobConsole() {
                 <StatusIcon status={selected.status} />
                 <span>
                   {selected.status === 'running'
-                    ? 'Running…'
+                    ? t('jobConsole.runningStatus')
                     : selected.status === 'success'
-                      ? `Finished in ${duration(selected.startedAt, selected.endedAt ?? Date.now())}`
-                      : `Failed (exit ${selected.exitCode ?? '?'})`}
+                      ? t('jobConsole.finishedIn', { duration: duration(selected.startedAt, selected.endedAt ?? Date.now()) })
+                      : t('jobConsole.failedExitCode', { code: selected.exitCode ?? '?' })}
                 </span>
                 <span className="flex-1" />
                 {selected.status === 'running' && (
                   <button className="btn btn-ghost btn-xs" onClick={() => cancelJob(selected.id)}>
-                    Cancel
+                    {t('jobConsole.cancel')}
                   </button>
                 )}
                 {selected.status === 'error' && <GistLogsButton title={selected.title} />}
@@ -148,7 +151,7 @@ export default function JobConsole() {
                   </div>
                 ))
               ) : (
-                <div className="opacity-50">Waiting for output…</div>
+                <div className="opacity-50">{t('jobConsole.waitingForOutput')}</div>
               )}
               {selected?.error && <div className="text-warning mt-1">{selected.error}</div>}
             </div>

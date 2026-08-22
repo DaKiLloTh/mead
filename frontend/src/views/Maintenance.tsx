@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { api, BundleCleanupItem, CacheInfo, PackageSize } from '../lib/api'
 import { useJobs } from '../context/JobsContext'
 import { useConfirm } from '../context/ConfirmContext'
@@ -7,6 +8,7 @@ import { BeakerIcon, CheckIcon, DownloadIcon, ImportIcon, RefreshIcon, TrashIcon
 type Tab = 'doctor' | 'cleanup' | 'brewfile' | 'config'
 
 export default function Maintenance() {
+  const { t } = useTranslation()
   const { runAction, notify } = useJobs()
   const confirm = useConfirm()
   const [tab, setTab] = useState<Tab>('doctor')
@@ -123,17 +125,17 @@ export default function Maintenance() {
   async function doCleanupReal() {
     if (!bundlePath || !cleanupPreview || cleanupPreview.length === 0) return
     const { ok, checked } = await confirm({
-      title: `Remove ${cleanupPreview.length} package${cleanupPreview.length === 1 ? '' : 's'}?`,
-      body: `Not listed in the selected Brewfile:\n${cleanupPreview.map((i) => i.name).join(', ')}`,
-      confirmLabel: 'Remove',
+      title: t('maintenance.confirmRemoveTitle', { count: cleanupPreview.length }),
+      body: t('maintenance.confirmRemoveBody', { names: cleanupPreview.map((i) => i.name).join(', ') }),
+      confirmLabel: t('maintenance.confirmRemoveLabel'),
       danger: true,
-      checkboxes: [{ label: 'Create a local safety snapshot first (Time Machine)' }],
+      checkboxes: [{ label: t('maintenance.checkboxSnapshot') }],
     })
     if (!ok) return
     if (checked[0]) {
       try {
         await api.createSnapshot()
-        notify('success', 'Local snapshot created')
+        notify('success', t('maintenance.localSnapshotCreated'))
       } catch (e) {
         notify('error', String(e))
       }
@@ -173,18 +175,18 @@ export default function Maintenance() {
 
   return (
     <div className="p-6 max-w-3xl">
-      <h1 className="text-2xl font-bold mb-1">Maintenance</h1>
-      <p className="text-base-content/60 text-sm mb-4">Diagnose problems and reclaim disk space.</p>
+      <h1 className="text-2xl font-bold mb-1">{t('maintenance.title')}</h1>
+      <p className="text-base-content/60 text-sm mb-4">{t('maintenance.subtitle')}</p>
 
       <div role="tablist" className="tabs tabs-box tabs-sm w-fit mb-4">
         <button role="tab" className={`tab ${tab === 'doctor' ? 'tab-active' : ''}`} onClick={() => setTab('doctor')}>
-          <WrenchIcon className="size-3.5 mr-1" /> Doctor
+          <WrenchIcon className="size-3.5 mr-1" /> {t('maintenance.tabDoctor')}
         </button>
         <button role="tab" className={`tab ${tab === 'cleanup' ? 'tab-active' : ''}`} onClick={() => setTab('cleanup')}>
-          <TrashIcon className="size-3.5 mr-1" /> Cleanup
+          <TrashIcon className="size-3.5 mr-1" /> {t('maintenance.tabCleanup')}
         </button>
         <button role="tab" className={`tab ${tab === 'brewfile' ? 'tab-active' : ''}`} onClick={() => setTab('brewfile')}>
-          <ImportIcon className="size-3.5 mr-1" /> Brewfile
+          <ImportIcon className="size-3.5 mr-1" /> {t('maintenance.tabBrewfile')}
         </button>
         <button
           role="tab"
@@ -194,22 +196,20 @@ export default function Maintenance() {
             if (config === null) void loadConfig()
           }}
         >
-          <BeakerIcon className="size-3.5 mr-1" /> Config
+          <BeakerIcon className="size-3.5 mr-1" /> {t('maintenance.tabConfig')}
         </button>
       </div>
 
       {tab === 'doctor' && (
         <div className="space-y-3">
-          <p className="text-sm text-base-content/70">
-            Checks your system for potential problems that could interfere with Homebrew.
-          </p>
+          <p className="text-sm text-base-content/70">{t('maintenance.doctorDescription')}</p>
           <button className="btn btn-sm btn-primary" disabled={doctorRunning} onClick={runDoctor}>
             {doctorRunning ? <span className="loading loading-spinner loading-xs" /> : <WrenchIcon className="size-4" />}
-            Run brew doctor
+            {t('maintenance.runDoctor')}
           </button>
           {doctorOutput && (
             <pre className="mockup-code text-xs overflow-x-auto max-h-96">
-              <code className="whitespace-pre px-4">{doctorOutput.join('\n') || 'Your system is ready to brew.'}</code>
+              <code className="whitespace-pre px-4">{doctorOutput.join('\n') || t('maintenance.doctorAllGood')}</code>
             </pre>
           )}
         </div>
@@ -220,7 +220,7 @@ export default function Maintenance() {
           {cache && (
             <div className="stats shadow bg-base-200">
               <div className="stat py-3">
-                <div className="stat-title">Download cache</div>
+                <div className="stat-title">{t('maintenance.downloadCache')}</div>
                 <div className="stat-value text-lg">{cache.sizeHuman}</div>
                 <div className="stat-desc font-mono truncate max-w-xs">{cache.path}</div>
               </div>
@@ -229,21 +229,19 @@ export default function Maintenance() {
 
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <p className="text-sm text-base-content/70">
-                Largest installed packages. See what's taking up the most disk space.
-              </p>
+              <p className="text-sm text-base-content/70">{t('maintenance.largestDescription')}</p>
               <button className="btn btn-xs" disabled={largestLoading} onClick={loadLargest}>
                 {largestLoading ? (
                   <span className="loading loading-spinner loading-xs" />
                 ) : (
                   <RefreshIcon className="size-3.5" />
                 )}
-                Refresh
+                {t('common.refresh')}
               </button>
             </div>
             {largestLoading && largest === null && (
               <div className="flex items-center gap-2 text-base-content/60">
-                <span className="loading loading-spinner loading-sm" /> Scanning…
+                <span className="loading loading-spinner loading-sm" /> {t('maintenance.scanning')}
               </div>
             )}
             {largest && largest.length > 0 && (
@@ -256,9 +254,9 @@ export default function Maintenance() {
                   </colgroup>
                   <thead>
                     <tr>
-                      <th>Name</th>
-                      <th>Type</th>
-                      <th className="text-right">Size</th>
+                      <th>{t('maintenance.colName')}</th>
+                      <th>{t('maintenance.colType')}</th>
+                      <th className="text-right">{t('maintenance.colSize')}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -267,7 +265,7 @@ export default function Maintenance() {
                         <td className="font-medium truncate">{p.name}</td>
                         <td>
                           <span className={`badge badge-sm badge-outline ${p.isCask ? 'badge-accent' : 'badge-primary'}`}>
-                            {p.isCask ? 'cask' : 'formula'}
+                            {p.isCask ? t('common.cask') : t('common.formula')}
                           </span>
                         </td>
                         <td className="text-right font-mono text-xs">{p.sizeHuman}</td>
@@ -278,42 +276,38 @@ export default function Maintenance() {
               </div>
             )}
             {largest && largest.length === 0 && (
-              <div className="text-xs text-base-content/50">No installed packages found.</div>
+              <div className="text-xs text-base-content/50">{t('maintenance.noInstalledPackages')}</div>
             )}
           </div>
 
           <div className="divider my-1" />
 
-          <p className="text-sm text-base-content/70">
-            Removes old versions of installed formulae and casks, and clears the download cache.
-          </p>
+          <p className="text-sm text-base-content/70">{t('maintenance.cleanupDescription')}</p>
           <div className="flex gap-2">
             <button className="btn btn-sm" disabled={cleanupRunning !== null} onClick={() => runCleanup(true)}>
               {cleanupRunning === 'preview' ? <span className="loading loading-spinner loading-xs" /> : null}
-              Preview (dry run)
+              {t('maintenance.previewDryRun')}
             </button>
             <button className="btn btn-sm btn-error" disabled={cleanupRunning !== null} onClick={() => runCleanup(false)}>
               {cleanupRunning === 'real' ? <span className="loading loading-spinner loading-xs" /> : <TrashIcon className="size-4" />}
-              Clean up now
+              {t('maintenance.cleanUpNow')}
             </button>
           </div>
           <div className="divider my-1" />
-          <p className="text-sm text-base-content/70">
-            Removes formulae that were installed only as a dependency and are no longer needed by anything.
-          </p>
+          <p className="text-sm text-base-content/70">{t('maintenance.autoremoveDescription')}</p>
           <div className="flex gap-2">
             <button className="btn btn-sm" disabled={cleanupRunning !== null} onClick={() => runAutoremove(true)}>
               {cleanupRunning === 'autoremove-preview' ? <span className="loading loading-spinner loading-xs" /> : null}
-              Preview orphans
+              {t('maintenance.previewOrphans')}
             </button>
             <button className="btn btn-sm btn-warning" disabled={cleanupRunning !== null} onClick={() => runAutoremove(false)}>
               {cleanupRunning === 'autoremove' ? <span className="loading loading-spinner loading-xs" /> : <TrashIcon className="size-4" />}
-              Remove orphaned dependencies
+              {t('maintenance.removeOrphanedDeps')}
             </button>
           </div>
           {cleanupOutput && (
             <pre className="mockup-code text-xs overflow-x-auto max-h-96">
-              <code className="whitespace-pre px-4">{cleanupOutput.join('\n') || 'Nothing to clean up.'}</code>
+              <code className="whitespace-pre px-4">{cleanupOutput.join('\n') || t('maintenance.nothingToCleanUp')}</code>
             </pre>
           )}
         </div>
@@ -322,37 +316,29 @@ export default function Maintenance() {
       {tab === 'brewfile' && (
         <div className="space-y-4">
           <div>
-            <p className="text-sm text-base-content/70 mb-2">
-              Export everything you have installed to a Brewfile, a portable snapshot you can check into a dotfiles
-              repo or use to set up a new machine.
-            </p>
+            <p className="text-sm text-base-content/70 mb-2">{t('maintenance.exportDescription')}</p>
             <button className="btn btn-sm btn-primary" disabled={exporting} onClick={doExport}>
               {exporting ? <span className="loading loading-spinner loading-xs" /> : <DownloadIcon className="size-4" />}
-              Export Brewfile…
+              {t('maintenance.exportButton')}
             </button>
-            {exportedPath && <p className="text-xs text-success mt-2">Saved to {exportedPath}</p>}
+            {exportedPath && <p className="text-xs text-success mt-2">{t('maintenance.savedTo', { path: exportedPath })}</p>}
           </div>
           <div className="divider my-1" />
           <div>
-            <p className="text-sm text-base-content/70 mb-2">
-              Install everything listed in an existing Brewfile. Useful for restoring a snapshot on a new machine.
-            </p>
+            <p className="text-sm text-base-content/70 mb-2">{t('maintenance.importDescription')}</p>
             <button className="btn btn-sm" disabled={importing} onClick={doImport}>
               {importing ? <span className="loading loading-spinner loading-xs" /> : <ImportIcon className="size-4" />}
-              Import Brewfile…
+              {t('maintenance.importButton')}
             </button>
           </div>
 
           <div className="divider my-1" />
 
           <div>
-            <p className="text-sm text-base-content/70 mb-2">
-              Check whether a Brewfile is satisfied, see everything it declares, or preview removing anything
-              installed that isn't in it.
-            </p>
+            <p className="text-sm text-base-content/70 mb-2">{t('maintenance.checkDescription')}</p>
             <div className="flex items-center gap-2 mb-3">
               <button className="btn btn-sm" onClick={pickBundlePath}>
-                {bundlePath ? 'Change Brewfile…' : 'Select a Brewfile…'}
+                {bundlePath ? t('maintenance.changeBrewfile') : t('maintenance.selectBrewfile')}
               </button>
               {bundlePath && <span className="font-mono text-xs text-base-content/60 truncate">{bundlePath}</span>}
             </div>
@@ -361,13 +347,13 @@ export default function Maintenance() {
               <div className="space-y-3">
                 <div className="flex flex-wrap gap-2">
                   <button className="btn btn-xs" disabled={bundleCheckLoading} onClick={doBundleCheck}>
-                    {bundleCheckLoading && <span className="loading loading-spinner loading-xs" />} Check
+                    {bundleCheckLoading && <span className="loading loading-spinner loading-xs" />} {t('maintenance.check')}
                   </button>
                   <button className="btn btn-xs" disabled={bundleListLoading} onClick={doBundleList}>
-                    {bundleListLoading && <span className="loading loading-spinner loading-xs" />} List contents
+                    {bundleListLoading && <span className="loading loading-spinner loading-xs" />} {t('maintenance.listContents')}
                   </button>
                   <button className="btn btn-xs" disabled={cleanupPreviewLoading} onClick={doCleanupPreview}>
-                    {cleanupPreviewLoading && <span className="loading loading-spinner loading-xs" />} Preview cleanup
+                    {cleanupPreviewLoading && <span className="loading loading-spinner loading-xs" />} {t('maintenance.previewCleanup')}
                   </button>
                 </div>
 
@@ -389,14 +375,10 @@ export default function Maintenance() {
                 {cleanupPreview && (
                   <div>
                     {cleanupPreview.length === 0 ? (
-                      <div className="alert alert-success alert-soft text-xs">
-                        Nothing to remove. Everything installed is in the Brewfile.
-                      </div>
+                      <div className="alert alert-success alert-soft text-xs">{t('maintenance.cleanupNothingToRemove')}</div>
                     ) : (
                       <div className="space-y-2">
-                        <div className="text-xs text-base-content/60">
-                          Not in the Brewfile, would be removed:
-                        </div>
+                        <div className="text-xs text-base-content/60">{t('maintenance.notInBrewfile')}</div>
                         <div className="flex flex-wrap gap-1">
                           {cleanupPreview.map((item) => (
                             <span
@@ -413,7 +395,7 @@ export default function Maintenance() {
                           ) : (
                             <TrashIcon className="size-3.5" />
                           )}
-                          Remove {cleanupPreview.length} package{cleanupPreview.length === 1 ? '' : 's'}
+                          {t('maintenance.removePackagesButton', { count: cleanupPreview.length })}
                         </button>
                       </div>
                     )}
@@ -429,7 +411,7 @@ export default function Maintenance() {
         <div className="space-y-3">
           {configLoading && (
             <div className="flex items-center gap-2 text-base-content/60">
-              <span className="loading loading-spinner loading-sm" /> Loading…
+              <span className="loading loading-spinner loading-sm" /> {t('common.loading')}
             </div>
           )}
           {config && (

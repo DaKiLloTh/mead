@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { api, Collection } from '../lib/api'
 import { useJobs } from '../context/JobsContext'
 import { DownloadIcon, GridIcon } from '../components/Icons'
@@ -8,6 +9,7 @@ interface Props {
 }
 
 export default function Collections({ bump }: Props) {
+  const { t } = useTranslation()
   const { runAction } = useJobs()
   const [collections, setCollections] = useState<Collection[]>([])
   const [installing, setInstalling] = useState<string | null>(null)
@@ -25,8 +27,8 @@ export default function Collections({ bump }: Props) {
 
   return (
     <div className="p-6">
-      <h1 className="text-2xl font-bold mb-1">Collections</h1>
-      <p className="text-base-content/60 text-sm mb-4">Curated bundles for common workflows. Install everything in one go.</p>
+      <h1 className="text-2xl font-bold mb-1">{t('collections.title')}</h1>
+      <p className="text-base-content/60 text-sm mb-4">{t('collections.subtitle')}</p>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {collections.map((c) => (
@@ -54,7 +56,7 @@ export default function Collections({ bump }: Props) {
                   ) : (
                     <DownloadIcon className="size-4" />
                   )}
-                  Install all
+                  {t('collections.installAll')}
                 </button>
               </div>
             </div>

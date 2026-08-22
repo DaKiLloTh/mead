@@ -1,4 +1,5 @@
 import React, { createContext, useCallback, useContext, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 interface ConfirmCheckbox {
   label: string
@@ -32,6 +33,7 @@ export function useConfirm() {
 }
 
 export function ConfirmProvider({ children }: { children: React.ReactNode }) {
+  const { t } = useTranslation()
   const [pending, setPending] = useState<PendingConfirm | null>(null)
   const [checked, setChecked] = useState<boolean[]>([])
 
@@ -73,13 +75,13 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
           ))}
           <div className="modal-action">
             <button className="btn" onClick={() => close(false)}>
-              {pending?.cancelLabel ?? 'Cancel'}
+              {pending?.cancelLabel ?? t('confirmDialog.cancel')}
             </button>
             <button
               className={`btn ${pending?.danger ? 'btn-error' : 'btn-primary'}`}
               onClick={() => close(true)}
             >
-              {pending?.confirmLabel ?? 'Confirm'}
+              {pending?.confirmLabel ?? t('confirmDialog.confirm')}
             </button>
           </div>
         </div>

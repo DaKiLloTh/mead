@@ -116,6 +116,9 @@ export const api = {
   analyticsState: () => App.AnalyticsState(),
   analyticsSetEnabled: (enabled: boolean) => App.AnalyticsSetEnabled(enabled),
   analyticsRegenerateUUID: () => App.AnalyticsRegenerateUUID(),
+
+  // locale
+  systemLocale: () => App.SystemLocale(),
 }
 
 export function pkgKey(name: string, isCask: boolean): string {

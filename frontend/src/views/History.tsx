@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { api, HistoryEntry } from '../lib/api'
 import { useConfirm } from '../context/ConfirmContext'
 import { CheckIcon, ClockIcon, TrashIcon, XIcon } from '../components/Icons'
 
 export default function History() {
+  const { t } = useTranslation()
   const confirm = useConfirm()
   const [entries, setEntries] = useState<HistoryEntry[] | null>(null)
 
@@ -14,7 +16,7 @@ export default function History() {
   useEffect(load, [])
 
   async function clear() {
-    const { ok } = await confirm({ title: 'Clear activity history?', confirmLabel: 'Clear', danger: true })
+    const { ok } = await confirm({ title: t('history.confirmClearTitle'), confirmLabel: t('history.confirmClearLabel'), danger: true })
     if (!ok) return
     await api.clearHistory()
     load()
@@ -26,24 +28,24 @@ export default function History() {
     <div className="p-6 max-w-3xl">
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h1 className="text-2xl font-bold">History</h1>
-          <p className="text-base-content/60 text-sm">Everything mead has done to your Homebrew installation.</p>
+          <h1 className="text-2xl font-bold">{t('history.title')}</h1>
+          <p className="text-base-content/60 text-sm">{t('history.subtitle')}</p>
         </div>
         {sorted.length > 0 && (
           <button className="btn btn-sm btn-ghost text-error" onClick={clear}>
-            <TrashIcon className="size-4" /> Clear
+            <TrashIcon className="size-4" /> {t('history.clearButton')}
           </button>
         )}
       </div>
 
       {entries === null ? (
         <div className="flex items-center gap-2 text-base-content/60">
-          <span className="loading loading-spinner loading-sm" /> Loading…
+          <span className="loading loading-spinner loading-sm" /> {t('common.loading')}
         </div>
       ) : sorted.length === 0 ? (
         <div className="text-center text-base-content/50 py-16">
           <ClockIcon className="size-8 mx-auto mb-2 opacity-40" />
-          No activity yet.
+          {t('history.noActivity')}
         </div>
       ) : (
         <ul className="timeline timeline-vertical timeline-compact">
@@ -62,7 +64,7 @@ export default function History() {
               </div>
               <div className="timeline-end timeline-box">
                 <span className="capitalize font-medium">{e.action}</span> {e.name}
-                {e.isCask && <span className="badge badge-xs badge-accent badge-outline ml-2">cask</span>}
+                {e.isCask && <span className="badge badge-xs badge-accent badge-outline ml-2">{t('history.caskBadge')}</span>}
               </div>
               {i < sorted.length - 1 && <hr />}
             </li>

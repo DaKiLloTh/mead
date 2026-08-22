@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Trans, useTranslation } from 'react-i18next'
 import { api, AdoptCandidate } from '../lib/api'
 import { useJobs } from '../context/JobsContext'
 import { DownloadIcon, ImportIcon } from '../components/Icons'
@@ -8,6 +9,7 @@ interface Props {
 }
 
 export default function Adopt({ bump }: Props) {
+  const { t } = useTranslation()
   const { runAction } = useJobs()
   const [candidates, setCandidates] = useState<AdoptCandidate[] | null>(null)
   const [loading, setLoading] = useState(false)
@@ -37,27 +39,22 @@ export default function Adopt({ bump }: Props) {
 
   return (
     <div className="p-6 max-w-3xl">
-      <h1 className="text-2xl font-bold mb-1">Adopt Existing Apps</h1>
+      <h1 className="text-2xl font-bold mb-1">{t('adopt.title')}</h1>
       <p className="text-base-content/60 text-sm mb-4">
-        Apps already in <span className="font-mono">/Applications</span> that match an installable cask, so future
-        updates can run through Homebrew instead of each app's own updater.
+        <Trans i18nKey="adopt.subtitle" components={{ path: <span className="font-mono" /> }} />
       </p>
 
       <button className="btn btn-sm btn-primary mb-4" disabled={loading} onClick={scan}>
         {loading ? <span className="loading loading-spinner loading-xs" /> : <ImportIcon className="size-4" />}
-        Scan /Applications
+        {t('adopt.scanButton')}
       </button>
 
-      {loading && (
-        <p className="text-sm text-base-content/50">
-          Checking each app against Homebrew's cask index. This can take a little while.
-        </p>
-      )}
+      {loading && <p className="text-sm text-base-content/50">{t('adopt.scanningHint')}</p>}
 
       {error && !loading && (
         <div className="alert alert-error alert-soft text-sm mb-4">
           <div>
-            <div className="font-medium">Scan failed</div>
+            <div className="font-medium">{t('adopt.scanFailedTitle')}</div>
             <p className="text-sm mt-1">{error}</p>
           </div>
         </div>
@@ -66,9 +63,7 @@ export default function Adopt({ bump }: Props) {
       {candidates && !loading && (
         <>
           {candidates.length === 0 ? (
-            <div className="alert alert-success alert-soft text-sm">
-              Nothing to adopt. Everything matched is already Homebrew-managed (or nothing matched a known cask).
-            </div>
+            <div className="alert alert-success alert-soft text-sm">{t('adopt.nothingToAdopt')}</div>
           ) : (
             <div className="overflow-x-auto rounded-box border border-base-300">
               <table className="table table-sm table-fixed">
@@ -80,10 +75,10 @@ export default function Adopt({ bump }: Props) {
                 </colgroup>
                 <thead>
                   <tr>
-                    <th>App</th>
-                    <th>Matched cask</th>
-                    <th>Version</th>
-                    <th className="text-right">Action</th>
+                    <th>{t('adopt.colApp')}</th>
+                    <th>{t('adopt.colMatchedCask')}</th>
+                    <th>{t('adopt.colVersion')}</th>
+                    <th className="text-right">{t('adopt.colAction')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -110,7 +105,7 @@ export default function Adopt({ bump }: Props) {
                           ) : (
                             <DownloadIcon className="size-3.5" />
                           )}
-                          Adopt
+                          {t('adopt.adoptButton')}
                         </button>
                       </td>
                     </tr>

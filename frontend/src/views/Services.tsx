@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { api, Service } from '../lib/api'
 import { useJobs } from '../context/JobsContext'
 import { PlayIcon, RefreshIcon, SquareIcon } from '../components/Icons'
@@ -17,6 +18,7 @@ function statusBadge(status: string) {
 }
 
 export default function Services({ refreshToken, bump }: Props) {
+  const { t } = useTranslation()
   const { runAction } = useJobs()
   const [services, setServices] = useState<Service[]>([])
   const [loading, setLoading] = useState(true)
@@ -55,15 +57,15 @@ export default function Services({ refreshToken, bump }: Props) {
     <div className="p-6">
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h1 className="text-2xl font-bold">Services</h1>
-          <p className="text-base-content/60 text-sm">Background services managed by `brew services`.</p>
+          <h1 className="text-2xl font-bold">{t('services.title')}</h1>
+          <p className="text-base-content/60 text-sm">{t('services.subtitle')}</p>
         </div>
         <div className="flex gap-2">
           <button className="btn btn-sm" disabled={cleaningUp} onClick={cleanup}>
-            {cleaningUp && <span className="loading loading-spinner loading-xs" />} Clean up unused
+            {cleaningUp && <span className="loading loading-spinner loading-xs" />} {t('services.cleanUpUnused')}
           </button>
           <button className="btn btn-sm" disabled={loading} onClick={load}>
-            <RefreshIcon className="size-4" /> Refresh
+            <RefreshIcon className="size-4" /> {t('common.refresh')}
           </button>
         </div>
       </div>
@@ -72,10 +74,10 @@ export default function Services({ refreshToken, bump }: Props) {
 
       {loading && services.length === 0 ? (
         <div className="flex items-center gap-2 text-base-content/60">
-          <span className="loading loading-spinner loading-sm" /> Loading…
+          <span className="loading loading-spinner loading-sm" /> {t('common.loading')}
         </div>
       ) : services.length === 0 && !error ? (
-        <div className="text-center text-base-content/50 py-16">No services installed yet.</div>
+        <div className="text-center text-base-content/50 py-16">{t('services.noServices')}</div>
       ) : (
         <div className="overflow-x-auto rounded-box border border-base-300">
           <table className="table table-sm table-fixed">
@@ -88,11 +90,11 @@ export default function Services({ refreshToken, bump }: Props) {
             </colgroup>
             <thead>
               <tr>
-                <th>Name</th>
-                <th>Status</th>
-                <th>User</th>
-                <th>PID</th>
-                <th className="text-right">Actions</th>
+                <th>{t('services.colName')}</th>
+                <th>{t('services.colStatus')}</th>
+                <th>{t('services.colUser')}</th>
+                <th>{t('services.colPid')}</th>
+                <th className="text-right">{t('services.colActions')}</th>
               </tr>
             </thead>
             <tbody>
@@ -113,7 +115,7 @@ export default function Services({ refreshToken, bump }: Props) {
                           className="btn btn-xs btn-ghost"
                           disabled={rowBusy === s.name}
                           onClick={() => act(s.name, () => api.serviceStop(s.name))}
-                          title="Stop"
+                          title={t('services.stopTooltip')}
                         >
                           <SquareIcon className="size-4" />
                         </button>
@@ -122,7 +124,7 @@ export default function Services({ refreshToken, bump }: Props) {
                           className="btn btn-xs btn-ghost text-success"
                           disabled={rowBusy === s.name}
                           onClick={() => act(s.name, () => api.serviceStart(s.name))}
-                          title="Start"
+                          title={t('services.startTooltip')}
                         >
                           <PlayIcon className="size-4" />
                         </button>
@@ -131,7 +133,7 @@ export default function Services({ refreshToken, bump }: Props) {
                         className="btn btn-xs btn-ghost"
                         disabled={rowBusy === s.name}
                         onClick={() => act(s.name, () => api.serviceRestart(s.name))}
-                        title="Restart"
+                        title={t('services.restartTooltip')}
                       >
                         <RefreshIcon className="size-4" />
                       </button>
