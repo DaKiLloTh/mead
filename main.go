@@ -30,7 +30,7 @@ func main() {
 		},
 		BackgroundColour: &options.RGBA{R: 0, G: 0, B: 0, A: 0},
 		OnStartup:        application.Startup,
-		Bind: []interface{}{
+		Bind: []any{
 			application,
 		},
 		Mac: &mac.Options{
