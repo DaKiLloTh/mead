@@ -79,7 +79,7 @@ export default function Security() {
             <a className="link" href="https://osv.dev" target="_blank" rel="noreferrer">
               OSV.dev
             </a>
-            's public advisory database. Best-effort — casks aren't covered, and a clean scan doesn't guarantee
+            's public advisory database. Best-effort: casks aren't covered, and a clean scan doesn't guarantee
             there's nothing wrong, just nothing known.
           </p>
           <button className="btn btn-sm btn-primary" disabled={vulnsLoading} onClick={scanVulns}>
@@ -90,7 +90,7 @@ export default function Security() {
           {vulns && (
             <div className="mt-2">
               <div className="text-sm text-base-content/60 mb-2">
-                Scanned {vulns.length} formulae — {affected.length} with known advisories
+                Scanned {vulns.length} formulae, {affected.length} with known advisories
                 {errored.length > 0 && `, ${errored.length} couldn't be checked`}.
               </div>
               {affected.length === 0 ? (
@@ -146,7 +146,7 @@ export default function Security() {
       {tab === 'duplicates' && (
         <div className="space-y-3">
           <p className="text-sm text-base-content/70">
-            Flags names installed as both a formula and a cask — usually the same tool pulled in twice.
+            Flags names installed as both a formula and a cask, usually the same tool pulled in twice.
           </p>
           <button className="btn btn-sm btn-primary" disabled={dupesLoading} onClick={scanDupes}>
             {dupesLoading ? <span className="loading loading-spinner loading-xs" /> : <CopyIcon className="size-4" />}

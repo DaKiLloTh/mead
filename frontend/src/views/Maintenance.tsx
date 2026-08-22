@@ -230,7 +230,7 @@ export default function Maintenance() {
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <p className="text-sm text-base-content/70">
-                Largest installed packages — see what's taking up the most disk space.
+                Largest installed packages. See what's taking up the most disk space.
               </p>
               <button className="btn btn-xs" disabled={largestLoading} onClick={loadLargest}>
                 {largestLoading ? (
@@ -323,7 +323,7 @@ export default function Maintenance() {
         <div className="space-y-4">
           <div>
             <p className="text-sm text-base-content/70 mb-2">
-              Export everything you have installed to a Brewfile — a portable snapshot you can check into a dotfiles
+              Export everything you have installed to a Brewfile, a portable snapshot you can check into a dotfiles
               repo or use to set up a new machine.
             </p>
             <button className="btn btn-sm btn-primary" disabled={exporting} onClick={doExport}>
@@ -335,7 +335,7 @@ export default function Maintenance() {
           <div className="divider my-1" />
           <div>
             <p className="text-sm text-base-content/70 mb-2">
-              Install everything listed in an existing Brewfile — useful for restoring a snapshot on a new machine.
+              Install everything listed in an existing Brewfile. Useful for restoring a snapshot on a new machine.
             </p>
             <button className="btn btn-sm" disabled={importing} onClick={doImport}>
               {importing ? <span className="loading loading-spinner loading-xs" /> : <ImportIcon className="size-4" />}
@@ -390,12 +390,12 @@ export default function Maintenance() {
                   <div>
                     {cleanupPreview.length === 0 ? (
                       <div className="alert alert-success alert-soft text-xs">
-                        Nothing to remove — everything installed is in the Brewfile.
+                        Nothing to remove. Everything installed is in the Brewfile.
                       </div>
                     ) : (
                       <div className="space-y-2">
                         <div className="text-xs text-base-content/60">
-                          Not in the Brewfile — would be removed:
+                          Not in the Brewfile, would be removed:
                         </div>
                         <div className="flex flex-wrap gap-1">
                           {cleanupPreview.map((item) => (

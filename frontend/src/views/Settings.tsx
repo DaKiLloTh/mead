@@ -81,7 +81,7 @@ export default function Settings() {
   async function clearAllData() {
     const { ok } = await confirm({
       title: 'Clear all local mead data?',
-      body: 'Removes favorites, tags, notes, snoozes, and activity history. This only affects data mead keeps for itself — nothing installed by Homebrew is touched.',
+      body: 'Removes favorites, tags, notes, snoozes, and activity history. This only affects data mead keeps for itself. Nothing installed by Homebrew is touched.',
       confirmLabel: 'Clear data',
       danger: true,
     })
@@ -138,7 +138,7 @@ export default function Settings() {
           <h2 className="card-title text-base">Privacy</h2>
           <p className="text-sm text-base-content/70">
             mead never sends its own commands' analytics to Homebrew (suppressed automatically), but this controls
-            Homebrew's own global analytics preference — the one that also applies if you use `brew` directly in a
+            Homebrew's own global analytics preference, the one that also applies if you use `brew` directly in a
             terminal.
           </p>
           {analyticsLoading ? (
@@ -211,7 +211,7 @@ export default function Settings() {
           <p className="text-sm text-base-content/70">
             Favorites, tags, notes, snoozes, and history are stored locally at{' '}
             <span className="font-mono">~/Library/Application Support/mead/store.json</span>. Export a backup, or
-            import one to restore it — useful if the local file is ever lost, or when setting up mead on a new Mac.
+            import one to restore it, useful if the local file is ever lost, or when setting up mead on a new Mac.
           </p>
           <div className="flex flex-wrap gap-2">
             <button className="btn btn-sm" onClick={() => api.revealLocalDataFile()}>

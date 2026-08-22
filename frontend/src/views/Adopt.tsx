@@ -46,7 +46,7 @@ export default function Adopt({ bump }: Props) {
 
       {loading && (
         <p className="text-sm text-base-content/50">
-          Checking each app against Homebrew's cask index — this can take a little while.
+          Checking each app against Homebrew's cask index. This can take a little while.
         </p>
       )}
 
@@ -54,7 +54,7 @@ export default function Adopt({ bump }: Props) {
         <>
           {candidates.length === 0 ? (
             <div className="alert alert-success alert-soft text-sm">
-              Nothing to adopt — everything matched is already Homebrew-managed (or nothing matched a known cask).
+              Nothing to adopt. Everything matched is already Homebrew-managed (or nothing matched a known cask).
             </div>
           ) : (
             <div className="overflow-x-auto rounded-box border border-base-300">
