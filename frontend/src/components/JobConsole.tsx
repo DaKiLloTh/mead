@@ -53,7 +53,16 @@ function GistLogsButton({ title }: { title: string }) {
 }
 
 export default function JobConsole() {
-  const { jobs, activeCount, consoleOpen, setConsoleOpen, selectedJobId, setSelectedJobId, cancelJob } = useJobs()
+  const {
+    jobs,
+    activeCount,
+    consoleOpen,
+    setConsoleOpen,
+    selectedJobId,
+    setSelectedJobId,
+    cancelJob,
+    clearFinishedJobs,
+  } = useJobs()
   const bodyRef = useRef<HTMLDivElement>(null)
 
   const selected = jobs.find((j) => j.id === selectedJobId) ?? jobs[jobs.length - 1]
@@ -70,18 +79,29 @@ export default function JobConsole() {
 
   return (
     <div className="border-t border-base-300 bg-base-100 flex flex-col shrink-0" style={{ height: consoleOpen ? 280 : 40 }}>
-      <button
-        className="flex items-center gap-2 px-3 h-10 shrink-0 text-sm hover:bg-base-200 transition-colors"
-        onClick={() => setConsoleOpen(!consoleOpen)}
-      >
-        <span className="font-medium">Activity</span>
-        {activeCount > 0 && <span className="badge badge-primary badge-sm">{activeCount} running</span>}
-        <span className="flex-1" />
-        {selected && (
-          <span className="text-base-content/60 truncate max-w-xs">{selected.title}</span>
+      <div className="flex items-center gap-2 px-3 h-10 shrink-0 text-sm">
+        <button
+          className="flex items-center gap-2 flex-1 min-w-0 h-full hover:bg-base-200 transition-colors -mx-3 px-3"
+          onClick={() => setConsoleOpen(!consoleOpen)}
+        >
+          <span className="font-medium">Activity</span>
+          {activeCount > 0 && <span className="badge badge-primary badge-sm">{activeCount} running</span>}
+          <span className="flex-1" />
+          {selected && (
+            <span className="text-base-content/60 truncate max-w-xs">{selected.title}</span>
+          )}
+          <span className="text-base-content/50">{consoleOpen ? '▾' : '▴'}</span>
+        </button>
+        {activeCount === 0 && (
+          <button
+            className="btn btn-ghost btn-xs btn-circle shrink-0"
+            title="Close"
+            onClick={clearFinishedJobs}
+          >
+            ✕
+          </button>
         )}
-        <span className="text-base-content/50">{consoleOpen ? '▾' : '▴'}</span>
-      </button>
+      </div>
 
       {consoleOpen && (
         <div className="flex flex-1 min-h-0">

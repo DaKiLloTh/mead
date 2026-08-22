@@ -13,10 +13,12 @@ body {
 }
 
 .drag-region {
+  --wails-draggable: drag;
   -webkit-app-region: drag;
 }
 
 .no-drag {
+  --wails-draggable: no-drag;
   -webkit-app-region: no-drag;
 }
 
