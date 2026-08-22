@@ -108,15 +108,25 @@ func (a *App) Config() (string, error) {
 // ---- streaming (long-running) actions; each returns a job id, and the
 // frontend subscribes to job:start / job:output / job:done events ----
 
+// caskFlagsFor is the pure core of caskFlags: given a cask-appdir setting
+// (blank meaning "use brew's default"), it returns the flags to append for
+// a command that installs/reinstalls/upgrades a single cask -- forcing
+// --cask (to disambiguate the name) plus --appdir if a custom directory is
+// configured. Split out from caskFlags so it's directly unit testable
+// without an *App/*Store.
+func caskFlagsFor(caskAppDir string) []string {
+	flags := []string{"--cask"}
+	if caskAppDir != "" {
+		flags = append(flags, "--appdir="+caskAppDir)
+	}
+	return flags
+}
+
 // caskFlags returns the flags to append for a cask-touching command,
 // including --appdir if the user has set a custom cask install directory in
 // Settings.
 func (a *App) caskFlags() []string {
-	flags := []string{"--cask"}
-	if dir := a.store.CaskAppDir(); dir != "" {
-		flags = append(flags, "--appdir="+dir)
-	}
-	return flags
+	return caskFlagsFor(a.store.CaskAppDir())
 }
 
 func (a *App) Install(name string, isCask bool) string {
@@ -470,13 +480,24 @@ func (a *App) ScanAdoptableApps() ([]AdoptCandidate, error) {
 	return ScanAdoptableApps(a.ctx)
 }
 
+// buildAdoptCaskArgs builds the `brew install --cask --adopt <name>`
+// argument list, including --appdir if a custom cask install directory is
+// configured. Pure so it's directly unit testable.
+func buildAdoptCaskArgs(name string, caskAppDir string) []string {
+	args := []string{"install"}
+	args = append(args, caskFlagsFor(caskAppDir)...)
+	args = append(args, "--adopt", name)
+	return args
+}
+
 // AdoptCask takes over management of an app that's already installed by
 // hand, using brew's own --adopt flag so it doesn't reinstall/overwrite it.
 func (a *App) AdoptCask(name string) string {
 	if err := validName(name); err != nil {
 		return a.jobs.Fail(fmt.Sprintf("Adopt %s", name), err.Error())
 	}
-	return a.jobs.StartTracked(fmt.Sprintf("Adopt %s", name), a.record("adopt", name, true), "install", "--cask", "--adopt", name)
+	args := buildAdoptCaskArgs(name, a.store.CaskAppDir())
+	return a.jobs.StartTracked(fmt.Sprintf("Adopt %s", name), a.record("adopt", name, true), args...)
 }
 
 func (a *App) FindDuplicateApps() ([]DuplicateApp, error) {
