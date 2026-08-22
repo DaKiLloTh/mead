@@ -7,7 +7,8 @@ package security
 import (
 	"bytes"
 	"context"
-	"encoding/json"
+	"encoding/json/v2" // OSV.dev request/response bodies; unrelated to the
+	// Wails RPC boundary (see internal/brew/brewinfo.go for the full note).
 	"fmt"
 	"net/http"
 	"os"
@@ -105,7 +106,7 @@ func ScanVulnerabilities(ctx context.Context, pkgs []brew.BrewPackage) ([]VulnRe
 	}
 
 	var batchResp osvBatchResponse
-	if err := json.NewDecoder(resp.Body).Decode(&batchResp); err != nil {
+	if err := json.UnmarshalRead(resp.Body, &batchResp); err != nil {
 		return nil, err
 	}
 

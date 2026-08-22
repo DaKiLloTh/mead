@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 )
 
@@ -248,5 +249,310 @@ func TestCaskToPackage_FullName(t *testing.T) {
 				t.Errorf("%s: FullName = %q, want %q (%s)", tt.name, p.FullName, tt.wantFull, tt.desc)
 			}
 		})
+	}
+}
+
+// ---- encoding/json/v2 migration regression coverage ----
+//
+// These fixtures are trimmed but otherwise verbatim excerpts of real
+// `brew info --json=v2 --installed` output (captured against Homebrew
+// 6.0.18 on macOS/arm64: one formula, "coreutils", and one cask, "iterm2"),
+// deliberately including a long tail of real fields decodeInfoV2/
+// formulaToPackage/caskToPackage don't model (oldnames, urls, bottle,
+// requirements, ruby_source_path, an unrelated top-level key, etc), several
+// real JSON nulls, and nested arrays/objects. The point is to prove the
+// encoding/json/v2 migration parses real, unmodeled-field-heavy brew output
+// exactly like v1 did: v2 ignores unknown struct/object members by default
+// (same as v1) rather than rejecting them, which is what this whole decode
+// layer's map[string]interface{}-based approach depends on.
+const realBrewInfoV2Fixture = `{
+  "unexpected_future_top_level_key": {"brew_might_add_this_someday": true},
+  "formulae": [
+    {
+      "name": "coreutils",
+      "full_name": "coreutils",
+      "tap": "homebrew/core",
+      "oldnames": [],
+      "aliases": [],
+      "versioned_formulae": [],
+      "desc": "GNU File, Shell, and Text utilities",
+      "license": "GPL-3.0-or-later",
+      "homepage": "https://www.gnu.org/software/coreutils/",
+      "versions": {"stable": "9.11", "head": "HEAD", "bottle": true},
+      "urls": {
+        "stable": {"url": "https://ftpmirror.gnu.org/gnu/coreutils/coreutils-9.11.tar.xz", "tag": null, "revision": null, "using": null, "checksum": "394024eda0a5955217ceda9cd1201e65dc8fa3aa29c2951135a49521d57c3cc3"},
+        "head": {"url": "https://git.savannah.gnu.org/git/coreutils.git", "branch": "master", "using": null}
+      },
+      "patches": [],
+      "revision": 0,
+      "version_scheme": 0,
+      "compatibility_version": null,
+      "autobump": true,
+      "bottle": {
+        "stable": {
+          "rebuild": 0,
+          "root_url": "https://ghcr.io/v2/homebrew/core",
+          "files": {"arm64_tahoe": {"cellar": "/opt/homebrew/Cellar", "url": "https://ghcr.io/v2/homebrew/core/coreutils/blobs/sha256:85beae05ca59ba87d10380b529d6fb3837f3527c79a6045abb52643eb3ff2316", "sha256": "85beae05ca59ba87d10380b529d6fb3837f3527c79a6045abb52643eb3ff2316"}}
+        }
+      },
+      "pour_bottle_only_if": null,
+      "keg_only": false,
+      "keg_only_reason": null,
+      "options": [],
+      "build_dependencies": [],
+      "dependencies": ["gmp"],
+      "test_dependencies": [],
+      "recommended_dependencies": [],
+      "optional_dependencies": [],
+      "uses_from_macos": [{"gperf": "build"}],
+      "uses_from_macos_bounds": [{}],
+      "requirements": [],
+      "conflicts_with": ["b2sum", "gfold", "idutils"],
+      "conflicts_with_reasons": ["both install ` + "`b2sum`" + ` binaries", "both install ` + "`gfold`" + ` binaries", "both install ` + "`gid`" + ` and ` + "`gid.1`" + `"],
+      "link_overwrite": [],
+      "caveats": "Commands also provided by macOS and the commands dir, dircolors, vdir have been installed with the prefix \"g\".\nIf you need to use these commands with their normal names, you can add a \"gnubin\" directory to your PATH with:\n  PATH=\"$HOMEBREW_PREFIX/opt/coreutils/libexec/gnubin:$PATH\"\n",
+      "installed": [
+        {
+          "version": "9.11",
+          "used_options": [],
+          "built_as_bottle": true,
+          "poured_from_bottle": true,
+          "time": 1780788852,
+          "runtime_dependencies": [
+            {"full_name": "gmp", "version": "6.3.0", "revision": 0, "bottle_rebuild": 0, "pkg_version": "6.3.0", "declared_directly": true}
+          ],
+          "installed_on_request": true,
+          "installed_as_dependency": false
+        }
+      ],
+      "linked_keg": "9.11",
+      "pinned": false,
+      "outdated": false,
+      "deprecated": false,
+      "deprecation_date": null,
+      "deprecation_reason": null,
+      "disabled": false,
+      "disable_date": null,
+      "disable_reason": null,
+      "post_install_steps": [],
+      "post_install_defined": false,
+      "service": null,
+      "tap_git_head": "abc123",
+      "ruby_source_path": "Formula/c/coreutils.rb",
+      "ruby_source_checksum": {"sha256": "deadbeef"},
+      "head_dependencies": {}
+    }
+  ],
+  "casks": [
+    {
+      "token": "iterm2",
+      "full_token": "iterm2",
+      "old_tokens": [],
+      "tap": "homebrew/cask",
+      "name": ["iTerm2"],
+      "desc": "Terminal emulator as alternative to Apple's Terminal app",
+      "homepage": "https://iterm2.com/",
+      "url": "https://iterm2.com/downloads/stable/iTerm2-3_6_11.zip",
+      "url_specs": {},
+      "version": "3.6.11",
+      "autobump": true,
+      "installed": "3.6.11",
+      "installed_time": 1780769226,
+      "bundle_version": "3.6.11",
+      "bundle_short_version": "3.6.11",
+      "pinned": false,
+      "pinned_version": null,
+      "outdated": false,
+      "sha256": "36e78c5049560eaa8e122224f6652eb4b229c61cd5e7332d6d25b5c36f7398e7",
+      "artifacts": [
+        {"app": ["iTerm.app"], "target": "/Applications/iTerm.app"},
+        {"zap": [{"trash": [
+          "~/Library/Application Support/iTerm",
+          "~/Library/Application Support/iTerm2",
+          "~/Library/Caches/com.googlecode.iterm2",
+          "~/Library/Preferences/com.googlecode.iterm2.plist"
+        ]}]}
+      ],
+      "caveats": null,
+      "caveats_rosetta": null,
+      "depends_on": {"macos": {">=": ["12"]}},
+      "conflicts_with": {"cask": ["iterm2@beta", "iterm2@nightly"]},
+      "container": null,
+      "rename": [],
+      "auto_updates": true,
+      "deprecated": false,
+      "deprecation_date": null,
+      "disabled": false,
+      "disable_date": null,
+      "tap_git_head": "4c4eeced68a80edd3d8a7d43287a6618d6ee2679",
+      "languages": [],
+      "ruby_source_path": "Casks/i/iterm2.rb",
+      "ruby_source_checksum": {"sha256": "c5cd110e5dabf28727f1788609d800fb180273c85a5a635ea53f0a9f23b20700"}
+    }
+  ]
+}`
+
+// TestDecodeInfoV2_RealFixture feeds decodeInfoV2 a trimmed real
+// `brew info --json=v2` payload (see realBrewInfoV2Fixture) and checks the
+// fields mead actually surfaces come out right under encoding/json/v2 --
+// including a top-level key ("unexpected_future_top_level_key") that isn't
+// part of the {formulae, casks} wrapper struct at all, which must be
+// silently ignored rather than rejected (v2's RejectUnknownMembers option
+// defaults to off, same as v1's always-ignore behavior).
+func TestDecodeInfoV2_RealFixture(t *testing.T) {
+	pkgs, err := decodeInfoV2([]byte(realBrewInfoV2Fixture))
+	if err != nil {
+		t.Fatalf("decodeInfoV2: %v", err)
+	}
+	if len(pkgs) != 2 {
+		t.Fatalf("got %d packages, want 2", len(pkgs))
+	}
+
+	var formula, cask *BrewPackage
+	for i := range pkgs {
+		switch pkgs[i].Name {
+		case "coreutils":
+			formula = &pkgs[i]
+		case "iterm2":
+			cask = &pkgs[i]
+		}
+	}
+	if formula == nil {
+		t.Fatal("coreutils formula not found in decoded output")
+	}
+	if cask == nil {
+		t.Fatal("iterm2 cask not found in decoded output")
+	}
+
+	// Formula assertions.
+	if formula.FullName != "coreutils" {
+		t.Errorf("formula.FullName = %q, want %q", formula.FullName, "coreutils")
+	}
+	if formula.IsCask {
+		t.Error("formula.IsCask = true, want false")
+	}
+	if formula.Tap != "homebrew/core" {
+		t.Errorf("formula.Tap = %q, want %q", formula.Tap, "homebrew/core")
+	}
+	if formula.Version != "9.11" {
+		t.Errorf("formula.Version = %q, want %q (from versions.stable)", formula.Version, "9.11")
+	}
+	if !formula.Installed {
+		t.Error("formula.Installed = false, want true")
+	}
+	if formula.InstalledVersion != "9.11" {
+		t.Errorf("formula.InstalledVersion = %q, want %q", formula.InstalledVersion, "9.11")
+	}
+	if !formula.InstalledOnRequest {
+		t.Error("formula.InstalledOnRequest = false, want true")
+	}
+	if formula.InstalledAsDependency {
+		t.Error("formula.InstalledAsDependency = true, want false")
+	}
+	if !formula.Linked {
+		t.Error("formula.Linked = false, want true (linked_keg == installed version)")
+	}
+	if formula.Caveats == "" {
+		t.Error("formula.Caveats is empty, want the real multi-line caveats text")
+	}
+	if len(formula.Dependencies) != 1 || formula.Dependencies[0] != "gmp" {
+		t.Errorf("formula.Dependencies = %v, want [gmp]", formula.Dependencies)
+	}
+	wantConflicts := []string{"b2sum", "gfold", "idutils"}
+	if len(formula.ConflictsWith) != len(wantConflicts) {
+		t.Errorf("formula.ConflictsWith = %v, want %v", formula.ConflictsWith, wantConflicts)
+	} else {
+		for i, c := range wantConflicts {
+			if formula.ConflictsWith[i] != c {
+				t.Errorf("formula.ConflictsWith[%d] = %q, want %q", i, formula.ConflictsWith[i], c)
+			}
+		}
+	}
+
+	// Cask assertions.
+	if cask.Name != "iterm2" {
+		t.Errorf("cask.Name = %q, want %q", cask.Name, "iterm2")
+	}
+	if !cask.IsCask {
+		t.Error("cask.IsCask = false, want true")
+	}
+	if cask.FullName != "iTerm2" {
+		t.Errorf("cask.FullName = %q, want %q (from name[0])", cask.FullName, "iTerm2")
+	}
+	if cask.Version != "3.6.11" {
+		t.Errorf("cask.Version = %q, want %q", cask.Version, "3.6.11")
+	}
+	if !cask.Installed || cask.InstalledVersion != "3.6.11" {
+		t.Errorf("cask.Installed=%v InstalledVersion=%q, want true/%q", cask.Installed, cask.InstalledVersion, "3.6.11")
+	}
+	if !cask.AutoUpdates {
+		t.Error("cask.AutoUpdates = false, want true")
+	}
+	wantApp := filepath.Join("/Applications", "iTerm.app")
+	found := false
+	for _, p := range cask.AppPaths {
+		if p == wantApp {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("cask.AppPaths = %v, want it to contain %q", cask.AppPaths, wantApp)
+	}
+	if len(cask.ZapTrashPaths) != 4 {
+		t.Errorf("cask.ZapTrashPaths has %d entries, want 4", len(cask.ZapTrashPaths))
+	}
+	wantArtifactLabel := "App: iTerm.app"
+	if len(cask.Artifacts) == 0 || cask.Artifacts[0] != wantArtifactLabel {
+		t.Errorf("cask.Artifacts = %v, want first entry %q", cask.Artifacts, wantArtifactLabel)
+	}
+}
+
+// TestDecodeInfoV2_DuplicateObjectMemberNames documents a genuine behavioral
+// difference between v1 and v2: v1 silently accepts duplicate JSON object
+// member names (last one wins), while v2 rejects them by default
+// (jsontext.AllowDuplicateNames is off by default). Real `brew info --json`
+// output has never been observed to contain duplicate keys within a single
+// object -- Ruby's Hash#to_json can't produce them -- so this isn't expected
+// to bite in practice, but it's the one case where v2 is measurably stricter
+// than v1 for object decoding, so it's worth pinning down explicitly rather
+// than discovering it via a cryptic user bug report.
+func TestDecodeInfoV2_DuplicateObjectMemberNames(t *testing.T) {
+	const dup = `{"formulae":[{"name":"a","name":"b"}],"casks":[]}`
+	_, err := decodeInfoV2([]byte(dup))
+	if err == nil {
+		t.Fatal("expected decodeInfoV2 to reject duplicate object member names under encoding/json/v2, got nil error")
+	}
+	if !strings.Contains(err.Error(), "duplicate") {
+		t.Errorf("expected error to mention duplicate names, got: %v", err)
+	}
+}
+
+// TestOutdatedDecode_UnknownFieldsIgnored proves Outdated's inline decode
+// struct tolerates the long tail of fields real `brew outdated --json=v2`
+// entries carry beyond installed_versions/current_version/pinned (mirroring
+// the shape brew actually emits, e.g. a "pinned_version" field alongside
+// "pinned" for formulae), under encoding/json/v2's default of ignoring
+// unknown struct members.
+func TestOutdatedDecode_UnknownFieldsIgnored(t *testing.T) {
+	const raw = `{
+  "formulae": [
+    {"name": "wget", "installed_versions": ["1.24.5"], "current_version": "1.25.0", "pinned": false, "pinned_version": null}
+  ],
+  "casks": [
+    {"name": "firefox", "installed_versions": ["139.0"], "current_version": "140.0", "unrelated_future_field": {"nested": true}}
+  ]
+}`
+	results, err := decodeOutdatedV2([]byte(raw))
+	if err != nil {
+		t.Fatalf("Outdated decode: %v", err)
+	}
+	if len(results) != 2 {
+		t.Fatalf("got %d results, want 2", len(results))
+	}
+	if results[0].Name != "wget" || results[0].CurrentVersion != "1.25.0" {
+		t.Errorf("unexpected formula result: %+v", results[0])
+	}
+	if results[1].Name != "firefox" || !results[1].IsCask {
+		t.Errorf("unexpected cask result: %+v", results[1])
 	}
 }
