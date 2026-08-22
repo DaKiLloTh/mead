@@ -6,6 +6,7 @@ package store
 
 import (
 	"encoding/json"
+	"maps"
 	"os"
 	"path/filepath"
 	"sync"
@@ -153,18 +154,12 @@ func (s *Store) Snapshot() UserData {
 		History:   append([]HistoryEntry{}, s.data.History...),
 		Settings:  s.data.Settings,
 	}
-	for k, v := range s.data.Favorites {
-		cp.Favorites[k] = v
-	}
+	maps.Copy(cp.Favorites, s.data.Favorites)
 	for k, v := range s.data.Tags {
 		cp.Tags[k] = append([]string{}, v...)
 	}
-	for k, v := range s.data.Notes {
-		cp.Notes[k] = v
-	}
-	for k, v := range s.data.Snoozed {
-		cp.Snoozed[k] = v
-	}
+	maps.Copy(cp.Notes, s.data.Notes)
+	maps.Copy(cp.Snoozed, s.data.Snoozed)
 	return cp
 }
 

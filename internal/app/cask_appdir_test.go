@@ -1,6 +1,7 @@
 package app
 
 import (
+	"slices"
 	"strings"
 	"testing"
 
@@ -9,12 +10,7 @@ import (
 
 // containsFlag reports whether args contains the exact flag/token.
 func containsFlag(args []string, flag string) bool {
-	for _, a := range args {
-		if a == flag {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(args, flag)
 }
 
 // containsAppDirFlag reports whether any element of args is an --appdir=...

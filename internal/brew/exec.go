@@ -55,7 +55,7 @@ func ResolveBrewPath() (string, error) {
 		}
 		p, err := exec.LookPath("brew")
 		if err != nil {
-			brewPathErr = errors.New("could not find the `brew` executable on this system; is Homebrew installed?")
+			brewPathErr = errors.New("could not find the `brew` executable on this system; is Homebrew installed")
 			return
 		}
 		brewPath = p
@@ -139,7 +139,7 @@ func runBrewLines(ctx context.Context, args ...string) ([]string, error) {
 		return nil, err
 	}
 	lines := []string{}
-	for _, l := range strings.Split(out, "\n") {
+	for l := range strings.SplitSeq(out, "\n") {
 		l = strings.TrimSpace(l)
 		if l != "" {
 			lines = append(lines, l)

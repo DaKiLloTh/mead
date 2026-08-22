@@ -71,7 +71,6 @@ func ScanAdoptableApps(ctx context.Context) ([]AdoptCandidate, error) {
 	sem := make(chan struct{}, 8)
 
 	for _, j := range jobs {
-		j := j
 		wg.Add(1)
 		sem <- struct{}{}
 		go func() {

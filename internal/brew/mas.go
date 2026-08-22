@@ -25,7 +25,7 @@ func MasList(ctx context.Context) ([]MasApp, error) {
 		return nil, err
 	}
 	apps := []MasApp{}
-	for _, line := range strings.Split(out, "\n") {
+	for line := range strings.SplitSeq(out, "\n") {
 		line = strings.TrimSpace(line)
 		if line == "" {
 			continue
@@ -44,7 +44,7 @@ func MasOutdated(ctx context.Context) ([]MasApp, error) {
 		return nil, err
 	}
 	apps := []MasApp{}
-	for _, line := range strings.Split(out, "\n") {
+	for line := range strings.SplitSeq(out, "\n") {
 		line = strings.TrimSpace(line)
 		if line == "" {
 			continue
