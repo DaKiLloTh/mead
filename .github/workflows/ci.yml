@@ -25,10 +25,16 @@ jobs:
       - name: Install Wails CLI
         run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.15.0
 
+      # main.go does //go:embed all:frontend/dist, which fails to compile
+      # (even just for `wails generate module`'s introspection of the App
+      # struct) if that directory doesn't exist yet on a fresh checkout --
+      # frontend/dist is gitignored since it's build output.
+      - name: Seed frontend/dist placeholder
+        run: mkdir -p frontend/dist && touch frontend/dist/.gitkeep
+
       # Generates frontend/wailsjs (the Go<->TS bindings) that the frontend
       # imports from, and is a prerequisite for everything below: the
-      # frontend typecheck needs the bindings to exist, and go vet/build
-      # need frontend/dist to exist (main.go does //go:embed all:frontend/dist).
+      # frontend typecheck needs the bindings to exist.
       - name: Generate Wails bindings
         run: wails generate module
 
