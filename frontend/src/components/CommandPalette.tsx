@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { filterNavItems, filterPackages } from '../lib/paletteFilter'
 import { useInstalledPackages } from '../context/InstalledPackagesContext'
 import { navItems, type ViewKey } from './Sidebar'
