@@ -3,6 +3,7 @@ import { api } from '../lib/api'
 import { useJobs } from '../context/JobsContext'
 import { useConfirm } from '../context/ConfirmContext'
 import { useUserData } from '../context/UserDataContext'
+import { DownloadIcon, ImportIcon } from '../components/Icons'
 
 const SIZES = [
   { key: 'sm', label: 'Small', scale: '14px' },
@@ -19,7 +20,7 @@ function getInitialSize(): SizeKey {
 }
 
 export default function Settings() {
-  const { runAction } = useJobs()
+  const { runAction, notify } = useJobs()
   const confirm = useConfirm()
   const userData = useUserData()
 
@@ -31,6 +32,9 @@ export default function Settings() {
   const [appDirSaved, setAppDirSaved] = useState(false)
 
   const [size, setSize] = useState<SizeKey>(getInitialSize)
+
+  const [exportingData, setExportingData] = useState(false)
+  const [importingData, setImportingData] = useState(false)
 
   function loadAnalytics() {
     setAnalyticsLoading(true)
@@ -84,6 +88,42 @@ export default function Settings() {
     if (!ok) return
     await api.clearAllData()
     userData.refresh()
+  }
+
+  async function exportData() {
+    setExportingData(true)
+    try {
+      const path = await api.exportUserDataToFile()
+      if (path) notify('success', `Saved to ${path}`)
+    } catch (e) {
+      notify('error', String(e))
+    } finally {
+      setExportingData(false)
+    }
+  }
+
+  async function importData() {
+    const path = await api.pickUserDataFile()
+    if (!path) return
+
+    const { ok } = await confirm({
+      title: 'Import mead data?',
+      body: 'Replaces favorites, tags, notes, snoozes, and activity history with the contents of the selected file. Your Settings (like the cask install directory) are left untouched.',
+      confirmLabel: 'Import data',
+      danger: true,
+    })
+    if (!ok) return
+
+    setImportingData(true)
+    try {
+      await api.importUserDataFromFile(path)
+      userData.refresh()
+      notify('success', 'Data imported')
+    } catch (e) {
+      notify('error', String(e))
+    } finally {
+      setImportingData(false)
+    }
   }
 
   return (
@@ -170,11 +210,20 @@ export default function Settings() {
           <h2 className="card-title text-base">Data</h2>
           <p className="text-sm text-base-content/70">
             Favorites, tags, notes, snoozes, and history are stored locally at{' '}
-            <span className="font-mono">~/Library/Application Support/mead/store.json</span>.
+            <span className="font-mono">~/Library/Application Support/mead/store.json</span>. Export a backup, or
+            import one to restore it — useful if the local file is ever lost, or when setting up mead on a new Mac.
           </p>
           <div className="flex flex-wrap gap-2">
             <button className="btn btn-sm" onClick={() => api.revealLocalDataFile()}>
               Reveal in Finder
+            </button>
+            <button className="btn btn-sm" disabled={exportingData} onClick={exportData}>
+              {exportingData ? <span className="loading loading-spinner loading-xs" /> : <DownloadIcon className="size-4" />}
+              Export data…
+            </button>
+            <button className="btn btn-sm" disabled={importingData} onClick={importData}>
+              {importingData ? <span className="loading loading-spinner loading-xs" /> : <ImportIcon className="size-4" />}
+              Import data…
             </button>
             <button className="btn btn-sm btn-error btn-outline" onClick={clearAllData}>
               Clear all local data
