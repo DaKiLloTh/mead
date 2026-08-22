@@ -1,22 +1,9 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { EventsOn } from '../../wailsjs/runtime/runtime'
 import { api } from '../lib/api'
+import { JobTracker, type JobState, type JobLine } from './jobTracker'
 
-export interface JobLine {
-  stream: 'stdout' | 'stderr'
-  text: string
-}
-
-export interface JobState {
-  id: string
-  title: string
-  lines: JobLine[]
-  status: 'running' | 'success' | 'error'
-  exitCode?: number
-  error?: string
-  startedAt: number
-  endedAt?: number
-}
+export type { JobState, JobLine }
 
 export interface Toast {
   id: string
@@ -52,10 +39,6 @@ export function JobsProvider({ children }: { children: React.ReactNode }) {
   const [consoleOpen, setConsoleOpen] = useState(false)
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null)
 
-  const resolvers = useRef(new Map<string, (job: JobState) => void>())
-  const jobsRef = useRef<JobState[]>([])
-  jobsRef.current = jobs
-
   const dismissToast = useCallback((id: string) => {
     setToasts((t) => t.filter((x) => x.id !== id))
   }, [])
@@ -68,75 +51,37 @@ export function JobsProvider({ children }: { children: React.ReactNode }) {
     }, 5000)
   }, [])
 
-  useEffect(() => {
-    const offStart = EventsOn('job:start', (payload: { id: string; title: string }) => {
-      setJobs((prev) => [
-        ...prev,
-        { id: payload.id, title: payload.title, lines: [], status: 'running', startedAt: Date.now() },
-      ])
-      setSelectedJobId(payload.id)
-      setConsoleOpen(true)
+  // The tracker owns the authoritative, synchronously-updated job list and
+  // resolver bookkeeping (see jobTracker.ts for why this must live outside
+  // React state to avoid the job:done-vs-RPC-promise race). React state
+  // (`jobs` above) is just a mirror of it, for rendering.
+  const trackerRef = useRef<JobTracker | null>(null)
+  if (!trackerRef.current) {
+    trackerRef.current = new JobTracker({
+      onJobsChange: (next) => setJobs(next),
+      onNotify: (type, message) => pushToast(type, message),
+      onJobStarted: (id) => {
+        setSelectedJobId(id)
+        setConsoleOpen(true)
+      },
     })
+  }
 
-    const offOutput = EventsOn(
-      'job:output',
-      (payload: { id: string; line: string; stream: 'stdout' | 'stderr' }) => {
-        setJobs((prev) =>
-          prev.map((j) =>
-            j.id === payload.id ? { ...j, lines: [...j.lines, { stream: payload.stream, text: payload.line }] } : j
-          )
-        )
-      }
-    )
-
-    const offDone = EventsOn(
-      'job:done',
-      (payload: { id: string; success: boolean; exitCode: number; error?: string }) => {
-        setJobs((prev) => {
-          const next = prev.map((j) =>
-            j.id === payload.id
-              ? {
-                  ...j,
-                  status: (payload.success ? 'success' : 'error') as JobState['status'],
-                  exitCode: payload.exitCode,
-                  error: payload.error,
-                  endedAt: Date.now(),
-                }
-              : j
-          )
-          const job = next.find((j) => j.id === payload.id)
-          if (job) {
-            const resolve = resolvers.current.get(payload.id)
-            if (resolve) {
-              resolve(job)
-              resolvers.current.delete(payload.id)
-            }
-            pushToast(
-              payload.success ? 'success' : 'error',
-              payload.success ? `${job.title} — done` : `${job.title} — failed${payload.error ? `: ${payload.error}` : ''}`
-            )
-          }
-          return next
-        })
-      }
-    )
+  useEffect(() => {
+    const tracker = trackerRef.current!
+    const offStart = EventsOn('job:start', tracker.handleStart)
+    const offOutput = EventsOn('job:output', tracker.handleOutput)
+    const offDone = EventsOn('job:done', tracker.handleDone)
 
     return () => {
       offStart()
       offOutput()
       offDone()
     }
-  }, [pushToast])
+  }, [])
 
-  const runAction = useCallback(async (action: () => Promise<string>): Promise<JobState> => {
-    const id = await action()
-    const existing = jobsRef.current.find((j) => j.id === id)
-    if (existing && existing.status !== 'running') {
-      return existing
-    }
-    return new Promise<JobState>((resolve) => {
-      resolvers.current.set(id, resolve)
-    })
+  const runAction = useCallback((action: () => Promise<string>): Promise<JobState> => {
+    return trackerRef.current!.runAction(action)
   }, [])
 
   const cancelJob = useCallback((id: string) => {
