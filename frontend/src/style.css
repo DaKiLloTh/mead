@@ -9,6 +9,15 @@ html, body, #root {
 
 body {
   overscroll-behavior: none;
+  background: transparent;
+}
+
+.drag-region {
+  -webkit-app-region: drag;
+}
+
+.no-drag {
+  -webkit-app-region: no-drag;
 }
 
 ::-webkit-scrollbar {

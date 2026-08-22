@@ -22,6 +22,8 @@ type BrewPackage struct {
 	InstalledOnRequest    bool     `json:"installedOnRequest"`
 	InstalledAsDependency bool     `json:"installedAsDependency"`
 	AutoUpdates           bool     `json:"autoUpdates"`
+	Artifacts             []string `json:"artifacts"`
+	AppPaths              []string `json:"appPaths"`
 }
 
 // SearchResult is a lightweight entry returned by `brew search`.
@@ -63,14 +65,17 @@ type CacheInfo struct {
 
 // SystemInfo is a snapshot of the local brew environment.
 type SystemInfo struct {
-	BrewPath      string `json:"brewPath"`
-	BrewVersion   string `json:"brewVersion"`
-	Prefix        string `json:"prefix"`
-	Cellar        string `json:"cellar"`
-	Caskroom      string `json:"caskroom"`
-	InstalledForm int    `json:"installedFormulaCount"`
-	InstalledCask int    `json:"installedCaskCount"`
-	OutdatedCount int    `json:"outdatedCount"`
+	BrewPath        string `json:"brewPath"`
+	BrewVersion     string `json:"brewVersion"`
+	Prefix          string `json:"prefix"`
+	Cellar          string `json:"cellar"`
+	Caskroom        string `json:"caskroom"`
+	InstalledForm   int    `json:"installedFormulaCount"`
+	InstalledCask   int    `json:"installedCaskCount"`
+	OutdatedCount   int    `json:"outdatedCount"`
+	DeprecatedCount int    `json:"deprecatedCount"`
+	DisabledCount   int    `json:"disabledCount"`
+	PinnedCount     int    `json:"pinnedCount"`
 }
 
 // JobEvent payloads emitted over the Wails event bus.
@@ -90,4 +95,63 @@ type JobDoneEvent struct {
 	Success  bool   `json:"success"`
 	ExitCode int    `json:"exitCode"`
 	Error    string `json:"error,omitempty"`
+}
+
+// VulnResult is one package's outcome from a best-effort OSV.dev scan.
+type VulnResult struct {
+	Name    string   `json:"name"`
+	IsCask  bool     `json:"isCask"`
+	Version string   `json:"version"`
+	VulnIDs []string `json:"vulnIds"`
+	Error   string   `json:"error,omitempty"`
+}
+
+// SecurityInfo is a Gatekeeper / code-signing snapshot for an installed app.
+type SecurityInfo struct {
+	AppPath      string `json:"appPath"`
+	Signed       bool   `json:"signed"`
+	Authority    string `json:"authority"`
+	TeamID       string `json:"teamId"`
+	GatekeeperOK bool   `json:"gatekeeperOk"`
+	Assessment   string `json:"assessment"`
+	Quarantined  bool   `json:"quarantined"`
+}
+
+// AdoptCandidate is an app in /Applications that looks like it matches an
+// installable cask but isn't currently tracked by Homebrew.
+type AdoptCandidate struct {
+	AppName     string `json:"appName"`
+	AppPath     string `json:"appPath"`
+	CaskToken   string `json:"caskToken"`
+	CaskDesc    string `json:"caskDesc"`
+	CaskVersion string `json:"caskVersion"`
+}
+
+// DuplicateApp flags a name that shows up as both an installed formula and
+// an installed cask, which usually means the same tool got installed twice.
+type DuplicateApp struct {
+	Name       string `json:"name"`
+	FormulaVer string `json:"formulaVersion"`
+	CaskVer    string `json:"caskVersion"`
+}
+
+// MasApp represents one row from `mas list` / `mas outdated`.
+type MasApp struct {
+	ID               string `json:"id"`
+	Name             string `json:"name"`
+	InstalledVersion string `json:"installedVersion"`
+	LatestVersion    string `json:"latestVersion,omitempty"`
+	Outdated         bool   `json:"outdated"`
+}
+
+// Collection is a curated bundle of packages a user can install together.
+type Collection struct {
+	Name        string              `json:"name"`
+	Description string              `json:"description"`
+	Packages    []CollectionPackage `json:"packages"`
+}
+
+type CollectionPackage struct {
+	Name   string `json:"name"`
+	IsCask bool   `json:"isCask"`
 }

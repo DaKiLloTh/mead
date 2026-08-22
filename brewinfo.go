@@ -151,7 +151,60 @@ func caskToPackage(c map[string]interface{}) BrewPackage {
 		p.Dependencies = append(p.Dependencies, mGetStringSlice(dependsOn, "formula")...)
 		p.Dependencies = append(p.Dependencies, mGetStringSlice(dependsOn, "cask")...)
 	}
+	p.Artifacts, p.AppPaths = parseCaskArtifacts(mGetArr(c, "artifacts"))
 	return p
+}
+
+// parseCaskArtifacts turns brew's heterogeneous "artifacts" array into
+// human-readable labels and, separately, any /Applications/*.app paths it
+// installs (used for security inspection and quarantine removal).
+func parseCaskArtifacts(artifacts []interface{}) (labels []string, appPaths []string) {
+	for _, raw := range artifacts {
+		entry, ok := raw.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		for key, val := range entry {
+			switch key {
+			case "app":
+				for _, name := range interfaceStringSlice(val) {
+					labels = append(labels, "App: "+name)
+					appPaths = append(appPaths, filepath.Join("/Applications", name))
+				}
+			case "binary":
+				for _, name := range interfaceStringSlice(val) {
+					labels = append(labels, "Binary: "+name)
+				}
+			case "pkg":
+				for _, name := range interfaceStringSlice(val) {
+					labels = append(labels, "Installer package: "+name)
+				}
+			case "manpage":
+				for _, name := range interfaceStringSlice(val) {
+					labels = append(labels, "Man page: "+name)
+				}
+			}
+		}
+	}
+	return labels, appPaths
+}
+
+// interfaceStringSlice normalizes a JSON value that may be a bare string or
+// an array of strings (brew's artifact entries vary by artifact type).
+func interfaceStringSlice(v interface{}) []string {
+	switch t := v.(type) {
+	case string:
+		return []string{t}
+	case []interface{}:
+		var out []string
+		for _, e := range t {
+			if s, ok := e.(string); ok {
+				out = append(out, s)
+			}
+		}
+		return out
+	}
+	return nil
 }
 
 // ListInstalled returns all installed formulae and casks with full detail.
@@ -404,6 +457,15 @@ func GetSystemInfo(ctx context.Context) (*SystemInfo, error) {
 				info.InstalledCask++
 			} else {
 				info.InstalledForm++
+			}
+			if p.Deprecated {
+				info.DeprecatedCount++
+			}
+			if p.Disabled {
+				info.DisabledCount++
+			}
+			if p.Pinned {
+				info.PinnedCount++
 			}
 		}
 	}

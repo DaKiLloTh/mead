@@ -1,12 +1,17 @@
 import { useEffect, useState } from 'react'
-import { api, BrewPackage } from '../lib/api'
+import { api, BrewPackage, SecurityInfo } from '../lib/api'
 import { useJobs } from '../context/JobsContext'
 import { useConfirm } from '../context/ConfirmContext'
+import { useUserData } from '../context/UserDataContext'
 import {
   ArrowUpCircleIcon,
+  CheckIcon,
   DownloadIcon,
   ExternalLinkIcon,
   PinIcon,
+  ShieldIcon,
+  StarIcon,
+  TagIcon,
   TrashIcon,
   XIcon,
 } from './Icons'
@@ -22,16 +27,24 @@ interface Props {
   onChanged?: () => void
 }
 
+type Tab = 'overview' | 'deps' | 'security'
+
 export default function PackageDetailModal({ target, onClose, onChanged }: Props) {
   const { runAction } = useJobs()
   const confirm = useConfirm()
+  const userData = useUserData()
   const [pkg, setPkg] = useState<BrewPackage | null>(null)
   const [loading, setLoading] = useState(false)
-  const [tab, setTab] = useState<'overview' | 'deps'>('overview')
+  const [tab, setTab] = useState<Tab>('overview')
   const [uses, setUses] = useState<string[] | null>(null)
   const [tree, setTree] = useState<string | null>(null)
   const [treeLoading, setTreeLoading] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [tagInput, setTagInput] = useState('')
+  const [note, setNote] = useState('')
+  const [security, setSecurity] = useState<SecurityInfo | null>(null)
+  const [securityLoading, setSecurityLoading] = useState(false)
+  const [securityError, setSecurityError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!target) return
@@ -40,6 +53,9 @@ export default function PackageDetailModal({ target, onClose, onChanged }: Props
     setUses(null)
     setTree(null)
     setPkg(null)
+    setSecurity(null)
+    setSecurityError(null)
+    setNote(userData.noteFor(target.name, target.isCask))
     api
       .getInfo(target.name, target.isCask)
       .then(setPkg)
@@ -72,6 +88,31 @@ export default function PackageDetailModal({ target, onClose, onChanged }: Props
       setTree(String(e))
     } finally {
       setTreeLoading(false)
+    }
+  }
+
+  async function loadSecurity() {
+    if (!target || security || securityLoading) return
+    setSecurityLoading(true)
+    setSecurityError(null)
+    try {
+      const info = await api.inspectCaskSecurity(target.name)
+      setSecurity(info)
+    } catch (e) {
+      setSecurityError(String(e))
+    } finally {
+      setSecurityLoading(false)
+    }
+  }
+
+  async function doRemoveQuarantine() {
+    if (!security) return
+    try {
+      await api.removeQuarantine(security.appPath)
+      setSecurity(null)
+      void loadSecurity()
+    } catch (e) {
+      setSecurityError(String(e))
     }
   }
 
@@ -114,6 +155,23 @@ export default function PackageDetailModal({ target, onClose, onChanged }: Props
     refresh()
   }
 
+  const tags = target ? userData.tagsFor(target.name, target.isCask) : []
+  const favorite = target ? userData.isFavorite(target.name, target.isCask) : false
+
+  function addTag() {
+    const t = tagInput.trim()
+    if (!t || !target) return
+    if (!tags.includes(t)) {
+      void userData.setTags(target.name, target.isCask, [...tags, t])
+    }
+    setTagInput('')
+  }
+
+  function removeTag(t: string) {
+    if (!target) return
+    void userData.setTags(target.name, target.isCask, tags.filter((x) => x !== t))
+  }
+
   return (
     <dialog className="modal modal-open">
       <div className="modal-box max-w-2xl">
@@ -135,7 +193,14 @@ export default function PackageDetailModal({ target, onClose, onChanged }: Props
 
         {!loading && pkg && (
           <>
-            <div className="flex items-start gap-3 pr-8">
+            <div className="flex items-start gap-2 pr-8">
+              <button
+                className="btn btn-sm btn-circle btn-ghost mt-0.5"
+                onClick={() => userData.toggleFavorite(target.name, target.isCask)}
+                aria-label="Toggle favorite"
+              >
+                <StarIcon filled={favorite} className={`size-4 ${favorite ? 'text-warning' : ''}`} />
+              </button>
               <div>
                 <h3 className="font-bold text-xl">{pkg.fullName || pkg.name}</h3>
                 <div className="flex flex-wrap gap-1.5 mt-1.5">
@@ -147,6 +212,14 @@ export default function PackageDetailModal({ target, onClose, onChanged }: Props
                   {pkg.pinned && <span className="badge badge-sm badge-outline">pinned</span>}
                   {pkg.deprecated && <span className="badge badge-sm badge-error badge-outline">deprecated</span>}
                   {pkg.kegOnly && <span className="badge badge-sm badge-ghost">keg-only</span>}
+                  {tags.map((t) => (
+                    <span key={t} className="badge badge-sm badge-neutral gap-1">
+                      {t}
+                      <button onClick={() => removeTag(t)} aria-label={`Remove tag ${t}`}>
+                        <XIcon className="size-2.5" />
+                      </button>
+                    </span>
+                  ))}
                 </div>
               </div>
             </div>
@@ -178,6 +251,22 @@ export default function PackageDetailModal({ target, onClose, onChanged }: Props
               )}
             </div>
 
+            <label className="input input-sm w-full mt-2">
+              <TagIcon className="size-3.5 opacity-50" />
+              <input
+                type="text"
+                placeholder="Add a tag and press Enter"
+                value={tagInput}
+                onChange={(e) => setTagInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    addTag()
+                  }
+                }}
+              />
+            </label>
+
             <div role="tablist" className="tabs tabs-border mt-4">
               <button
                 role="tab"
@@ -196,12 +285,36 @@ export default function PackageDetailModal({ target, onClose, onChanged }: Props
               >
                 Dependencies
               </button>
+              {pkg.isCask && pkg.installed && (
+                <button
+                  role="tab"
+                  className={`tab ${tab === 'security' ? 'tab-active' : ''}`}
+                  onClick={() => {
+                    setTab('security')
+                    void loadSecurity()
+                  }}
+                >
+                  Security
+                </button>
+              )}
             </div>
 
             {tab === 'overview' && (
               <div className="mt-3 space-y-3 text-sm">
                 {pkg.caveats && (
                   <div className="alert alert-warning alert-soft text-xs whitespace-pre-wrap">{pkg.caveats}</div>
+                )}
+                {pkg.isCask && !pkg.installed && pkg.artifacts.length > 0 && (
+                  <div>
+                    <div className="font-medium text-xs uppercase text-base-content/50 mb-1">
+                      What this installs
+                    </div>
+                    <ul className="text-xs text-base-content/70 list-disc list-inside">
+                      {pkg.artifacts.map((a) => (
+                        <li key={a}>{a}</li>
+                      ))}
+                    </ul>
+                  </div>
                 )}
                 {!pkg.isCask && (
                   <div>
@@ -233,6 +346,17 @@ export default function PackageDetailModal({ target, onClose, onChanged }: Props
                     </div>
                   </div>
                 )}
+                <div>
+                  <div className="font-medium text-xs uppercase text-base-content/50 mb-1">Note</div>
+                  <textarea
+                    className="textarea textarea-sm w-full"
+                    rows={2}
+                    placeholder="Private note (only you see this)…"
+                    value={note}
+                    onChange={(e) => setNote(e.target.value)}
+                    onBlur={() => void userData.setNote(target.name, target.isCask, note)}
+                  />
+                </div>
               </div>
             )}
 
@@ -246,6 +370,43 @@ export default function PackageDetailModal({ target, onClose, onChanged }: Props
                   <pre className="mockup-code text-xs overflow-x-auto max-h-72">
                     <code className="whitespace-pre px-4">{tree || 'No dependencies.'}</code>
                   </pre>
+                )}
+              </div>
+            )}
+
+            {tab === 'security' && (
+              <div className="mt-3 text-sm">
+                {securityLoading && (
+                  <div className="flex items-center gap-2 text-base-content/60 py-4">
+                    <span className="loading loading-spinner loading-xs" /> Inspecting code signature…
+                  </div>
+                )}
+                {securityError && <div className="alert alert-error alert-soft text-xs">{securityError}</div>}
+                {security && !securityLoading && (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      {security.gatekeeperOk ? (
+                        <CheckIcon className="size-4 text-success" />
+                      ) : (
+                        <ShieldIcon className="size-4 text-error" />
+                      )}
+                      <span>{security.gatekeeperOk ? 'Passes Gatekeeper assessment' : 'Fails Gatekeeper assessment'}</span>
+                    </div>
+                    <div className="text-xs text-base-content/60 space-y-1">
+                      <div>Signed: {security.signed ? 'yes' : 'no'}</div>
+                      {security.authority && <div>Authority: {security.authority}</div>}
+                      {security.teamId && <div>Team ID: {security.teamId}</div>}
+                      <div>Quarantine flag: {security.quarantined ? 'present' : 'cleared'}</div>
+                    </div>
+                    {security.quarantined && (
+                      <button className="btn btn-xs" onClick={doRemoveQuarantine}>
+                        Remove quarantine flag
+                      </button>
+                    )}
+                    <pre className="mockup-code text-xs overflow-x-auto max-h-40 mt-2">
+                      <code className="whitespace-pre px-4">{security.assessment}</code>
+                    </pre>
+                  </div>
                 )}
               </div>
             )}

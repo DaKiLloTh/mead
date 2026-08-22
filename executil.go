@@ -91,6 +91,22 @@ func runBrew(ctx context.Context, args ...string) (string, error) {
 	return stdout.String(), nil
 }
 
+// runCmd executes an arbitrary local binary (not brew) and returns its
+// combined stdout+stderr, for the handful of macOS system tools we shell
+// out to (xattr, spctl, codesign).
+func runCmd(ctx context.Context, name string, args ...string) (string, error) {
+	path, err := exec.LookPath(name)
+	if err != nil {
+		return "", fmt.Errorf("%s not found on this system", name)
+	}
+	cmd := exec.CommandContext(ctx, path, args...)
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &out
+	err = cmd.Run()
+	return out.String(), err
+}
+
 // runBrewLines runs brew and splits stdout into non-empty trimmed lines.
 func runBrewLines(ctx context.Context, args ...string) ([]string, error) {
 	out, err := runBrew(ctx, args...)

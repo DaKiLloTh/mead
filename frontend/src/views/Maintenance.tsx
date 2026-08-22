@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 import { api, CacheInfo } from '../lib/api'
 import { useJobs } from '../context/JobsContext'
-import { BeakerIcon, TrashIcon, WrenchIcon } from '../components/Icons'
+import { BeakerIcon, DownloadIcon, ImportIcon, TrashIcon, WrenchIcon } from '../components/Icons'
 
-type Tab = 'doctor' | 'cleanup' | 'config'
+type Tab = 'doctor' | 'cleanup' | 'brewfile' | 'config'
 
 export default function Maintenance() {
   const { runAction } = useJobs()
@@ -14,14 +14,43 @@ export default function Maintenance() {
 
   const [cache, setCache] = useState<CacheInfo | null>(null)
   const [cleanupOutput, setCleanupOutput] = useState<string[] | null>(null)
-  const [cleanupRunning, setCleanupRunning] = useState<'preview' | 'real' | null>(null)
+  const [cleanupRunning, setCleanupRunning] = useState<'preview' | 'real' | 'autoremove' | 'autoremove-preview' | null>(null)
 
   const [config, setConfig] = useState<string | null>(null)
   const [configLoading, setConfigLoading] = useState(false)
 
+  const [exporting, setExporting] = useState(false)
+  const [exportedPath, setExportedPath] = useState<string | null>(null)
+  const [importing, setImporting] = useState(false)
+
   useEffect(() => {
     api.cacheInfo().then(setCache).catch(() => {})
   }, [])
+
+  async function runAutoremove(dryRun: boolean) {
+    setCleanupRunning(dryRun ? 'autoremove-preview' : 'autoremove')
+    setCleanupOutput(null)
+    const job = await runAction(() => api.autoremove(dryRun))
+    setCleanupOutput(job.lines.map((l) => l.text))
+    setCleanupRunning(null)
+  }
+
+  async function doExport() {
+    setExporting(true)
+    setExportedPath(null)
+    try {
+      const path = await api.exportBrewfileToFile()
+      setExportedPath(path || null)
+    } finally {
+      setExporting(false)
+    }
+  }
+
+  async function doImport() {
+    setImporting(true)
+    await runAction(() => api.importBrewfile())
+    setImporting(false)
+  }
 
   async function runDoctor() {
     setDoctorRunning(true)
@@ -61,6 +90,9 @@ export default function Maintenance() {
         </button>
         <button role="tab" className={`tab ${tab === 'cleanup' ? 'tab-active' : ''}`} onClick={() => setTab('cleanup')}>
           <TrashIcon className="size-3.5 mr-1" /> Cleanup
+        </button>
+        <button role="tab" className={`tab ${tab === 'brewfile' ? 'tab-active' : ''}`} onClick={() => setTab('brewfile')}>
+          <ImportIcon className="size-3.5 mr-1" /> Brewfile
         </button>
         <button
           role="tab"
@@ -115,11 +147,51 @@ export default function Maintenance() {
               Clean up now
             </button>
           </div>
+          <div className="divider my-1" />
+          <p className="text-sm text-base-content/70">
+            Removes formulae that were installed only as a dependency and are no longer needed by anything.
+          </p>
+          <div className="flex gap-2">
+            <button className="btn btn-sm" disabled={cleanupRunning !== null} onClick={() => runAutoremove(true)}>
+              {cleanupRunning === 'autoremove-preview' ? <span className="loading loading-spinner loading-xs" /> : null}
+              Preview orphans
+            </button>
+            <button className="btn btn-sm btn-warning" disabled={cleanupRunning !== null} onClick={() => runAutoremove(false)}>
+              {cleanupRunning === 'autoremove' ? <span className="loading loading-spinner loading-xs" /> : <TrashIcon className="size-4" />}
+              Remove orphaned dependencies
+            </button>
+          </div>
           {cleanupOutput && (
             <pre className="mockup-code text-xs overflow-x-auto max-h-96">
               <code className="whitespace-pre px-4">{cleanupOutput.join('\n') || 'Nothing to clean up.'}</code>
             </pre>
           )}
+        </div>
+      )}
+
+      {tab === 'brewfile' && (
+        <div className="space-y-4">
+          <div>
+            <p className="text-sm text-base-content/70 mb-2">
+              Export everything you have installed to a Brewfile — a portable snapshot you can check into a dotfiles
+              repo or use to set up a new machine.
+            </p>
+            <button className="btn btn-sm btn-primary" disabled={exporting} onClick={doExport}>
+              {exporting ? <span className="loading loading-spinner loading-xs" /> : <DownloadIcon className="size-4" />}
+              Export Brewfile…
+            </button>
+            {exportedPath && <p className="text-xs text-success mt-2">Saved to {exportedPath}</p>}
+          </div>
+          <div className="divider my-1" />
+          <div>
+            <p className="text-sm text-base-content/70 mb-2">
+              Install everything listed in an existing Brewfile — useful for restoring a snapshot on a new machine.
+            </p>
+            <button className="btn btn-sm" disabled={importing} onClick={doImport}>
+              {importing ? <span className="loading loading-spinner loading-xs" /> : <ImportIcon className="size-4" />}
+              Import Brewfile…
+            </button>
+          </div>
         </div>
       )}
 

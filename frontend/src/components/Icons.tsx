@@ -205,6 +205,91 @@ export function MoonIcon(p: IconProps) {
   )
 }
 
+export function StarIcon(p: IconProps & { filled?: boolean }) {
+  const { filled, ...rest } = p
+  return (
+    <svg {...base} fill={filled ? 'currentColor' : 'none'} {...rest}>
+      <path d="M12 3l2.6 5.6 6.1.6-4.6 4.1 1.3 6-5.4-3.1-5.4 3.1 1.3-6-4.6-4.1 6.1-.6L12 3z" />
+    </svg>
+  )
+}
+
+export function TagIcon(p: IconProps) {
+  return (
+    <svg {...base} {...p}>
+      <path d="M12 3h6a1 1 0 011 1v6l-9 9-7-7 9-9z" />
+      <circle cx="15" cy="7.5" r="1.2" fill="currentColor" stroke="none" />
+    </svg>
+  )
+}
+
+export function ShieldIcon(p: IconProps) {
+  return (
+    <svg {...base} {...p}>
+      <path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z" />
+    </svg>
+  )
+}
+
+export function ClockIcon(p: IconProps) {
+  return (
+    <svg {...base} {...p}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7v5l3.5 2" />
+    </svg>
+  )
+}
+
+export function GridIcon(p: IconProps) {
+  return (
+    <svg {...base} {...p}>
+      <rect x="3" y="3" width="7" height="7" rx="1" />
+      <rect x="14" y="3" width="7" height="7" rx="1" />
+      <rect x="3" y="14" width="7" height="7" rx="1" />
+      <rect x="14" y="14" width="7" height="7" rx="1" />
+    </svg>
+  )
+}
+
+export function ImportIcon(p: IconProps) {
+  return (
+    <svg {...base} {...p}>
+      <path d="M12 3v12" />
+      <path d="M8 11l4 4 4-4" />
+      <rect x="4" y="17" width="16" height="4" rx="1" />
+    </svg>
+  )
+}
+
+export function StoreIcon(p: IconProps) {
+  return (
+    <svg {...base} {...p}>
+      <path d="M4 8l1.5-4h13L20 8" />
+      <path d="M4 8h16v11a1 1 0 01-1 1H5a1 1 0 01-1-1V8z" />
+      <path d="M9 8v2a3 3 0 006 0V8" />
+    </svg>
+  )
+}
+
+export function CopyIcon(p: IconProps) {
+  return (
+    <svg {...base} {...p}>
+      <rect x="9" y="9" width="11" height="11" rx="1.5" />
+      <path d="M5 15V5a1 1 0 011-1h10" />
+    </svg>
+  )
+}
+
+export function AlertIcon(p: IconProps) {
+  return (
+    <svg {...base} {...p}>
+      <path d="M12 3l9 16H3l9-16z" />
+      <path d="M12 10v4" />
+      <circle cx="12" cy="17" r="0.15" fill="currentColor" stroke="currentColor" strokeWidth="2" />
+    </svg>
+  )
+}
+
 export function TerminalIcon(p: IconProps) {
   return (
     <svg {...base} {...p}>

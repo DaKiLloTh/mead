@@ -3,17 +3,28 @@ package main
 import (
 	"context"
 	"fmt"
+	"os"
+	"time"
+
+	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 // App struct
 type App struct {
-	ctx  context.Context
-	jobs *JobManager
+	ctx   context.Context
+	jobs  *JobManager
+	store *Store
 }
 
 // NewApp creates a new App application struct
 func NewApp() *App {
-	return &App{jobs: NewJobManager()}
+	store, err := NewStore()
+	if err != nil {
+		// Fall back to an in-memory, unpersisted store rather than failing
+		// startup over what's a nice-to-have (favorites/tags/history).
+		store = &Store{data: newUserData()}
+	}
+	return &App{jobs: NewJobManager(), store: store}
 }
 
 // startup is called when the app starts. The context is saved
@@ -21,6 +32,18 @@ func NewApp() *App {
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 	a.jobs.setContext(ctx)
+}
+
+func (a *App) record(action, name string, isCask bool) func(success bool) {
+	return func(success bool) {
+		a.store.AppendHistory(HistoryEntry{
+			Time:    time.Now().Format(time.RFC3339),
+			Action:  action,
+			Name:    name,
+			IsCask:  isCask,
+			Success: success,
+		})
+	}
 }
 
 // ---- read-only queries ----
@@ -85,7 +108,7 @@ func (a *App) Install(name string, isCask bool) string {
 		args = append(args, "--cask")
 	}
 	args = append(args, name)
-	return a.jobs.Start(fmt.Sprintf("Install %s", name), args...)
+	return a.jobs.StartTracked(fmt.Sprintf("Install %s", name), a.record("install", name, isCask), args...)
 }
 
 func (a *App) Uninstall(name string, isCask bool) string {
@@ -97,7 +120,7 @@ func (a *App) Uninstall(name string, isCask bool) string {
 		args = append(args, "--cask")
 	}
 	args = append(args, name)
-	return a.jobs.Start(fmt.Sprintf("Uninstall %s", name), args...)
+	return a.jobs.StartTracked(fmt.Sprintf("Uninstall %s", name), a.record("uninstall", name, isCask), args...)
 }
 
 func (a *App) Upgrade(name string, isCask bool) string {
@@ -109,11 +132,11 @@ func (a *App) Upgrade(name string, isCask bool) string {
 		args = append(args, "--cask")
 	}
 	args = append(args, name)
-	return a.jobs.Start(fmt.Sprintf("Upgrade %s", name), args...)
+	return a.jobs.StartTracked(fmt.Sprintf("Upgrade %s", name), a.record("upgrade", name, isCask), args...)
 }
 
 func (a *App) UpgradeAll() string {
-	return a.jobs.Start("Upgrade all packages", "upgrade")
+	return a.jobs.StartTracked("Upgrade all packages", a.record("upgrade", "all packages", false), "upgrade")
 }
 
 func (a *App) Update() string {
@@ -132,6 +155,16 @@ func (a *App) Cleanup(dryRun bool) string {
 	return a.jobs.Start(title, args...)
 }
 
+func (a *App) Autoremove(dryRun bool) string {
+	args := []string{"autoremove"}
+	title := "Remove orphaned dependencies"
+	if dryRun {
+		args = append(args, "--dry-run")
+		title = "Remove orphaned dependencies (preview)"
+	}
+	return a.jobs.Start(title, args...)
+}
+
 func (a *App) Doctor() string {
 	return a.jobs.StartLenient("Doctor", "doctor")
 }
@@ -140,28 +173,28 @@ func (a *App) Pin(name string) string {
 	if err := validName(name); err != nil {
 		return a.jobs.Fail(fmt.Sprintf("Pin %s", name), err.Error())
 	}
-	return a.jobs.Start(fmt.Sprintf("Pin %s", name), "pin", name)
+	return a.jobs.StartTracked(fmt.Sprintf("Pin %s", name), a.record("pin", name, false), "pin", name)
 }
 
 func (a *App) Unpin(name string) string {
 	if err := validName(name); err != nil {
 		return a.jobs.Fail(fmt.Sprintf("Unpin %s", name), err.Error())
 	}
-	return a.jobs.Start(fmt.Sprintf("Unpin %s", name), "unpin", name)
+	return a.jobs.StartTracked(fmt.Sprintf("Unpin %s", name), a.record("unpin", name, false), "unpin", name)
 }
 
 func (a *App) TapAdd(name string) string {
 	if err := validName(name); err != nil {
 		return a.jobs.Fail(fmt.Sprintf("Tap %s", name), err.Error())
 	}
-	return a.jobs.Start(fmt.Sprintf("Tap %s", name), "tap", name)
+	return a.jobs.StartTracked(fmt.Sprintf("Tap %s", name), a.record("tap", name, false), "tap", name)
 }
 
 func (a *App) TapRemove(name string) string {
 	if err := validName(name); err != nil {
 		return a.jobs.Fail(fmt.Sprintf("Untap %s", name), err.Error())
 	}
-	return a.jobs.Start(fmt.Sprintf("Untap %s", name), "untap", name)
+	return a.jobs.StartTracked(fmt.Sprintf("Untap %s", name), a.record("untap", name, false), "untap", name)
 }
 
 func (a *App) ServiceStart(name string) string {
@@ -187,4 +220,152 @@ func (a *App) ServiceRestart(name string) string {
 
 func (a *App) CancelJob(id string) bool {
 	return a.jobs.Cancel(id)
+}
+
+// ---- user data: favorites, tags, notes, snoozes, history ----
+
+func (a *App) GetUserData() UserData {
+	return a.store.Snapshot()
+}
+
+func (a *App) ToggleFavorite(name string, isCask bool) error {
+	return a.store.ToggleFavorite(pkgKey(name, isCask))
+}
+
+func (a *App) SetTags(name string, isCask bool, tags []string) error {
+	return a.store.SetTags(pkgKey(name, isCask), tags)
+}
+
+func (a *App) SetNote(name string, isCask bool, note string) error {
+	return a.store.SetNote(pkgKey(name, isCask), note)
+}
+
+func (a *App) SnoozePackage(name string, isCask bool, days int) error {
+	return a.store.Snooze(pkgKey(name, isCask), time.Now().AddDate(0, 0, days))
+}
+
+func (a *App) UnsnoozePackage(name string, isCask bool) error {
+	return a.store.Unsnooze(pkgKey(name, isCask))
+}
+
+func (a *App) ClearHistory() error {
+	return a.store.ClearHistory()
+}
+
+// ---- security ----
+
+func (a *App) ScanVulnerabilities() ([]VulnResult, error) {
+	pkgs, err := ListInstalled(a.ctx)
+	if err != nil {
+		return nil, err
+	}
+	return ScanVulnerabilities(a.ctx, pkgs)
+}
+
+func (a *App) InspectCaskSecurity(name string) (*SecurityInfo, error) {
+	pkg, err := GetInfo(a.ctx, name, true)
+	if err != nil {
+		return nil, err
+	}
+	appPath := resolveCaskAppPath(pkg)
+	if appPath == "" {
+		return nil, fmt.Errorf("couldn't find an installed .app for %s", name)
+	}
+	return InspectAppSecurity(a.ctx, appPath)
+}
+
+// RemoveQuarantine is synchronous (a single xattr call) so it's exposed as
+// a plain error-returning method rather than a streaming job.
+func (a *App) RemoveQuarantine(appPath string) error {
+	if appPath == "" {
+		return fmt.Errorf("no app path given")
+	}
+	out, err := RemoveQuarantine(a.ctx, appPath)
+	if err != nil {
+		if out != "" {
+			return fmt.Errorf("%s: %s", err.Error(), out)
+		}
+		return err
+	}
+	return nil
+}
+
+// ---- adopt & duplicates ----
+
+func (a *App) ScanAdoptableApps() ([]AdoptCandidate, error) {
+	return ScanAdoptableApps(a.ctx)
+}
+
+// AdoptCask takes over management of an app that's already installed by
+// hand, using brew's own --adopt flag so it doesn't reinstall/overwrite it.
+func (a *App) AdoptCask(name string) string {
+	if err := validName(name); err != nil {
+		return a.jobs.Fail(fmt.Sprintf("Adopt %s", name), err.Error())
+	}
+	return a.jobs.StartTracked(fmt.Sprintf("Adopt %s", name), a.record("adopt", name, true), "install", "--cask", "--adopt", name)
+}
+
+func (a *App) FindDuplicateApps() ([]DuplicateApp, error) {
+	return FindDuplicateApps(a.ctx)
+}
+
+// ---- Mac App Store bridge (via the `mas` CLI) ----
+
+func (a *App) MasAvailable() bool {
+	return MasAvailable()
+}
+
+func (a *App) MasList() ([]MasApp, error) {
+	return MasList(a.ctx)
+}
+
+func (a *App) MasOutdated() ([]MasApp, error) {
+	return MasOutdated(a.ctx)
+}
+
+func (a *App) MasUpgrade(id string) string {
+	if id == "" {
+		return a.jobs.Fail("App Store upgrade", "missing app id")
+	}
+	return a.jobs.Start(fmt.Sprintf("Upgrade App Store app %s", id), "upgrade", id)
+}
+
+func (a *App) MasUpgradeAll() string {
+	return a.jobs.Start("Upgrade all App Store apps", "upgrade")
+}
+
+// ---- Brewfile import/export (native file dialogs) ----
+
+func (a *App) ExportBrewfileToFile() (string, error) {
+	content, err := runBrew(a.ctx, "bundle", "dump", "--force", "--file=-")
+	if err != nil {
+		return "", err
+	}
+	path, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
+		Title:           "Export Brewfile",
+		DefaultFilename: "Brewfile",
+	})
+	if err != nil {
+		return "", err
+	}
+	if path == "" {
+		return "", nil // user cancelled
+	}
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		return "", err
+	}
+	return path, nil
+}
+
+func (a *App) ImportBrewfile() string {
+	path, err := runtime.OpenFileDialog(a.ctx, runtime.OpenDialogOptions{
+		Title: "Select a Brewfile",
+	})
+	if err != nil {
+		return a.jobs.Fail("Import Brewfile", err.Error())
+	}
+	if path == "" {
+		return a.jobs.Fail("Import Brewfile", "cancelled")
+	}
+	return a.jobs.Start("Import Brewfile", "bundle", "install", "--file="+path)
 }

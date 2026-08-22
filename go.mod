@@ -1,4 +1,4 @@
-module brewtender
+module mead
 
 go 1.25.0
 
