@@ -45,83 +45,111 @@ func newJobID() string {
 	return hex.EncodeToString(b)
 }
 
+// binaryTarget describes which local executable a job should run and what
+// environment it should default to. Threading this through start() lets
+// brew jobs and mas (Mac App Store CLI) jobs share the same launch/tracking
+// machinery instead of start() hardcoding brew as it used to.
+type binaryTarget struct {
+	// resolve locates the binary's absolute path, or returns an error
+	// explaining why it couldn't be found.
+	resolve func() (string, error)
+	// defaultEnv, if non-nil, supplies cmd.Env when the caller didn't pass
+	// an explicit env. A nil defaultEnv leaves cmd.Env nil, i.e. the
+	// subprocess simply inherits this process's environment.
+	defaultEnv func() []string
+}
+
+var brewTarget = binaryTarget{resolve: brew.ResolveBrewPath, defaultEnv: brew.Env}
+
+// masTarget runs the `mas` CLI (Mac App Store bridge) instead of brew. mas
+// has no use for brew's HOMEBREW_* environment overrides, so it just
+// inherits the parent process's environment, same as brew.RunCmd does for
+// mas elsewhere.
+var masTarget = binaryTarget{resolve: brew.ResolveMasPath, defaultEnv: nil}
+
 // Fail immediately reports a job that never started (e.g. failed input
 // validation) so the frontend's job-tracking UI behaves consistently.
 func (jm *Manager) Fail(title, errMsg string) string {
 	id := newJobID()
 	runtime.EventsEmit(jm.ctx, eventJobStart, StartEvent{ID: id, Title: title})
-	runtime.EventsEmit(jm.ctx, eventJobDone, DoneEvent{ID: id, Success: false, ExitCode: -1, Error: errMsg})
+	jm.failDone(id, nil, errMsg)
 	return id
+}
+
+// failDone emits the job:done failure event for id and invokes onDone(false)
+// if provided. It's the shared tail end of every path that reports a job as
+// failed without it ever producing real subprocess output -- both Fail()
+// above and every early-exit branch in start() below.
+func (jm *Manager) failDone(id string, onDone func(success bool), errMsg string) {
+	runtime.EventsEmit(jm.ctx, eventJobDone, DoneEvent{ID: id, Success: false, ExitCode: -1, Error: errMsg})
+	if onDone != nil {
+		onDone(false)
+	}
 }
 
 // Start launches `brew <args...>` in the background, streaming its combined
 // output to the frontend as job:output events, and returns the job id
 // immediately so the caller (App method) can hand it back to JS.
 func (jm *Manager) Start(title string, args ...string) string {
-	return jm.start(title, false, nil, nil, args...)
+	return jm.start(brewTarget, title, false, nil, nil, args...)
 }
 
 // StartLenient behaves like Start, but a non-zero exit code is still
 // reported as Success so the UI doesn't flag it as a failure (e.g. `brew
 // doctor` exits 1 merely to signal it found something worth mentioning).
 func (jm *Manager) StartLenient(title string, args ...string) string {
-	return jm.start(title, true, nil, nil, args...)
+	return jm.start(brewTarget, title, true, nil, nil, args...)
 }
 
 // StartTracked behaves like Start, but additionally invokes onDone with the
 // final success flag once the job finishes — used to record history entries
 // without threading that concern through every call site.
 func (jm *Manager) StartTracked(title string, onDone func(success bool), args ...string) string {
-	return jm.start(title, false, nil, onDone, args...)
+	return jm.start(brewTarget, title, false, nil, onDone, args...)
 }
 
 // StartWithEnv behaves like Start, but replaces the default brew.Env() with
 // env -- used only by the explicit "Update Homebrew" action, which is the
 // one place we actually want brew's auto-update behavior to run.
 func (jm *Manager) StartWithEnv(title string, env []string, args ...string) string {
-	return jm.start(title, false, env, nil, args...)
+	return jm.start(brewTarget, title, false, env, nil, args...)
 }
 
-func (jm *Manager) start(title string, lenient bool, env []string, onDone func(success bool), args ...string) string {
-	id := newJobID()
+// StartMas behaves like Start, but launches the `mas` CLI (Mac App Store
+// bridge) instead of brew -- used for App Store app upgrades, which brew
+// itself has no knowledge of.
+func (jm *Manager) StartMas(title string, args ...string) string {
+	return jm.start(masTarget, title, false, nil, nil, args...)
+}
 
-	path, err := brew.ResolveBrewPath()
+func (jm *Manager) start(target binaryTarget, title string, lenient bool, env []string, onDone func(success bool), args ...string) string {
+	id := newJobID()
+	runtime.EventsEmit(jm.ctx, eventJobStart, StartEvent{ID: id, Title: title})
+
+	path, err := target.resolve()
 	if err != nil {
-		runtime.EventsEmit(jm.ctx, eventJobStart, StartEvent{ID: id, Title: title})
-		runtime.EventsEmit(jm.ctx, eventJobDone, DoneEvent{ID: id, Success: false, ExitCode: -1, Error: err.Error()})
-		if onDone != nil {
-			onDone(false)
-		}
+		jm.failDone(id, onDone, err.Error())
 		return id
 	}
 
 	cmd := exec.Command(path, args...)
 	if env != nil {
 		cmd.Env = env
-	} else {
-		cmd.Env = brew.Env()
+	} else if target.defaultEnv != nil {
+		cmd.Env = target.defaultEnv()
 	}
 	cmd.Stdin = nil
 
 	stdout, err1 := cmd.StdoutPipe()
 	stderr, err2 := cmd.StderrPipe()
 
-	runtime.EventsEmit(jm.ctx, eventJobStart, StartEvent{ID: id, Title: title})
-
 	if err1 != nil || err2 != nil {
-		errMsg := "failed to create output pipes"
-		runtime.EventsEmit(jm.ctx, eventJobDone, DoneEvent{ID: id, Success: false, ExitCode: -1, Error: errMsg})
-		if onDone != nil {
-			onDone(false)
-		}
+		jm.failDone(id, onDone, "failed to create output pipes")
 		return id
 	}
 
 	if err := cmd.Start(); err != nil {
-		runtime.EventsEmit(jm.ctx, eventJobDone, DoneEvent{ID: id, Success: false, ExitCode: -1, Error: err.Error()})
-		if onDone != nil {
-			onDone(false)
-		}
+		jm.failDone(id, onDone, err.Error())
 		return id
 	}
 

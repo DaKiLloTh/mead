@@ -2,7 +2,6 @@ package brew
 
 import (
 	"context"
-	"os/exec"
 	"regexp"
 	"strings"
 )
@@ -11,7 +10,7 @@ import (
 // PATH. mas itself is installable via Homebrew, so when it's missing we
 // just point the user at `brew install mas` instead of hiding the feature.
 func MasAvailable() bool {
-	_, err := exec.LookPath("mas")
+	_, err := ResolveMasPath()
 	return err == nil
 }
 
