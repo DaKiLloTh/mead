@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"mead/internal/brew"
+	"mead/internal/system"
 )
 
 // ---- CVE scanning via OSV.dev (best-effort, no API key required) ----
@@ -139,11 +140,11 @@ func InspectAppSecurity(ctx context.Context, appPath string) (*SecurityInfo, err
 
 	info := &SecurityInfo{AppPath: appPath}
 
-	spctlOut, spctlErr := brew.RunCmd(ctx, "spctl", "--assess", "--type", "execute", "-vv", appPath)
+	spctlOut, spctlErr := system.RunCmd(ctx, "spctl", "--assess", "--type", "execute", "-vv", appPath)
 	info.Assessment = strings.TrimSpace(spctlOut)
 	info.GatekeeperOK = spctlErr == nil
 
-	codesignOut, _ := brew.RunCmd(ctx, "codesign", "-dv", "--verbose=4", appPath)
+	codesignOut, _ := system.RunCmd(ctx, "codesign", "-dv", "--verbose=4", appPath)
 	if m := authorityRe.FindStringSubmatch(codesignOut); m != nil {
 		info.Authority = strings.TrimSpace(m[1])
 		info.Signed = true
@@ -152,7 +153,7 @@ func InspectAppSecurity(ctx context.Context, appPath string) (*SecurityInfo, err
 		info.TeamID = strings.TrimSpace(m[1])
 	}
 
-	xattrOut, _ := brew.RunCmd(ctx, "xattr", appPath)
+	xattrOut, _ := system.RunCmd(ctx, "xattr", appPath)
 	info.Quarantined = strings.Contains(xattrOut, "com.apple.quarantine")
 
 	return info, nil
@@ -167,7 +168,7 @@ func RemoveQuarantine(ctx context.Context, appPath string) (string, error) {
 	if _, err := os.Stat(appPath); err != nil {
 		return "", fmt.Errorf("app not found at %s", appPath)
 	}
-	out, err := brew.RunCmd(ctx, "xattr", "-d", "com.apple.quarantine", appPath)
+	out, err := system.RunCmd(ctx, "xattr", "-d", "com.apple.quarantine", appPath)
 	return out, err
 }
 
@@ -194,7 +195,7 @@ func ResolveCaskAppPath(pkg *brew.BrewPackage) string {
 // "Browse Time Machine snapshots...", or Recovery Mode), which mead doesn't
 // reimplement.
 func CreateLocalSnapshot(ctx context.Context) error {
-	out, err := brew.RunCmd(ctx, "tmutil", "localsnapshot")
+	out, err := system.RunCmd(ctx, "tmutil", "localsnapshot")
 	if err != nil {
 		msg := strings.TrimSpace(out)
 		if msg == "" {
@@ -213,6 +214,6 @@ func RevealInFinder(ctx context.Context, path string) error {
 	if _, err := os.Stat(path); err != nil {
 		return fmt.Errorf("not found: %s", path)
 	}
-	_, err := brew.RunCmd(ctx, "open", "-R", path)
+	_, err := system.RunCmd(ctx, "open", "-R", path)
 	return err
 }

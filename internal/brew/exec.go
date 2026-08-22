@@ -24,12 +24,26 @@ func baseEnv() []string {
 // so they can never be interpreted as flags by brew (no leading dash) and
 // can't smuggle shell metacharacters (they're never passed through a shell
 // anyway, but this keeps brew's own arg parsing from being confused).
+//
+// "/" and "." are allowed because real names need them: tap names
+// (homebrew/cask), tap-qualified formula/cask names (user/tap/formula), and
+// versioned formulae (node@18, openssl@1.1). Go's regexp package is RE2,
+// which has no lookahead, so the extra exclusions that keep those characters
+// from being abused for path traversal -- a literal ".." segment, an empty
+// "//" segment, or a trailing "/" -- can't be expressed in the pattern
+// itself and are checked separately in ValidName below. A leading "/" is
+// already impossible here since the pattern requires the first character to
+// be alphanumeric.
 var namePattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9@/_.+-]*$`)
 
 // ValidName reports whether name is safe to pass to brew as a package, tap,
 // or service name.
 func ValidName(name string) error {
-	if name == "" || !namePattern.MatchString(name) {
+	if name == "" ||
+		!namePattern.MatchString(name) ||
+		strings.Contains(name, "..") ||
+		strings.Contains(name, "//") ||
+		strings.HasSuffix(name, "/") {
 		return fmt.Errorf("invalid package name: %q", name)
 	}
 	return nil
@@ -125,22 +139,6 @@ func RunBrew(ctx context.Context, args ...string) (string, error) {
 		return stdout.String(), errors.New(msg)
 	}
 	return stdout.String(), nil
-}
-
-// RunCmd executes an arbitrary local binary (not brew) and returns its
-// combined stdout+stderr, for the handful of macOS system tools we shell
-// out to (xattr, spctl, codesign, mas, ...).
-func RunCmd(ctx context.Context, name string, args ...string) (string, error) {
-	path, err := exec.LookPath(name)
-	if err != nil {
-		return "", fmt.Errorf("%s not found on this system", name)
-	}
-	cmd := exec.CommandContext(ctx, path, args...)
-	var out bytes.Buffer
-	cmd.Stdout = &out
-	cmd.Stderr = &out
-	err = cmd.Run()
-	return out.String(), err
 }
 
 // runBrewLines runs brew and splits stdout into non-empty trimmed lines.
