@@ -433,7 +433,7 @@ export default function Maintenance() {
             </div>
           )}
           {config && (
-            <pre className="mockup-code text-xs overflow-x-auto max-h-[32rem]">
+            <pre className="mockup-code text-xs overflow-x-auto max-h-128">
               <code className="whitespace-pre px-4">{config}</code>
             </pre>
           )}

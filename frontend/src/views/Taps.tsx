@@ -133,7 +133,7 @@ export default function Taps({ refreshToken, bump }: Props) {
         <ul className="menu bg-base-200 rounded-box w-full">
           {taps.map((t) => (
             <li key={t}>
-              <div className="flex flex-col items-stretch !p-0">
+              <div className="flex flex-col items-stretch p-0!">
                 <div className="flex items-center justify-between px-3 py-2">
                   <button className="flex items-center gap-1.5 font-mono text-sm" onClick={() => toggleExpand(t)}>
                     <ChevronDownIcon className={`size-3.5 transition-transform ${expanded === t ? '' : '-rotate-90'}`} />

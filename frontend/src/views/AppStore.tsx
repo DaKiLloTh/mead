@@ -133,7 +133,7 @@ export default function AppStore() {
                 {apps.map((app) => (
                   <tr key={app.id} className="hover:bg-base-200">
                     <td className="font-medium truncate">{app.name}</td>
-                    <td className="font-mono text-xs break-words">
+                    <td className="font-mono text-xs wrap-break-word">
                       {app.installedVersion}
                       {outdatedIds.has(app.id) && (
                         <>

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { api, BrewPackage } from '../lib/api'
 import { filterNavItems, filterPackages } from '../lib/paletteFilter'
 import { navItems, type ViewKey } from './Sidebar'
