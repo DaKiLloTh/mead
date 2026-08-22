@@ -1,4 +1,8 @@
-package main
+// Package brew is the Homebrew/macOS-CLI data layer: it shells out to brew
+// (and a handful of other local CLIs like mas) and normalizes their output
+// into plain Go types. It has no Wails coupling, so it can be exercised and
+// reasoned about independently of the app/UI glue layer.
+package brew
 
 import (
 	"bytes"
@@ -22,7 +26,9 @@ func baseEnv() []string {
 // anyway, but this keeps brew's own arg parsing from being confused).
 var namePattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9@/_.+-]*$`)
 
-func validName(name string) error {
+// ValidName reports whether name is safe to pass to brew as a package, tap,
+// or service name.
+func ValidName(name string) error {
 	if name == "" || !namePattern.MatchString(name) {
 		return fmt.Errorf("invalid package name: %q", name)
 	}
@@ -35,7 +41,10 @@ var (
 	brewPathErr  error
 )
 
-func resolveBrewPath() (string, error) {
+// ResolveBrewPath locates the `brew` executable, preferring the well-known
+// Apple Silicon / Intel / Linuxbrew install locations before falling back to
+// PATH lookup.
+func ResolveBrewPath() (string, error) {
 	brewPathOnce.Do(func() {
 		candidates := []string{"/opt/homebrew/bin/brew", "/usr/local/bin/brew", "/home/linuxbrew/.linuxbrew/bin/brew"}
 		for _, c := range candidates {
@@ -54,12 +63,12 @@ func resolveBrewPath() (string, error) {
 	return brewPath, brewPathErr
 }
 
-// brewEnv returns a stable, non-interactive environment for brew subprocesses.
+// Env returns a stable, non-interactive environment for brew subprocesses.
 // Without HOMEBREW_NO_AUTO_UPDATE, any brew command can silently trigger a
 // full `brew update` first if it's been a while -- surprising and slow for a
 // GUI where updating should be an explicit, visible action. We suppress that
 // everywhere except the one job that IS an explicit update.
-func brewEnv() []string {
+func Env() []string {
 	return append(baseEnv(),
 		"HOMEBREW_NO_COLOR=1",
 		"HOMEBREW_NO_EMOJI=1",
@@ -69,9 +78,9 @@ func brewEnv() []string {
 	)
 }
 
-// brewEnvAllowingAutoUpdate is brewEnv() without the auto-update suppression,
-// for the one job that should actually be allowed to update Homebrew itself.
-func brewEnvAllowingAutoUpdate() []string {
+// EnvAllowingAutoUpdate is Env() without the auto-update suppression, for
+// the one job that should actually be allowed to update Homebrew itself.
+func EnvAllowingAutoUpdate() []string {
 	return append(baseEnv(),
 		"HOMEBREW_NO_COLOR=1",
 		"HOMEBREW_NO_EMOJI=1",
@@ -80,16 +89,16 @@ func brewEnvAllowingAutoUpdate() []string {
 	)
 }
 
-// runBrew executes brew synchronously and returns combined stdout (stderr is
+// RunBrew executes brew synchronously and returns combined stdout (stderr is
 // captured separately for error reporting). It does not stream output; use
-// the job manager for long-running/interactive commands.
-func runBrew(ctx context.Context, args ...string) (string, error) {
-	path, err := resolveBrewPath()
+// the jobs package for long-running/interactive commands.
+func RunBrew(ctx context.Context, args ...string) (string, error) {
+	path, err := ResolveBrewPath()
 	if err != nil {
 		return "", err
 	}
 	cmd := exec.CommandContext(ctx, path, args...)
-	cmd.Env = brewEnv()
+	cmd.Env = Env()
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
@@ -107,10 +116,10 @@ func runBrew(ctx context.Context, args ...string) (string, error) {
 	return stdout.String(), nil
 }
 
-// runCmd executes an arbitrary local binary (not brew) and returns its
+// RunCmd executes an arbitrary local binary (not brew) and returns its
 // combined stdout+stderr, for the handful of macOS system tools we shell
-// out to (xattr, spctl, codesign).
-func runCmd(ctx context.Context, name string, args ...string) (string, error) {
+// out to (xattr, spctl, codesign, mas, ...).
+func RunCmd(ctx context.Context, name string, args ...string) (string, error) {
 	path, err := exec.LookPath(name)
 	if err != nil {
 		return "", fmt.Errorf("%s not found on this system", name)
@@ -125,7 +134,7 @@ func runCmd(ctx context.Context, name string, args ...string) (string, error) {
 
 // runBrewLines runs brew and splits stdout into non-empty trimmed lines.
 func runBrewLines(ctx context.Context, args ...string) ([]string, error) {
-	out, err := runBrew(ctx, args...)
+	out, err := RunBrew(ctx, args...)
 	if err != nil {
 		return nil, err
 	}

@@ -1,4 +1,4 @@
-package main
+package brew
 
 import (
 	"context"
@@ -228,7 +228,7 @@ func interfaceStringSlice(v interface{}) []string {
 
 // ListInstalled returns all installed formulae and casks with full detail.
 func ListInstalled(ctx context.Context) ([]BrewPackage, error) {
-	out, err := runBrew(ctx, "info", "--json=v2", "--installed")
+	out, err := RunBrew(ctx, "info", "--json=v2", "--installed")
 	if err != nil {
 		return nil, err
 	}
@@ -244,7 +244,7 @@ func ListInstalled(ctx context.Context) ([]BrewPackage, error) {
 
 // GetInfo fetches full detail for a single formula or cask.
 func GetInfo(ctx context.Context, name string, isCask bool) (*BrewPackage, error) {
-	if err := validName(name); err != nil {
+	if err := ValidName(name); err != nil {
 		return nil, err
 	}
 	args := []string{"info", "--json=v2"}
@@ -254,7 +254,7 @@ func GetInfo(ctx context.Context, name string, isCask bool) (*BrewPackage, error
 		args = append(args, "--formula")
 	}
 	args = append(args, name)
-	out, err := runBrew(ctx, args...)
+	out, err := RunBrew(ctx, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -266,6 +266,19 @@ func GetInfo(ctx context.Context, name string, isCask bool) (*BrewPackage, error
 		return nil, fmt.Errorf("no such package: %s", name)
 	}
 	return &pkgs[0], nil
+}
+
+// searchKey builds a dedupe key for merging formula/cask search results.
+// This intentionally duplicates the tiny "cask:"/"formula:" format that
+// store.PkgKey also uses for its own, unrelated purpose (keying favorites/
+// tags/notes) -- the two are conceptually independent, and sharing the
+// helper would mean this package importing the store package just for a
+// three-line string formatter.
+func searchKey(name string, isCask bool) string {
+	if isCask {
+		return "cask:" + name
+	}
+	return "formula:" + name
 }
 
 // Search runs `brew search` for both formulae and casks and merges results.
@@ -289,7 +302,7 @@ func Search(ctx context.Context, query string, desc bool) ([]SearchResult, error
 					name = strings.TrimSpace(l[:i])
 				}
 			}
-			key := pkgKey(name, isCask)
+			key := searchKey(name, isCask)
 			if seen[key] {
 				continue
 			}
@@ -334,7 +347,7 @@ func Outdated(ctx context.Context, greedy bool) ([]OutdatedPackage, error) {
 	if greedy {
 		args = append(args, "--greedy")
 	}
-	out, err := runBrew(ctx, args...)
+	out, err := RunBrew(ctx, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -373,10 +386,10 @@ func Taps(ctx context.Context) ([]string, error) {
 
 // TapInfo fetches detail (remote URL, formula/cask counts) for a single tap.
 func TapInfo(ctx context.Context, name string) (*TapDetail, error) {
-	if err := validName(name); err != nil {
+	if err := ValidName(name); err != nil {
 		return nil, err
 	}
-	out, err := runBrew(ctx, "tap-info", "--json", name)
+	out, err := RunBrew(ctx, "tap-info", "--json", name)
 	if err != nil {
 		return nil, err
 	}
@@ -401,7 +414,7 @@ func TapInfo(ctx context.Context, name string) (*TapDetail, error) {
 
 // Services lists brew services.
 func Services(ctx context.Context) ([]Service, error) {
-	out, err := runBrew(ctx, "services", "list", "--json")
+	out, err := RunBrew(ctx, "services", "list", "--json")
 	if err != nil {
 		return nil, err
 	}
@@ -436,7 +449,7 @@ func Leaves(ctx context.Context) ([]string, error) {
 
 // Uses lists installed formulae that depend on the given formula.
 func Uses(ctx context.Context, name string) ([]string, error) {
-	if err := validName(name); err != nil {
+	if err := ValidName(name); err != nil {
 		return nil, err
 	}
 	return runBrewLines(ctx, "uses", "--installed", name)
@@ -450,7 +463,7 @@ func Missing(ctx context.Context) ([]string, error) {
 
 // Deps returns the raw dependency tree text for a package.
 func Deps(ctx context.Context, name string, isCask bool) (string, error) {
-	if err := validName(name); err != nil {
+	if err := ValidName(name); err != nil {
 		return "", err
 	}
 	args := []string{"deps", "--tree"}
@@ -460,12 +473,12 @@ func Deps(ctx context.Context, name string, isCask bool) (string, error) {
 		args = append(args, "--formula")
 	}
 	args = append(args, name)
-	return runBrew(ctx, args...)
+	return RunBrew(ctx, args...)
 }
 
-// CacheInfo reports the size of brew's download cache.
+// GetCacheInfo reports the size of brew's download cache.
 func GetCacheInfo(ctx context.Context) (*CacheInfo, error) {
-	pathOut, err := runBrew(ctx, "--cache")
+	pathOut, err := RunBrew(ctx, "--cache")
 	if err != nil {
 		return nil, err
 	}
@@ -503,12 +516,12 @@ func humanBytes(b int64) string {
 
 // Config returns the raw `brew config` diagnostic text.
 func Config(ctx context.Context) (string, error) {
-	return runBrew(ctx, "config")
+	return RunBrew(ctx, "config")
 }
 
 // BundleCheck reports whether a Brewfile's dependencies are all installed.
 func BundleCheck(ctx context.Context, path string) (string, error) {
-	out, err := runBrew(ctx, "bundle", "check", "--verbose", "--file="+path)
+	out, err := RunBrew(ctx, "bundle", "check", "--verbose", "--file="+path)
 	if err != nil {
 		// `bundle check` exits non-zero when unsatisfied; that's the answer,
 		// not a failure to report.
@@ -519,7 +532,7 @@ func BundleCheck(ctx context.Context, path string) (string, error) {
 
 // BundleList lists everything a Brewfile declares.
 func BundleList(ctx context.Context, path string) (string, error) {
-	return runBrew(ctx, "bundle", "list", "--all", "--file="+path)
+	return RunBrew(ctx, "bundle", "list", "--all", "--file="+path)
 }
 
 // bundleCleanupSectionRe matches the section headers `brew bundle cleanup`
@@ -530,7 +543,7 @@ var bundleCleanupSectionRe = regexp.MustCompile(`^Would uninstall (formulae|cask
 // only ever prints what would be removed, and parses that into a structured
 // list instead of leaving the frontend to render raw CLI text.
 func BundleCleanupPreview(ctx context.Context, path string) ([]BundleCleanupItem, error) {
-	out, err := runBrew(ctx, "bundle", "cleanup", "--file="+path)
+	out, err := RunBrew(ctx, "bundle", "cleanup", "--file="+path)
 	if err != nil {
 		return nil, err
 	}
@@ -555,13 +568,13 @@ func BundleCleanupPreview(ctx context.Context, path string) ([]BundleCleanupItem
 
 // GetSystemInfo assembles a dashboard summary.
 func GetSystemInfo(ctx context.Context) (*SystemInfo, error) {
-	path, err := resolveBrewPath()
+	path, err := ResolveBrewPath()
 	if err != nil {
 		return nil, err
 	}
-	versionOut, _ := runBrew(ctx, "--version")
+	versionOut, _ := RunBrew(ctx, "--version")
 	version := strings.TrimSpace(strings.SplitN(versionOut, "\n", 2)[0])
-	prefixOut, _ := runBrew(ctx, "--prefix")
+	prefixOut, _ := RunBrew(ctx, "--prefix")
 	prefix := strings.TrimSpace(prefixOut)
 
 	base := &SystemInfo{

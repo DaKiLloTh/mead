@@ -1,9 +1,11 @@
-package main
+package security
 
 import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"mead/internal/brew"
 )
 
 // TestResolveCaskAppPathKnownCask exercises the same server-side resolution
@@ -18,15 +20,15 @@ func TestResolveCaskAppPathKnownCask(t *testing.T) {
 		t.Fatalf("setup: %v", err)
 	}
 
-	pkg := &BrewPackage{
+	pkg := &brew.BrewPackage{
 		Name:     "managed-cask",
 		FullName: "managed-cask",
 		AppPaths: []string{appPath},
 	}
 
-	got := resolveCaskAppPath(pkg)
+	got := ResolveCaskAppPath(pkg)
 	if got != appPath {
-		t.Fatalf("resolveCaskAppPath() = %q, want %q", got, appPath)
+		t.Fatalf("ResolveCaskAppPath() = %q, want %q", got, appPath)
 	}
 }
 
@@ -39,14 +41,14 @@ func TestResolveCaskAppPathKnownCask(t *testing.T) {
 // only ever operates on a path resolved through this function, a name that
 // doesn't resolve can't result in any xattr call at all.
 func TestResolveCaskAppPathUnmanagedFails(t *testing.T) {
-	pkg := &BrewPackage{
+	pkg := &brew.BrewPackage{
 		Name:     "not-actually-installed",
 		FullName: "not-actually-installed",
 		AppPaths: []string{"/nonexistent/path/Some.app"},
 	}
 
-	got := resolveCaskAppPath(pkg)
+	got := ResolveCaskAppPath(pkg)
 	if got != "" {
-		t.Fatalf("resolveCaskAppPath() = %q, want empty string for an unresolvable cask", got)
+		t.Fatalf("ResolveCaskAppPath() = %q, want empty string for an unresolvable cask", got)
 	}
 }

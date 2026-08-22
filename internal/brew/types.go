@@ -1,4 +1,4 @@
-package main
+package brew
 
 // BrewPackage represents a Homebrew formula or cask, normalized for the frontend.
 type BrewPackage struct {
@@ -90,45 +90,6 @@ type SystemInfo struct {
 	DeprecatedCount int    `json:"deprecatedCount"`
 	DisabledCount   int    `json:"disabledCount"`
 	PinnedCount     int    `json:"pinnedCount"`
-}
-
-// JobEvent payloads emitted over the Wails event bus.
-type JobStartEvent struct {
-	ID    string `json:"id"`
-	Title string `json:"title"`
-}
-
-type JobOutputEvent struct {
-	ID     string `json:"id"`
-	Line   string `json:"line"`
-	Stream string `json:"stream"` // "stdout" | "stderr"
-}
-
-type JobDoneEvent struct {
-	ID       string `json:"id"`
-	Success  bool   `json:"success"`
-	ExitCode int    `json:"exitCode"`
-	Error    string `json:"error,omitempty"`
-}
-
-// VulnResult is one package's outcome from a best-effort OSV.dev scan.
-type VulnResult struct {
-	Name    string   `json:"name"`
-	IsCask  bool     `json:"isCask"`
-	Version string   `json:"version"`
-	VulnIDs []string `json:"vulnIds"`
-	Error   string   `json:"error,omitempty"`
-}
-
-// SecurityInfo is a Gatekeeper / code-signing snapshot for an installed app.
-type SecurityInfo struct {
-	AppPath      string `json:"appPath"`
-	Signed       bool   `json:"signed"`
-	Authority    string `json:"authority"`
-	TeamID       string `json:"teamId"`
-	GatekeeperOK bool   `json:"gatekeeperOk"`
-	Assessment   string `json:"assessment"`
-	Quarantined  bool   `json:"quarantined"`
 }
 
 // AdoptCandidate is an app in /Applications that looks like it matches an

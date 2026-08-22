@@ -1,4 +1,8 @@
-package main
+// Package security covers OSV.dev vulnerability scanning, Gatekeeper/
+// code-signing inspection, quarantine removal, and local APFS snapshots --
+// everything mead does to help a user reason about whether it's safe to
+// run or remove something.
+package security
 
 import (
 	"bytes"
@@ -11,6 +15,8 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"mead/internal/brew"
 )
 
 // ---- CVE scanning via OSV.dev (best-effort, no API key required) ----
@@ -48,8 +54,8 @@ type osvBatchResponse struct {
 // failure degrades to "no known vulnerabilities found" for that package
 // rather than failing the whole scan, since this is informational, not
 // load-bearing.
-func ScanVulnerabilities(ctx context.Context, pkgs []BrewPackage) ([]VulnResult, error) {
-	var targets []BrewPackage
+func ScanVulnerabilities(ctx context.Context, pkgs []brew.BrewPackage) ([]VulnResult, error) {
+	var targets []brew.BrewPackage
 	for _, p := range pkgs {
 		if !p.IsCask && p.Installed && p.InstalledVersion != "" {
 			targets = append(targets, p)
@@ -133,11 +139,11 @@ func InspectAppSecurity(ctx context.Context, appPath string) (*SecurityInfo, err
 
 	info := &SecurityInfo{AppPath: appPath}
 
-	spctlOut, spctlErr := runCmd(ctx, "spctl", "--assess", "--type", "execute", "-vv", appPath)
+	spctlOut, spctlErr := brew.RunCmd(ctx, "spctl", "--assess", "--type", "execute", "-vv", appPath)
 	info.Assessment = strings.TrimSpace(spctlOut)
 	info.GatekeeperOK = spctlErr == nil
 
-	codesignOut, _ := runCmd(ctx, "codesign", "-dv", "--verbose=4", appPath)
+	codesignOut, _ := brew.RunCmd(ctx, "codesign", "-dv", "--verbose=4", appPath)
 	if m := authorityRe.FindStringSubmatch(codesignOut); m != nil {
 		info.Authority = strings.TrimSpace(m[1])
 		info.Signed = true
@@ -146,7 +152,7 @@ func InspectAppSecurity(ctx context.Context, appPath string) (*SecurityInfo, err
 		info.TeamID = strings.TrimSpace(m[1])
 	}
 
-	xattrOut, _ := runCmd(ctx, "xattr", appPath)
+	xattrOut, _ := brew.RunCmd(ctx, "xattr", appPath)
 	info.Quarantined = strings.Contains(xattrOut, "com.apple.quarantine")
 
 	return info, nil
@@ -161,14 +167,14 @@ func RemoveQuarantine(ctx context.Context, appPath string) (string, error) {
 	if _, err := os.Stat(appPath); err != nil {
 		return "", fmt.Errorf("app not found at %s", appPath)
 	}
-	out, err := runCmd(ctx, "xattr", "-d", "com.apple.quarantine", appPath)
+	out, err := brew.RunCmd(ctx, "xattr", "-d", "com.apple.quarantine", appPath)
 	return out, err
 }
 
-// resolveCaskAppPath finds the first /Applications/<App>.app for a cask,
+// ResolveCaskAppPath finds the first /Applications/<App>.app for a cask,
 // preferring the artifact list from `brew info` and falling back to the
 // package's display name.
-func resolveCaskAppPath(pkg *BrewPackage) string {
+func ResolveCaskAppPath(pkg *brew.BrewPackage) string {
 	for _, p := range pkg.AppPaths {
 		if _, err := os.Stat(p); err == nil {
 			return p
@@ -188,7 +194,7 @@ func resolveCaskAppPath(pkg *BrewPackage) string {
 // "Browse Time Machine snapshots...", or Recovery Mode), which mead doesn't
 // reimplement.
 func CreateLocalSnapshot(ctx context.Context) error {
-	out, err := runCmd(ctx, "tmutil", "localsnapshot")
+	out, err := brew.RunCmd(ctx, "tmutil", "localsnapshot")
 	if err != nil {
 		msg := strings.TrimSpace(out)
 		if msg == "" {
@@ -207,6 +213,6 @@ func RevealInFinder(ctx context.Context, path string) error {
 	if _, err := os.Stat(path); err != nil {
 		return fmt.Errorf("not found: %s", path)
 	}
-	_, err := runCmd(ctx, "open", "-R", path)
+	_, err := brew.RunCmd(ctx, "open", "-R", path)
 	return err
 }

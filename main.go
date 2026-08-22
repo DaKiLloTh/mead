@@ -7,6 +7,8 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
 	"github.com/wailsapp/wails/v2/pkg/options/mac"
+
+	"mead/internal/app"
 )
 
 //go:embed all:frontend/dist
@@ -14,7 +16,7 @@ var assets embed.FS
 
 func main() {
 	// Create an instance of the app structure
-	app := NewApp()
+	application := app.New()
 
 	// Create application with options
 	err := wails.Run(&options.App{
@@ -27,9 +29,9 @@ func main() {
 			Assets: assets,
 		},
 		BackgroundColour: &options.RGBA{R: 0, G: 0, B: 0, A: 0},
-		OnStartup:        app.startup,
+		OnStartup:        application.Startup,
 		Bind: []interface{}{
-			app,
+			application,
 		},
 		Mac: &mac.Options{
 			TitleBar:             mac.TitleBarHiddenInset(),

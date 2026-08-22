@@ -1,8 +1,10 @@
-package main
+package app
 
 import (
 	"strings"
 	"testing"
+
+	"mead/internal/brew"
 )
 
 // containsFlag reports whether args contains the exact flag/token.
@@ -81,7 +83,7 @@ func TestBuildAdoptCaskArgs(t *testing.T) {
 
 func TestBuildCollectionInstallArgs(t *testing.T) {
 	// Mirrors the real "Web Dev" collection: a mix of formulae and one cask.
-	mixed := []CollectionPackage{
+	mixed := []brew.CollectionPackage{
 		{Name: "node"}, {Name: "yarn"}, {Name: "git"}, {Name: "gh"},
 		{Name: "watchman"}, {Name: "visual-studio-code", IsCask: true},
 	}
@@ -111,7 +113,7 @@ func TestBuildCollectionInstallArgs(t *testing.T) {
 	})
 
 	t.Run("formula-only collection, custom dir set", func(t *testing.T) {
-		formulaOnly := []CollectionPackage{
+		formulaOnly := []brew.CollectionPackage{
 			{Name: "docker"}, {Name: "kubectl"}, {Name: "terraform"},
 		}
 		args := buildCollectionInstallArgs(formulaOnly, "/Users/me/Applications")

@@ -1,23 +1,23 @@
-import * as App from '../../wailsjs/go/main/App'
-import { main } from '../../wailsjs/go/models'
+import * as App from '../../wailsjs/go/app/App'
+import { brew, security, store } from '../../wailsjs/go/models'
 
-export type BrewPackage = main.BrewPackage
-export type CacheInfo = main.CacheInfo
-export type OutdatedPackage = main.OutdatedPackage
-export type SearchResult = main.SearchResult
-export type Service = main.Service
-export type SystemInfo = main.SystemInfo
-export type UserData = main.UserData
-export type HistoryEntry = main.HistoryEntry
-export type VulnResult = main.VulnResult
-export type SecurityInfo = main.SecurityInfo
-export type AdoptCandidate = main.AdoptCandidate
-export type DuplicateApp = main.DuplicateApp
-export type MasApp = main.MasApp
-export type Collection = main.Collection
-export type CollectionPackage = main.CollectionPackage
-export type TapDetail = main.TapDetail
-export type BundleCleanupItem = main.BundleCleanupItem
+export type BrewPackage = brew.BrewPackage
+export type CacheInfo = brew.CacheInfo
+export type OutdatedPackage = brew.OutdatedPackage
+export type SearchResult = brew.SearchResult
+export type Service = brew.Service
+export type SystemInfo = brew.SystemInfo
+export type UserData = store.UserData
+export type HistoryEntry = store.HistoryEntry
+export type VulnResult = security.VulnResult
+export type SecurityInfo = security.SecurityInfo
+export type AdoptCandidate = brew.AdoptCandidate
+export type DuplicateApp = brew.DuplicateApp
+export type MasApp = brew.MasApp
+export type Collection = brew.Collection
+export type CollectionPackage = brew.CollectionPackage
+export type TapDetail = brew.TapDetail
+export type BundleCleanupItem = brew.BundleCleanupItem
 
 export const api = {
   getSystemInfo: () => App.GetSystemInfo(),
