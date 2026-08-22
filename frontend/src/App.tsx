@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { JobsProvider } from './context/JobsContext'
 import { ConfirmProvider } from './context/ConfirmContext'
 import { UserDataProvider } from './context/UserDataContext'
+import { InstalledPackagesProvider, useInstalledPackages } from './context/InstalledPackagesContext'
 import Sidebar, { type ViewKey } from './components/Sidebar'
 import JobConsole from './components/JobConsole'
 import Toasts from './components/Toasts'
@@ -41,8 +42,16 @@ function AppShell() {
   const [view, setView] = useState<ViewKey>('dashboard')
   const [refreshToken, setRefreshToken] = useState(0)
   const [outdatedCount, setOutdatedCount] = useState(0)
+  const installedPackages = useInstalledPackages()
 
-  const bump = () => setRefreshToken((t) => t + 1)
+  // The single "something changed, refresh now" signal for the whole app.
+  // Views still on the per-view fetch-on-refreshToken pattern pick this up
+  // via the `refreshToken` prop; the shared installed-packages cache hooks
+  // into the same call rather than exposing a second, parallel signal.
+  const bump = () => {
+    setRefreshToken((t) => t + 1)
+    installedPackages.refresh()
+  }
 
   useEffect(() => {
     api
@@ -92,7 +101,9 @@ export default function App() {
     <JobsProvider>
       <ConfirmProvider>
         <UserDataProvider>
-          <AppShell />
+          <InstalledPackagesProvider>
+            <AppShell />
+          </InstalledPackagesProvider>
         </UserDataProvider>
       </ConfirmProvider>
     </JobsProvider>
