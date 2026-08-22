@@ -20,6 +20,7 @@ export default function Updates({ refreshToken, bump }: Props) {
   const userData = useUserData()
   const [items, setItems] = useState<OutdatedPackage[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [rowBusy, setRowBusy] = useState<string | null>(null)
   const [upgradingAll, setUpgradingAll] = useState(false)
   const [showSnoozed, setShowSnoozed] = useState(false)
@@ -27,9 +28,11 @@ export default function Updates({ refreshToken, bump }: Props) {
 
   function load() {
     setLoading(true)
+    setError(null)
     api
       .outdated(greedy)
       .then(setItems)
+      .catch((e) => setError(String(e)))
       .finally(() => setLoading(false))
   }
 
@@ -73,10 +76,12 @@ export default function Updates({ refreshToken, bump }: Props) {
         <div>
           <h1 className="text-2xl font-bold">Updates</h1>
           <p className="text-base-content/60 text-sm">
-            {visible.length === 0
+            {error
+              ? "Couldn't check for updates."
+              : visible.length === 0
               ? 'Everything is up to date.'
               : `${visible.length} package${visible.length === 1 ? '' : 's'} can be upgraded`}
-            {snoozed.length > 0 && ` · ${snoozed.length} snoozed`}
+            {!error && snoozed.length > 0 && ` · ${snoozed.length} snoozed`}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -106,7 +111,14 @@ export default function Updates({ refreshToken, bump }: Props) {
         </div>
       </div>
 
-      {loading && items.length === 0 ? (
+      {error ? (
+        <div className="alert alert-error alert-soft">
+          <div>
+            <div className="font-medium">Couldn't check for updates</div>
+            <p className="text-sm mt-1">{error}</p>
+          </div>
+        </div>
+      ) : loading && items.length === 0 ? (
         <div className="flex items-center gap-2 text-base-content/60">
           <span className="loading loading-spinner loading-sm" /> Checking for updates…
         </div>
