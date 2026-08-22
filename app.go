@@ -12,7 +12,12 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
-var gistURLRe = regexp.MustCompile(`https://gist\.github\.com/\S+`)
+// gistURLRe matches a gist.github.com URL embedded in `brew gist-logs`
+// output. The path segment is restricted to characters that actually
+// appear in gist URLs (alphanumerics, hyphens, underscores, and slashes)
+// so trailing punctuation from surrounding prose -- e.g. a period ending a
+// sentence -- isn't swept into the match.
+var gistURLRe = regexp.MustCompile(`https://gist\.github\.com/[A-Za-z0-9_/-]+`)
 
 // App struct
 type App struct {
@@ -400,10 +405,22 @@ func (a *App) InspectCaskSecurity(name string) (*SecurityInfo, error) {
 }
 
 // RemoveQuarantine is synchronous (a single xattr call) so it's exposed as
-// a plain error-returning method rather than a streaming job.
-func (a *App) RemoveQuarantine(appPath string) error {
+// a plain error-returning method rather than a streaming job. It takes a
+// cask name -- not a raw filesystem path -- and resolves the .app path
+// itself via resolveCaskAppPath, the same helper InspectCaskSecurity uses,
+// so the frontend can't point it at an arbitrary .app bundle that mead
+// doesn't actually manage.
+func (a *App) RemoveQuarantine(name string) error {
+	if name == "" {
+		return fmt.Errorf("no cask name given")
+	}
+	pkg, err := GetInfo(a.ctx, name, true)
+	if err != nil {
+		return err
+	}
+	appPath := resolveCaskAppPath(pkg)
 	if appPath == "" {
-		return fmt.Errorf("no app path given")
+		return fmt.Errorf("couldn't find an installed .app for %s", name)
 	}
 	out, err := RemoveQuarantine(a.ctx, appPath)
 	if err != nil {

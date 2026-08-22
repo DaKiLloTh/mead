@@ -102,7 +102,14 @@ func (s *Store) load() {
 }
 
 // saveLocked writes the current data to disk. Caller must hold s.mu.
+// If the Store has no path (e.g. the in-memory fallback used when
+// NewStore fails to initialize a real config dir), persistence is
+// disabled and this is a no-op: mutations still take effect in memory,
+// they just aren't written to disk.
 func (s *Store) saveLocked() error {
+	if s.path == "" {
+		return nil
+	}
 	raw, err := json.MarshalIndent(s.data, "", "  ")
 	if err != nil {
 		return err
