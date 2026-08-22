@@ -1,7 +1,13 @@
 name: PR Title Check
 
 on:
-  pull_request_target:
+  # Plain pull_request, not pull_request_target: release-please-action opens
+  # its release PRs using the default GITHUB_TOKEN, and GitHub Actions never
+  # fires pull_request_target for events authored by that token (loop
+  # prevention). pull_request doesn't have that restriction -- it just needs
+  # a bot-authored run to be manually approved once, same as CI already
+  # requires.
+  pull_request:
     types: [opened, edited, synchronize, reopened]
 
 permissions:
