@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { api, SystemInfo } from '../lib/api'
 import { useJobs } from '../context/JobsContext'
 import { ArrowUpCircleIcon, ExternalLinkIcon, RefreshIcon, WrenchIcon } from '../components/Icons'
+import ExternalLink from '../components/ExternalLink'
 import type { ViewKey } from '../components/Sidebar'
 
 interface Props {
@@ -55,9 +56,9 @@ export default function Dashboard({ onNavigate, refreshToken }: Props) {
           </code>
         </pre>
         <div className="flex items-center gap-3 mt-3">
-          <a className="link inline-flex items-center gap-1 text-sm" href="https://brew.sh" target="_blank" rel="noreferrer">
+          <ExternalLink className="link inline-flex items-center gap-1 text-sm" href="https://brew.sh">
             brew.sh <ExternalLinkIcon className="size-3" />
-          </a>
+          </ExternalLink>
           <button className="btn btn-sm" onClick={load}>
             <RefreshIcon className="size-4" /> Try again
           </button>

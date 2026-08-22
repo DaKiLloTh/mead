@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useJobs } from '../context/JobsContext'
 import { duration } from '../lib/format'
 import { api } from '../lib/api'
+import ExternalLink from './ExternalLink'
 
 function StatusIcon({ status }: { status: 'running' | 'success' | 'error' }) {
   if (status === 'running') return <span className="loading loading-spinner loading-xs text-primary" />
@@ -44,9 +45,9 @@ function GistLogsButton({ title }: { title: string }) {
   }
   if ('url' in state) {
     return (
-      <a className="link link-primary text-xs" href={state.url} target="_blank" rel="noreferrer">
+      <ExternalLink className="link link-primary text-xs" href={state.url}>
         {state.url}
-      </a>
+      </ExternalLink>
     )
   }
   return <span className="text-error text-xs">{state.error}</span>

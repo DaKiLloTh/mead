@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { api, MasApp } from '../lib/api'
 import { useJobs } from '../context/JobsContext'
 import { ArrowUpCircleIcon, DownloadIcon, RefreshIcon, StoreIcon } from '../components/Icons'
+import ExternalLink from '../components/ExternalLink'
 
 export default function AppStore() {
   const { runAction } = useJobs()
@@ -80,9 +81,9 @@ export default function AppStore() {
             </h2>
             <p className="text-sm text-base-content/70">
               App Store integration needs{' '}
-              <a className="link" href="https://github.com/mas-cli/mas" target="_blank" rel="noreferrer">
+              <ExternalLink className="link" href="https://github.com/mas-cli/mas">
                 mas
-              </a>
+              </ExternalLink>
               , which is itself a Homebrew formula. Install it and this page will pick up your Mac App Store apps.
             </p>
             <div className="card-actions mt-2">

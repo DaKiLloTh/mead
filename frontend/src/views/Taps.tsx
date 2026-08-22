@@ -3,6 +3,7 @@ import { api, TapDetail } from '../lib/api'
 import { useJobs } from '../context/JobsContext'
 import { useConfirm } from '../context/ConfirmContext'
 import { ChevronDownIcon, ExternalLinkIcon, RefreshIcon, TapIcon, TrashIcon } from '../components/Icons'
+import ExternalLink from '../components/ExternalLink'
 
 interface Props {
   refreshToken: number
@@ -157,9 +158,9 @@ export default function Taps({ refreshToken, bump }: Props) {
                       <div className="space-y-0.5">
                         {detail.remote && (
                           <div className="flex items-center gap-1">
-                            <a className="link inline-flex items-center gap-1" href={detail.remote} target="_blank" rel="noreferrer">
+                            <ExternalLink className="link inline-flex items-center gap-1" href={detail.remote}>
                               {detail.remote} <ExternalLinkIcon className="size-3" />
-                            </a>
+                            </ExternalLink>
                           </div>
                         )}
                         <div>

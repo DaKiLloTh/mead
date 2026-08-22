@@ -16,6 +16,7 @@ import {
   TrashIcon,
   XIcon,
 } from './Icons'
+import ExternalLink from './ExternalLink'
 
 export interface DetailTarget {
   name: string
@@ -294,14 +295,9 @@ export default function PackageDetailModal({ target, onClose, onChanged }: Props
               {pkg.license && <span>License: {pkg.license}</span>}
               {pkg.tap && <span>Tap: {pkg.tap}</span>}
               {pkg.homepage && (
-                <a
-                  className="link link-hover inline-flex items-center gap-1"
-                  href={pkg.homepage}
-                  target="_blank"
-                  rel="noreferrer"
-                >
+                <ExternalLink className="link link-hover inline-flex items-center gap-1" href={pkg.homepage}>
                   Homepage <ExternalLinkIcon className="size-3" />
-                </a>
+                </ExternalLink>
               )}
               {pkg.installed && (
                 <button className="link link-hover" onClick={doReveal}>
