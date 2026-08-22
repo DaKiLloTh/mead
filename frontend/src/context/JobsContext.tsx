@@ -23,6 +23,7 @@ interface JobsContextValue {
   selectedJobId: string | null
   setSelectedJobId: (id: string | null) => void
   cancelJob: (id: string) => void
+  clearFinishedJobs: () => void
 }
 
 const JobsContext = createContext<JobsContextValue | null>(null)
@@ -88,6 +89,11 @@ export function JobsProvider({ children }: { children: React.ReactNode }) {
     void api.cancelJob(id)
   }, [])
 
+  const clearFinishedJobs = useCallback(() => {
+    trackerRef.current!.clearFinished()
+    setSelectedJobId(null)
+  }, [])
+
   const activeCount = jobs.filter((j) => j.status === 'running').length
 
   const value: JobsContextValue = {
@@ -102,6 +108,7 @@ export function JobsProvider({ children }: { children: React.ReactNode }) {
     selectedJobId,
     setSelectedJobId,
     cancelJob,
+    clearFinishedJobs,
   }
 
   return <JobsContext.Provider value={value}>{children}</JobsContext.Provider>

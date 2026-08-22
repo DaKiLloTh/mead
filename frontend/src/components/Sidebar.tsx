@@ -80,8 +80,8 @@ interface Props {
 export default function Sidebar({ view, onSelect, outdatedCount }: Props) {
   return (
     <div className="w-56 shrink-0 bg-base-200/70 backdrop-blur-xl border-r border-base-300/60 flex flex-col overflow-y-auto">
-      <div className="drag-region h-7 shrink-0" />
-      <div className="shrink-0 flex items-center gap-2 px-4 pb-3">
+      <div className="drag-region h-9 shrink-0" />
+      <div className="shrink-0 flex items-center gap-2 px-4 pt-2 pb-3">
         <span className="text-xl">🍺</span>
         <span className="font-bold tracking-tight">mead</span>
       </div>

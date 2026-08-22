@@ -79,6 +79,10 @@ export class JobTracker {
     return this.jobs
   }
 
+  clearFinished(): void {
+    this.setJobs(this.jobs.filter((j) => j.status === 'running'))
+  }
+
   private setJobs(next: JobState[]) {
     this.jobs = next
     this.callbacks.onJobsChange(next)
