@@ -13,7 +13,7 @@ import (
 
 // ---- generic map helpers for defensively decoding brew's JSON ----
 
-func mGetString(m map[string]interface{}, key string) string {
+func mGetString(m map[string]any, key string) string {
 	if v, ok := m[key]; ok && v != nil {
 		if s, ok := v.(string); ok {
 			return s
@@ -22,7 +22,7 @@ func mGetString(m map[string]interface{}, key string) string {
 	return ""
 }
 
-func mGetBool(m map[string]interface{}, key string) bool {
+func mGetBool(m map[string]any, key string) bool {
 	if v, ok := m[key]; ok && v != nil {
 		if b, ok := v.(bool); ok {
 			return b
@@ -34,7 +34,7 @@ func mGetBool(m map[string]interface{}, key string) bool {
 func mGetStringSlice(m map[string]interface{}, key string) []string {
 	out := []string{}
 	if v, ok := m[key]; ok && v != nil {
-		if arr, ok := v.([]interface{}); ok {
+		if arr, ok := v.([]any); ok {
 			for _, e := range arr {
 				if s, ok := e.(string); ok {
 					out = append(out, s)
@@ -45,9 +45,9 @@ func mGetStringSlice(m map[string]interface{}, key string) []string {
 	return out
 }
 
-func mGetMap(m map[string]interface{}, key string) map[string]interface{} {
+func mGetMap(m map[string]interface{}, key string) map[string]any {
 	if v, ok := m[key]; ok && v != nil {
-		if mm, ok := v.(map[string]interface{}); ok {
+		if mm, ok := v.(map[string]any); ok {
 			return mm
 		}
 	}
@@ -56,7 +56,7 @@ func mGetMap(m map[string]interface{}, key string) map[string]interface{} {
 
 func mGetArr(m map[string]interface{}, key string) []interface{} {
 	if v, ok := m[key]; ok && v != nil {
-		if arr, ok := v.([]interface{}); ok {
+		if arr, ok := v.([]any); ok {
 			return arr
 		}
 	}
@@ -166,12 +166,12 @@ func caskToPackage(c map[string]interface{}) BrewPackage {
 // security inspection and quarantine removal), and the paths its `zap`
 // stanza would trash on uninstall --zap (shown to the user before they
 // opt into that).
-func parseCaskArtifacts(artifacts []interface{}) (labels []string, appPaths []string, zapPaths []string) {
+func parseCaskArtifacts(artifacts []any) (labels []string, appPaths []string, zapPaths []string) {
 	labels = []string{}
 	appPaths = []string{}
 	zapPaths = []string{}
 	for _, raw := range artifacts {
-		entry, ok := raw.(map[string]interface{})
+		entry, ok := raw.(map[string]any)
 		if !ok {
 			continue
 		}
@@ -195,9 +195,9 @@ func parseCaskArtifacts(artifacts []interface{}) (labels []string, appPaths []st
 					labels = append(labels, "Man page: "+name)
 				}
 			case "zap":
-				if zapArr, ok := val.([]interface{}); ok {
+				if zapArr, ok := val.([]any); ok {
 					for _, ze := range zapArr {
-						if zm, ok := ze.(map[string]interface{}); ok {
+						if zm, ok := ze.(map[string]any); ok {
 							zapPaths = append(zapPaths, mGetStringSlice(zm, "trash")...)
 						}
 					}
@@ -298,8 +298,8 @@ func Search(ctx context.Context, query string, desc bool) ([]SearchResult, error
 			name := l
 			if desc {
 				// `--desc` lines look like "name: description text"
-				if i := strings.Index(l, ":"); i >= 0 {
-					name = strings.TrimSpace(l[:i])
+				if before, _, ok := strings.Cut(l, ":"); ok {
+					name = strings.TrimSpace(before)
 				}
 			}
 			key := searchKey(name, isCask)
@@ -549,7 +549,7 @@ func BundleCleanupPreview(ctx context.Context, path string) ([]BundleCleanupItem
 	}
 	items := []BundleCleanupItem{}
 	isCask := false
-	for _, line := range strings.Split(out, "\n") {
+	for line := range strings.SplitSeq(out, "\n") {
 		line = strings.TrimSpace(line)
 		if line == "" {
 			continue
