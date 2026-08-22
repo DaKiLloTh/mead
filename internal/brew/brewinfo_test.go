@@ -196,43 +196,43 @@ func TestDirSize_PermissionDenied(t *testing.T) {
 func TestCaskToPackage_FullName(t *testing.T) {
 	tests := []struct {
 		name     string
-		cask     map[string]interface{}
+		cask     map[string]any
 		wantFull string
 		desc     string
 	}{
 		{
 			name: "normal display name overrides full_token",
-			cask: map[string]interface{}{
+			cask: map[string]any{
 				"token":      "firefox",
 				"full_token": "homebrew/cask/firefox",
-				"name":       []interface{}{"Firefox"},
+				"name":       []any{"Firefox"},
 			},
 			wantFull: "Firefox",
 			desc:     "a real, non-empty name[0] should be preferred over full_token",
 		},
 		{
 			name: "empty string name falls back to full_token",
-			cask: map[string]interface{}{
+			cask: map[string]any{
 				"token":      "firefox",
 				"full_token": "homebrew/cask/firefox",
-				"name":       []interface{}{""},
+				"name":       []any{""},
 			},
 			wantFull: "homebrew/cask/firefox",
 			desc:     "name[0] == \"\" must not clobber the valid full_token-derived FullName",
 		},
 		{
 			name: "whitespace-only name falls back to full_token",
-			cask: map[string]interface{}{
+			cask: map[string]any{
 				"token":      "firefox",
 				"full_token": "homebrew/cask/firefox",
-				"name":       []interface{}{"   "},
+				"name":       []any{"   "},
 			},
 			wantFull: "homebrew/cask/firefox",
 			desc:     "a whitespace-only name[0] is effectively empty and must not clobber FullName",
 		},
 		{
 			name: "no name field falls back to full_token",
-			cask: map[string]interface{}{
+			cask: map[string]any{
 				"token":      "firefox",
 				"full_token": "homebrew/cask/firefox",
 			},

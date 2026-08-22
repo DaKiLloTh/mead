@@ -31,7 +31,7 @@ func mGetBool(m map[string]any, key string) bool {
 	return false
 }
 
-func mGetStringSlice(m map[string]interface{}, key string) []string {
+func mGetStringSlice(m map[string]any, key string) []string {
 	out := []string{}
 	if v, ok := m[key]; ok && v != nil {
 		if arr, ok := v.([]any); ok {
@@ -45,7 +45,7 @@ func mGetStringSlice(m map[string]interface{}, key string) []string {
 	return out
 }
 
-func mGetMap(m map[string]interface{}, key string) map[string]any {
+func mGetMap(m map[string]any, key string) map[string]any {
 	if v, ok := m[key]; ok && v != nil {
 		if mm, ok := v.(map[string]any); ok {
 			return mm
@@ -54,7 +54,7 @@ func mGetMap(m map[string]interface{}, key string) map[string]any {
 	return nil
 }
 
-func mGetArr(m map[string]interface{}, key string) []interface{} {
+func mGetArr(m map[string]any, key string) []any {
 	if v, ok := m[key]; ok && v != nil {
 		if arr, ok := v.([]any); ok {
 			return arr
@@ -67,8 +67,8 @@ func mGetArr(m map[string]interface{}, key string) []interface{} {
 
 func decodeInfoV2(data []byte) ([]BrewPackage, error) {
 	var raw struct {
-		Formulae []map[string]interface{} `json:"formulae"`
-		Casks    []map[string]interface{} `json:"casks"`
+		Formulae []map[string]any `json:"formulae"`
+		Casks    []map[string]any `json:"casks"`
 	}
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return nil, fmt.Errorf("parsing brew info output: %w", err)
@@ -84,7 +84,7 @@ func decodeInfoV2(data []byte) ([]BrewPackage, error) {
 	return out, nil
 }
 
-func formulaToPackage(f map[string]interface{}) BrewPackage {
+func formulaToPackage(f map[string]any) BrewPackage {
 	p := BrewPackage{
 		Name:          mGetString(f, "name"),
 		FullName:      mGetString(f, "full_name"),
@@ -111,7 +111,7 @@ func formulaToPackage(f map[string]interface{}) BrewPackage {
 	}
 	if installedArr := mGetArr(f, "installed"); len(installedArr) > 0 {
 		p.Installed = true
-		if last, ok := installedArr[len(installedArr)-1].(map[string]interface{}); ok {
+		if last, ok := installedArr[len(installedArr)-1].(map[string]any); ok {
 			p.InstalledVersion = mGetString(last, "version")
 			p.InstalledOnRequest = mGetBool(last, "installed_on_request")
 			p.InstalledAsDependency = mGetBool(last, "installed_as_dependency")
@@ -123,7 +123,7 @@ func formulaToPackage(f map[string]interface{}) BrewPackage {
 	return p
 }
 
-func caskToPackage(c map[string]interface{}) BrewPackage {
+func caskToPackage(c map[string]any) BrewPackage {
 	p := BrewPackage{
 		Name:          mGetString(c, "token"),
 		FullName:      mGetString(c, "full_token"),
@@ -210,11 +210,11 @@ func parseCaskArtifacts(artifacts []any) (labels []string, appPaths []string, za
 
 // interfaceStringSlice normalizes a JSON value that may be a bare string or
 // an array of strings (brew's artifact entries vary by artifact type).
-func interfaceStringSlice(v interface{}) []string {
+func interfaceStringSlice(v any) []string {
 	switch t := v.(type) {
 	case string:
 		return []string{t}
-	case []interface{}:
+	case []any:
 		var out []string
 		for _, e := range t {
 			if s, ok := e.(string); ok {
@@ -352,8 +352,8 @@ func Outdated(ctx context.Context, greedy bool) ([]OutdatedPackage, error) {
 		return nil, err
 	}
 	var raw struct {
-		Formulae []map[string]interface{} `json:"formulae"`
-		Casks    []map[string]interface{} `json:"casks"`
+		Formulae []map[string]any `json:"formulae"`
+		Casks    []map[string]any `json:"casks"`
 	}
 	if err := json.Unmarshal([]byte(out), &raw); err != nil {
 		return nil, fmt.Errorf("parsing brew outdated output: %w", err)
@@ -393,7 +393,7 @@ func TapInfo(ctx context.Context, name string) (*TapDetail, error) {
 	if err != nil {
 		return nil, err
 	}
-	var raw []map[string]interface{}
+	var raw []map[string]any
 	if err := json.Unmarshal([]byte(out), &raw); err != nil {
 		return nil, fmt.Errorf("parsing brew tap-info output: %w", err)
 	}
@@ -418,7 +418,7 @@ func Services(ctx context.Context) ([]Service, error) {
 	if err != nil {
 		return nil, err
 	}
-	var raw []map[string]interface{}
+	var raw []map[string]any
 	if err := json.Unmarshal([]byte(out), &raw); err != nil {
 		return nil, fmt.Errorf("parsing brew services output: %w", err)
 	}
