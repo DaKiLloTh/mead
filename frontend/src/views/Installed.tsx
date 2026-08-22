@@ -220,10 +220,18 @@ export default function Installed({ refreshToken, bump }: Props) {
         </div>
       ) : (
         <div className="overflow-x-auto rounded-box border border-base-300">
-          <table className="table table-sm">
+          <table className="table table-sm table-fixed">
+            <colgroup>
+              <col className="w-8" />
+              <col />
+              <col className="w-24" />
+              <col className="w-32" />
+              <col className="w-56" />
+              <col className="w-28" />
+            </colgroup>
             <thead>
               <tr>
-                <th className="w-8">
+                <th>
                   <input
                     type="checkbox"
                     className="checkbox checkbox-xs"
@@ -253,18 +261,20 @@ export default function Installed({ refreshToken, bump }: Props) {
                       />
                     </td>
                     <td className="cursor-pointer" onClick={() => setDetail({ name: p.name, isCask: p.isCask })}>
-                      <div className="font-medium flex items-center gap-1.5">
+                      <div className="font-medium flex items-center gap-1.5 min-w-0">
                         {favorite && <StarIcon filled className="size-3.5 text-warning shrink-0" />}
-                        {p.name}
+                        <span className="truncate">{p.name}</span>
                       </div>
-                      {p.desc && <div className="text-xs text-base-content/50 truncate max-w-md">{p.desc}</div>}
+                      {p.desc && <div className="text-xs text-base-content/50 truncate">{p.desc}</div>}
                     </td>
                     <td>
                       <span className={`badge badge-sm badge-outline ${p.isCask ? 'badge-accent' : 'badge-primary'}`}>
                         {p.isCask ? 'cask' : 'formula'}
                       </span>
                     </td>
-                    <td className="font-mono text-xs">{p.installedVersion || p.version}</td>
+                    <td className="font-mono text-xs truncate" title={p.installedVersion || p.version}>
+                      {p.installedVersion || p.version}
+                    </td>
                     <td>
                       <div className="flex gap-1 flex-wrap">
                         {p.outdated && <span className="badge badge-sm badge-warning">outdated</span>}

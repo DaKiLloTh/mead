@@ -97,7 +97,12 @@ export default function Security() {
                 <div className="alert alert-success alert-soft text-sm">No known vulnerabilities found.</div>
               ) : (
                 <div className="overflow-x-auto rounded-box border border-base-300">
-                  <table className="table table-sm">
+                  <table className="table table-sm table-fixed">
+                    <colgroup>
+                      <col />
+                      <col className="w-28" />
+                      <col className="w-72" />
+                    </colgroup>
                     <thead>
                       <tr>
                         <th>Package</th>
@@ -108,8 +113,10 @@ export default function Security() {
                     <tbody>
                       {affected.map((v) => (
                         <tr key={v.name} className="hover:bg-base-200">
-                          <td className="font-medium">{v.name}</td>
-                          <td className="font-mono text-xs">{v.version}</td>
+                          <td className="font-medium truncate">{v.name}</td>
+                          <td className="font-mono text-xs truncate" title={v.version}>
+                            {v.version}
+                          </td>
                           <td>
                             <div className="flex flex-wrap gap-1">
                               {v.vulnIds.map((id) => (
@@ -152,7 +159,12 @@ export default function Security() {
                 <div className="alert alert-success alert-soft text-sm">No duplicates found.</div>
               ) : (
                 <div className="overflow-x-auto rounded-box border border-base-300">
-                  <table className="table table-sm">
+                  <table className="table table-sm table-fixed">
+                    <colgroup>
+                      <col />
+                      <col className="w-36" />
+                      <col className="w-36" />
+                    </colgroup>
                     <thead>
                       <tr>
                         <th>Name</th>
@@ -163,11 +175,15 @@ export default function Security() {
                     <tbody>
                       {dupes.map((d) => (
                         <tr key={d.name} className="hover:bg-base-200">
-                          <td className="font-medium flex items-center gap-1.5">
-                            <AlertIcon className="size-4 text-warning" /> {d.name}
+                          <td className="font-medium flex items-center gap-1.5 min-w-0">
+                            <AlertIcon className="size-4 text-warning shrink-0" /> <span className="truncate">{d.name}</span>
                           </td>
-                          <td className="font-mono text-xs">{d.formulaVersion}</td>
-                          <td className="font-mono text-xs">{d.caskVersion}</td>
+                          <td className="font-mono text-xs truncate" title={d.formulaVersion}>
+                            {d.formulaVersion}
+                          </td>
+                          <td className="font-mono text-xs truncate" title={d.caskVersion}>
+                            {d.caskVersion}
+                          </td>
                         </tr>
                       ))}
                     </tbody>

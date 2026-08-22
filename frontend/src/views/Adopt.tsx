@@ -58,7 +58,13 @@ export default function Adopt({ bump }: Props) {
             </div>
           ) : (
             <div className="overflow-x-auto rounded-box border border-base-300">
-              <table className="table table-sm">
+              <table className="table table-sm table-fixed">
+                <colgroup>
+                  <col />
+                  <col className="w-40" />
+                  <col className="w-28" />
+                  <col className="w-28" />
+                </colgroup>
                 <thead>
                   <tr>
                     <th>App</th>
@@ -71,11 +77,15 @@ export default function Adopt({ bump }: Props) {
                   {candidates.map((c) => (
                     <tr key={c.appPath} className="hover:bg-base-200">
                       <td>
-                        <div className="font-medium">{c.appName}</div>
-                        <div className="text-xs text-base-content/50 truncate max-w-sm">{c.caskDesc}</div>
+                        <div className="font-medium truncate">{c.appName}</div>
+                        <div className="text-xs text-base-content/50 truncate">{c.caskDesc}</div>
                       </td>
-                      <td className="font-mono text-xs">{c.caskToken}</td>
-                      <td className="font-mono text-xs">{c.caskVersion}</td>
+                      <td className="font-mono text-xs truncate" title={c.caskToken}>
+                        {c.caskToken}
+                      </td>
+                      <td className="font-mono text-xs truncate" title={c.caskVersion}>
+                        {c.caskVersion}
+                      </td>
                       <td className="text-right">
                         <button
                           className="btn btn-xs btn-primary"
