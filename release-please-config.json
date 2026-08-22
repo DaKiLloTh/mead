@@ -4,8 +4,6 @@
     ".": {
       "release-type": "simple",
       "changelog-path": "CHANGELOG.md",
-      "prerelease": true,
-      "prerelease-type": "pre-alpha",
       "bump-minor-pre-major": true,
       "bump-patch-for-minor-pre-major": false
     }
