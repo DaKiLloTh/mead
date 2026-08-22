@@ -114,6 +114,13 @@ func (a *App) GetCacheInfo() (*brew.CacheInfo, error) {
 	return brew.GetCacheInfo(a.ctx)
 }
 
+// LargestInstalledPackages reports the largest installed formulae and casks
+// by on-disk size (top 20), so the user can see what's worth uninstalling to
+// free up space.
+func (a *App) LargestInstalledPackages() ([]brew.PackageSize, error) {
+	return brew.LargestInstalled(a.ctx, 20)
+}
+
 func (a *App) Config() (string, error) {
 	return brew.Config(a.ctx)
 }
