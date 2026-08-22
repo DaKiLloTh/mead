@@ -1,8 +1,15 @@
 package brew
 
+// This file uses encoding/json/v2 (stable as of Go 1.27) for mead's own
+// decoding of brew's JSON output. That's independent of the Wails RPC
+// boundary, which still marshals App method return values with plain v1
+// internally (see internal/binding/boundMethod.go in wailsapp/wails/v2) --
+// this import doesn't change that, and the explicit []T{} empty-slice
+// initializations elsewhere in this package that guard against v1's
+// nil-slice-as-null behavior across that boundary must stay as they are.
 import (
 	"context"
-	"encoding/json"
+	"encoding/json/v2"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -351,11 +358,18 @@ func Outdated(ctx context.Context, greedy bool) ([]OutdatedPackage, error) {
 	if err != nil {
 		return nil, err
 	}
+	return decodeOutdatedV2([]byte(out))
+}
+
+// decodeOutdatedV2 parses `brew outdated --json=v2` output. Split out from
+// Outdated so the decode logic (the part that actually depends on brew's
+// JSON shape) is unit-testable without shelling out to brew.
+func decodeOutdatedV2(data []byte) ([]OutdatedPackage, error) {
 	var raw struct {
 		Formulae []map[string]any `json:"formulae"`
 		Casks    []map[string]any `json:"casks"`
 	}
-	if err := json.Unmarshal([]byte(out), &raw); err != nil {
+	if err := json.Unmarshal(data, &raw); err != nil {
 		return nil, fmt.Errorf("parsing brew outdated output: %w", err)
 	}
 	results := []OutdatedPackage{}
