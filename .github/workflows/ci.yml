@@ -49,11 +49,18 @@ jobs:
         working-directory: frontend
         run: npm run build
 
+      - name: Frontend tests
+        working-directory: frontend
+        run: npx vitest run
+
       - name: Go vet
         run: go vet ./...
 
       - name: Go build
         run: go build ./...
+
+      - name: Go test
+        run: go test ./...
 
       - name: Wails build
         run: wails build
