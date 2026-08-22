@@ -36,6 +36,20 @@ jobs:
         with:
           ref: ${{ needs.release-please.outputs.tag_name }}
 
+      # release-please's own version-suffix mechanism for prereleases requires
+      # the manifest baseline to already carry a prerelease qualifier, which
+      # doesn't fit release-as-you-go Conventional Commits versioning. Instead,
+      # mark the release itself as a GitHub prerelease and prefix its title --
+      # every release stays labeled pre-alpha until the project is stable,
+      # independent of the numeric version.
+      - name: Mark release as pre-alpha
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release edit "${{ needs.release-please.outputs.tag_name }}" \
+            --prerelease \
+            --title "Pre-Alpha ${{ needs.release-please.outputs.tag_name }}"
+
       - uses: actions/setup-go@v5
         with:
           go-version: '1.25'

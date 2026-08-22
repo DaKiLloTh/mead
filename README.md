@@ -55,9 +55,10 @@ Releases are versioned and tagged automatically by
 a `BREAKING CHANGE:` footer for breaking changes, `docs:`, `chore:`, etc).
 Every merge to `master` updates a standing "Release PR" with the next
 version and changelog; merging *that* PR is what actually cuts the release
-— `.github/workflows/release.yml` then builds `mead.app`, zips it, builds a
-DMG installer, and attaches both to the GitHub Release release-please just
-created. Versions carry a `-pre-alpha.N` suffix until the project is stable.
+— `.github/workflows/release.yml` then marks the GitHub Release as a
+pre-release (title prefixed `Pre-Alpha`) — every release stays labeled
+pre-alpha until the project is stable — builds `mead.app`, zips it, builds a
+DMG installer, and attaches both to the release.
 
 Release builds are unsigned (no Apple Developer ID in this project), so
 Gatekeeper will block a plain double-click — see the release notes on each
