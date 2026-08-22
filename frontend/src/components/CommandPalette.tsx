@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { api, BrewPackage } from '../lib/api'
 import { filterNavItems, filterPackages } from '../lib/paletteFilter'
+import { useInstalledPackages } from '../context/InstalledPackagesContext'
 import { navItems, type ViewKey } from './Sidebar'
 import PackageDetailModal, { type DetailTarget } from './PackageDetailModal'
 import { PackageIcon, SearchIcon } from './Icons'
@@ -30,8 +30,10 @@ export default function CommandPalette({ onNavigate, bump }: Props) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [activeIndex, setActiveIndex] = useState(0)
-  const [packages, setPackages] = useState<BrewPackage[] | null>(null)
-  const [packagesLoading, setPackagesLoading] = useState(false)
+  // Backed by the shared installed-packages cache (populated at app start
+  // and kept fresh in the background), so the palette's package search is
+  // warm on first open instead of fetching lazily every session.
+  const { packages, loading: packagesLoading } = useInstalledPackages()
   const [detail, setDetail] = useState<DetailTarget | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -53,22 +55,13 @@ export default function CommandPalette({ onNavigate, bump }: Props) {
   }, [open])
 
   // Reset transient state and (re)focus the input every time the palette
-  // opens. Lazily fetch the installed package list once per app session
-  // (cached in this component) rather than on every open.
+  // opens. The package list itself comes from the shared cache, which is
+  // already fetched (or in flight) by the time the app renders at all.
   useEffect(() => {
     if (!open) return
     setQuery('')
     setActiveIndex(0)
     inputRef.current?.focus()
-    if (packages === null && !packagesLoading) {
-      setPackagesLoading(true)
-      api
-        .listInstalled()
-        .then(setPackages)
-        .catch(() => setPackages([]))
-        .finally(() => setPackagesLoading(false))
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
 
   const results = useMemo<ResultRow[]>(() => {

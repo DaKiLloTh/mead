@@ -3,6 +3,7 @@ import { api, BrewPackage } from '../lib/api'
 import { useJobs } from '../context/JobsContext'
 import { useConfirm } from '../context/ConfirmContext'
 import { useUserData } from '../context/UserDataContext'
+import { useInstalledPackages } from '../context/InstalledPackagesContext'
 import PackageDetailModal, { DetailTarget } from '../components/PackageDetailModal'
 import { ArrowUpCircleIcon, PinIcon, RefreshIcon, SearchIcon, StarIcon, TrashIcon } from '../components/Icons'
 
@@ -21,10 +22,9 @@ export default function Installed({ refreshToken, bump }: Props) {
   const { runAction } = useJobs()
   const confirm = useConfirm()
   const userData = useUserData()
-  const [pkgs, setPkgs] = useState<BrewPackage[]>([])
+  const { packages: cachedPkgs, loading, error, refresh: refreshPackages } = useInstalledPackages()
+  const pkgs = cachedPkgs ?? []
   const [leaves, setLeaves] = useState<Set<string>>(new Set())
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   const [filter, setFilter] = useState<Filter>('all')
   const [query, setQuery] = useState('')
   const [detail, setDetail] = useState<DetailTarget | null>(null)
@@ -32,19 +32,24 @@ export default function Installed({ refreshToken, bump }: Props) {
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [bulkBusy, setBulkBusy] = useState(false)
 
-  function load() {
-    setLoading(true)
-    setError(null)
-    Promise.all([api.listInstalled(), api.leaves().catch(() => [])])
-      .then(([p, l]) => {
-        setPkgs(p)
-        setLeaves(new Set(l))
-      })
-      .catch((e) => setError(String(e)))
-      .finally(() => setLoading(false))
+  function loadLeaves() {
+    api
+      .leaves()
+      .then((l) => setLeaves(new Set(l)))
+      .catch(() => {})
   }
 
-  useEffect(load, [refreshToken])
+  useEffect(loadLeaves, [refreshToken])
+
+  // Full reload of both the shared package cache and this view's own leaves
+  // lookup — used by the error-retry button and by actions (pin/unpin) that
+  // don't otherwise call `bump()`. Actions that do call `bump()` already get
+  // the package cache refreshed via that shared signal (see App.tsx), so
+  // they only need to refresh `leaves` themselves.
+  function load() {
+    refreshPackages()
+    loadLeaves()
+  }
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -91,7 +96,7 @@ export default function Installed({ refreshToken, bump }: Props) {
     setRowBusy(p.name)
     await runAction(() => api.uninstall(p.name, p.isCask, checked[0] ?? false))
     setRowBusy(null)
-    load()
+    loadLeaves()
     bump()
   }
 
@@ -99,7 +104,7 @@ export default function Installed({ refreshToken, bump }: Props) {
     setRowBusy(p.name)
     await runAction(() => api.upgrade(p.name, p.isCask))
     setRowBusy(null)
-    load()
+    loadLeaves()
     bump()
   }
 
@@ -120,7 +125,7 @@ export default function Installed({ refreshToken, bump }: Props) {
     }
     setBulkBusy(false)
     setSelected(new Set())
-    load()
+    loadLeaves()
     bump()
   }
 
@@ -131,7 +136,7 @@ export default function Installed({ refreshToken, bump }: Props) {
     }
     setBulkBusy(false)
     setSelected(new Set())
-    load()
+    loadLeaves()
     bump()
   }
 
@@ -355,7 +360,7 @@ export default function Installed({ refreshToken, bump }: Props) {
         target={detail}
         onClose={() => setDetail(null)}
         onChanged={() => {
-          load()
+          loadLeaves()
           bump()
         }}
       />
