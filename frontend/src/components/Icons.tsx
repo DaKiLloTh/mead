@@ -188,23 +188,6 @@ export function ServerIcon(p: IconProps) {
   )
 }
 
-export function SunIcon(p: IconProps) {
-  return (
-    <svg {...base} {...p}>
-      <circle cx="12" cy="12" r="4" />
-      <path d="M12 2v2M12 20v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M2 12h2M20 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4" />
-    </svg>
-  )
-}
-
-export function MoonIcon(p: IconProps) {
-  return (
-    <svg {...base} {...p}>
-      <path d="M21 12.8A9 9 0 1111.2 3 7 7 0 0021 12.8z" />
-    </svg>
-  )
-}
-
 export function StarIcon(p: IconProps & { filled?: boolean }) {
   const { filled, ...rest } = p
   return (
@@ -295,16 +278,6 @@ export function GearIcon(p: IconProps) {
     <svg {...base} {...p}>
       <circle cx="12" cy="12" r="3" />
       <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09a1.65 1.65 0 00-1-1.51 1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09a1.65 1.65 0 001.51-1 1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" />
-    </svg>
-  )
-}
-
-export function TerminalIcon(p: IconProps) {
-  return (
-    <svg {...base} {...p}>
-      <rect x="3" y="4" width="18" height="16" rx="2" />
-      <path d="M7 9l3 3-3 3" />
-      <path d="M13 15h4" />
     </svg>
   )
 }

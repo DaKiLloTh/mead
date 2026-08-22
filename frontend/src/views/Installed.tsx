@@ -50,9 +50,7 @@ export default function Installed({ refreshToken, bump }: Props) {
       if (filter === 'cask' && !p.isCask) return false
       if (filter === 'outdated' && !p.outdated) return false
       if (filter === 'favorites' && !userData.isFavorite(p.name, p.isCask)) return false
-      if (q && !p.name.toLowerCase().includes(q) && !p.fullName?.toLowerCase().includes(q) && !p.desc?.toLowerCase().includes(q)) {
-        return false
-      }
+      if (q && !p.name.toLowerCase().includes(q) && !p.fullName?.toLowerCase().includes(q) && !p.desc?.toLowerCase().includes(q)) return false
       return true
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps

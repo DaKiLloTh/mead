@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useState, type SyntheticEvent } from 'react'
 import { api, TapDetail } from '../lib/api'
 import { useJobs } from '../context/JobsContext'
 import { useConfirm } from '../context/ConfirmContext'
@@ -32,7 +32,7 @@ export default function Taps({ refreshToken, bump }: Props) {
 
   useEffect(load, [refreshToken])
 
-  async function addTap(e: FormEvent) {
+  async function addTap(e: SyntheticEvent<HTMLFormElement>) {
     e.preventDefault()
     const name = newTap.trim()
     if (!name) return

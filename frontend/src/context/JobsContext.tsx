@@ -1,5 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
-import { EventsOn } from '../../wailsjs/runtime/runtime'
+import { EventsOn } from '../../wailsjs/runtime'
 import { api } from '../lib/api'
 import { JobTracker, type JobState, type JobLine } from './jobTracker'
 

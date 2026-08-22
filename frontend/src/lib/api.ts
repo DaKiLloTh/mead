@@ -15,7 +15,6 @@ export type AdoptCandidate = brew.AdoptCandidate
 export type DuplicateApp = brew.DuplicateApp
 export type MasApp = brew.MasApp
 export type Collection = brew.Collection
-export type CollectionPackage = brew.CollectionPackage
 export type TapDetail = brew.TapDetail
 export type BundleCleanupItem = brew.BundleCleanupItem
 
