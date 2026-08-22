@@ -543,15 +543,27 @@ func (a *App) MasOutdated() ([]brew.MasApp, error) {
 	return brew.MasOutdated(a.ctx)
 }
 
+// buildMasUpgradeArgs builds the `mas upgrade [id]` argument list: a single
+// id upgrades just that app, while an empty id upgrades everything mas
+// considers outdated. Pure so the "this must be a mas job, not a brew job"
+// shape is directly unit testable.
+func buildMasUpgradeArgs(id string) []string {
+	args := []string{"upgrade"}
+	if id != "" {
+		args = append(args, id)
+	}
+	return args
+}
+
 func (a *App) MasUpgrade(id string) string {
 	if id == "" {
 		return a.jobs.Fail("App Store upgrade", "missing app id")
 	}
-	return a.jobs.Start(fmt.Sprintf("Upgrade App Store app %s", id), "upgrade", id)
+	return a.jobs.StartMas(fmt.Sprintf("Upgrade App Store app %s", id), buildMasUpgradeArgs(id)...)
 }
 
 func (a *App) MasUpgradeAll() string {
-	return a.jobs.Start("Upgrade all App Store apps", "upgrade")
+	return a.jobs.StartMas("Upgrade all App Store apps", buildMasUpgradeArgs("")...)
 }
 
 // ---- Brewfile import/export (native file dialogs) ----

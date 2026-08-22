@@ -63,6 +63,17 @@ func ResolveBrewPath() (string, error) {
 	return brewPath, brewPathErr
 }
 
+// ResolveMasPath locates the `mas` executable. Unlike brew, mas has no
+// well-known install locations to search first -- Homebrew always installs
+// it as a regular formula, so a plain PATH lookup is sufficient.
+func ResolveMasPath() (string, error) {
+	p, err := exec.LookPath("mas")
+	if err != nil {
+		return "", errors.New("could not find the `mas` executable on this system; install it with `brew install mas`")
+	}
+	return p, nil
+}
+
 // Env returns a stable, non-interactive environment for brew subprocesses.
 // Without HOMEBREW_NO_AUTO_UPDATE, any brew command can silently trigger a
 // full `brew update` first if it's been a while -- surprising and slow for a
