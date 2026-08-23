@@ -3,6 +3,18 @@
 ## [0.4.0](https://github.com/DaKiLloTh/mead/compare/v0.3.0...v0.4.0) (2026-08-23)
 
 
+### Features
+
+* Interactive dependency graph visualization in package detail (closes [#56](https://github.com/DaKiLloTh/mead/issues/56)) ([#67](https://github.com/DaKiLloTh/mead/pull/67))
+
+
+### Bug Fixes
+
+* Health tile: compact redesign, and its stats now link to real filters instead of an unfiltered list (closes [#64](https://github.com/DaKiLloTh/mead/issues/64), [#65](https://github.com/DaKiLloTh/mead/issues/65)) ([#70](https://github.com/DaKiLloTh/mead/pull/70))
+* Clear Cache and Cleanup actions now sit together instead of requiring a scroll between them (closes [#61](https://github.com/DaKiLloTh/mead/issues/61)) ([#69](https://github.com/DaKiLloTh/mead/pull/69))
+* Stop native rubber-band bounce when scrolling over non-scrollable areas (closes [#62](https://github.com/DaKiLloTh/mead/issues/62)) ([#71](https://github.com/DaKiLloTh/mead/pull/71))
+
+
 ### Miscellaneous Chores
 
 * gitignore .DS_Store, force release trigger ([#73](https://github.com/DaKiLloTh/mead/issues/73)) ([2678c5a](https://github.com/DaKiLloTh/mead/commit/2678c5a33afc39607ea979214028eb29ad246508))
