@@ -1,0 +1,18 @@
+<!--
+  Source of truth for build/appicon.png.
+  From the approved mead icon design handoff (app-icon.svg), see issue #87.
+  To regenerate appicon.png at a different size:
+    rsvg-convert -w 1024 -h 1024 build/appicon.svg -o build/appicon.png
+  Do not edit colors, shapes, or proportions, this design is final.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="512" height="512">
+<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#D4A24C"></stop><stop offset="1" stop-color="#8B6224"></stop></linearGradient></defs>
+<rect x="2" y="2" width="96" height="96" rx="22" fill="url(#g)"></rect>
+<polygon points="16,76 21,73 21,79 16,82" fill="#F6E7CC" opacity="0.28"></polygon>
+<rect x="34" y="30" width="28" height="42" rx="5" fill="#F6E7CC" stroke="#6B4B1B" stroke-width="2.5"></rect>
+<path d="M62 40 C79 40 79 61 62 61" fill="none" stroke="#6B4B1B" stroke-width="3.5" stroke-linecap="round"></path>
+<rect x="36.5" y="41" width="23" height="28.5" rx="3" fill="#8B6224"></rect>
+<ellipse cx="48" cy="41" rx="12.5" ry="4" fill="#F6E7CC" opacity="0.95"></ellipse>
+<circle cx="43" cy="55" r="1.5" fill="#F6E7CC" opacity="0.6"></circle>
+<circle cx="52" cy="61" r="1.2" fill="#F6E7CC" opacity="0.5"></circle>
+</svg>
