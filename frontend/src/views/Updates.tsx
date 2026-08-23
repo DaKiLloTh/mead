@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { api, OutdatedPackage } from '../lib/api'
 import { useJobs } from '../context/JobsContext'
 import { useUserData } from '../context/UserDataContext'
+import PackageDetailModal, { DetailTarget } from '../components/PackageDetailModal'
 import { ArrowUpCircleIcon, ClockIcon, RefreshIcon } from '../components/Icons'
 
 interface Props {
@@ -27,6 +28,7 @@ export default function Updates({ refreshToken, bump }: Props) {
   const [upgradingAll, setUpgradingAll] = useState(false)
   const [showSnoozed, setShowSnoozed] = useState(false)
   const [greedy, setGreedy] = useState(false)
+  const [detail, setDetail] = useState<DetailTarget | null>(null)
 
   function load() {
     setLoading(true)
@@ -152,7 +154,12 @@ export default function Updates({ refreshToken, bump }: Props) {
             <tbody>
               {list.map((p) => (
                 <tr key={`${p.isCask ? 'c' : 'f'}:${p.name}`} className="hover:bg-base-200">
-                  <td className="font-medium truncate">{p.name}</td>
+                  <td
+                    className="font-medium truncate cursor-pointer"
+                    onClick={() => setDetail({ name: p.name, isCask: p.isCask })}
+                  >
+                    {p.name}
+                  </td>
                   <td>
                     <span className={`badge badge-sm badge-outline ${p.isCask ? 'badge-accent' : 'badge-primary'}`}>
                       {p.isCask ? t('common.cask') : t('common.formula')}
@@ -169,7 +176,10 @@ export default function Updates({ refreshToken, bump }: Props) {
                       {showSnoozed ? (
                         <button
                           className="btn btn-xs btn-ghost"
-                          onClick={() => userData.unsnooze(p.name, p.isCask)}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            userData.unsnooze(p.name, p.isCask)
+                          }}
                         >
                           {t('updates.unsnooze')}
                         </button>
@@ -178,13 +188,26 @@ export default function Updates({ refreshToken, bump }: Props) {
                       ) : (
                         <>
                           <div className="dropdown dropdown-end">
-                            <div tabIndex={0} role="button" className="btn btn-xs btn-ghost" title={t('updates.snoozeTooltip')}>
+                            <div
+                              tabIndex={0}
+                              role="button"
+                              className="btn btn-xs btn-ghost"
+                              title={t('updates.snoozeTooltip')}
+                              onClick={(e) => e.stopPropagation()}
+                            >
                               <ClockIcon className="size-3.5" />
                             </div>
                             <ul tabIndex={0} className="dropdown-content menu menu-sm bg-base-100 rounded-box z-10 w-32 p-1 shadow border border-base-300">
                               {SNOOZE_OPTIONS.map((o) => (
                                 <li key={o.days}>
-                                  <a onClick={() => userData.snooze(p.name, p.isCask, o.days)}>{t(o.labelKey)}</a>
+                                  <a
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      userData.snooze(p.name, p.isCask, o.days)
+                                    }}
+                                  >
+                                    {t(o.labelKey)}
+                                  </a>
                                 </li>
                               ))}
                             </ul>
@@ -192,7 +215,10 @@ export default function Updates({ refreshToken, bump }: Props) {
                           <button
                             className="btn btn-xs btn-primary"
                             disabled={rowBusy === p.name}
-                            onClick={() => upgradeOne(p)}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              upgradeOne(p)
+                            }}
                           >
                             {rowBusy === p.name ? <span className="loading loading-spinner loading-xs" /> : t('common.upgrade')}
                           </button>
@@ -206,6 +232,15 @@ export default function Updates({ refreshToken, bump }: Props) {
           </table>
         </div>
       )}
+
+      <PackageDetailModal
+        target={detail}
+        onClose={() => setDetail(null)}
+        onChanged={() => {
+          load()
+          bump()
+        }}
+      />
     </div>
   )
 }

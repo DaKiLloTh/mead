@@ -20,6 +20,7 @@ import {
 import ExternalLink from './ExternalLink'
 import PackageIcon from './PackageIcon'
 import DependencyGraph from './DependencyGraph'
+import { deriveChangelogUrl } from '../lib/changelog'
 
 export interface DetailTarget {
   name: string
@@ -243,6 +244,8 @@ export default function PackageDetailModal({ target, onClose, onChanged }: Props
     void userData.setTags(viewTarget.name, viewTarget.isCask, tags.filter((x) => x !== t))
   }
 
+  const changelogLink = pkg ? deriveChangelogUrl(pkg) : null
+
   return (
     <dialog className="modal modal-open">
       <div className={`modal-box ${tab === 'graph' ? 'max-w-4xl' : 'max-w-2xl'}`}>
@@ -315,9 +318,10 @@ export default function PackageDetailModal({ target, onClose, onChanged }: Props
               )}
               {pkg.license && <span>{t('packageDetail.license', { license: pkg.license })}</span>}
               {pkg.tap && <span>{t('packageDetail.tap', { tap: pkg.tap })}</span>}
-              {pkg.homepage && (
-                <ExternalLink className="link link-hover inline-flex items-center gap-1" href={pkg.homepage}>
-                  {t('packageDetail.homepage')} <ExternalLinkIcon className="size-3" />
+              {changelogLink && (
+                <ExternalLink className="link link-hover inline-flex items-center gap-1" href={changelogLink.url}>
+                  {t(changelogLink.kind === 'releases' ? 'packageDetail.releaseNotes' : 'packageDetail.homepage')}{' '}
+                  <ExternalLinkIcon className="size-3" />
                 </ExternalLink>
               )}
               {pkg.installed && (
