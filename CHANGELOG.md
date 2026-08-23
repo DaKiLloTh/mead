@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.5.0](https://github.com/DaKiLloTh/mead/compare/v0.4.0...v0.5.0) (2026-08-23)
+
+
+### Features
+
+* add mead-mon standalone menu bar update notifier ([4938f05](https://github.com/DaKiLloTh/mead/commit/4938f0591c1db08a1898fa78c0153adc6fd61065))
+* auto-mirror releases and bump cask on the homebrew-mead tap ([ee3fef0](https://github.com/DaKiLloTh/mead/commit/ee3fef0d5a367567241e4fbdb67bfe11df3c1a83))
+* open package detail from Updates, link out to changelog ([9f0e81a](https://github.com/DaKiLloTh/mead/commit/9f0e81a0ac54ecfac977ebbbe3911fe08ee73751))
+* show Homebrew staleness next to the update button ([48ab1ce](https://github.com/DaKiLloTh/mead/commit/48ab1ce511fc310ec429fc8b650a52fe3c095e1a))
+
+
+### Bug Fixes
+
+* cache Dashboard system info across navigation ([6ed886f](https://github.com/DaKiLloTh/mead/commit/6ed886f2d7019586d69cc20f52029e4c9f821562))
+
 ## [0.4.0](https://github.com/DaKiLloTh/mead/compare/v0.3.0...v0.4.0) (2026-08-23)
 
 
