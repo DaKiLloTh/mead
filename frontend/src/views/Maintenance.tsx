@@ -325,6 +325,20 @@ export default function Maintenance() {
           )}
           {cache && <p className="text-xs text-base-content/50">{t('maintenance.clearCacheDescription')}</p>}
 
+          <p className="text-sm text-base-content/70">{t('maintenance.cleanupDescription')}</p>
+          <div className="flex gap-2">
+            <button className="btn btn-sm" disabled={cleanupRunning !== null || clearingCache} onClick={() => runCleanup(true)}>
+              {cleanupRunning === 'preview' ? <span className="loading loading-spinner loading-xs" /> : null}
+              {t('maintenance.previewDryRun')}
+            </button>
+            <button className="btn btn-sm btn-error" disabled={cleanupRunning !== null || clearingCache} onClick={() => runCleanup(false)}>
+              {cleanupRunning === 'real' ? <span className="loading loading-spinner loading-xs" /> : <TrashIcon className="size-4" />}
+              {t('maintenance.cleanUpNow')}
+            </button>
+          </div>
+
+          <div className="divider my-1" />
+
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <p className="text-sm text-base-content/70">{t('maintenance.largestDescription')}</p>
@@ -380,18 +394,6 @@ export default function Maintenance() {
 
           <div className="divider my-1" />
 
-          <p className="text-sm text-base-content/70">{t('maintenance.cleanupDescription')}</p>
-          <div className="flex gap-2">
-            <button className="btn btn-sm" disabled={cleanupRunning !== null || clearingCache} onClick={() => runCleanup(true)}>
-              {cleanupRunning === 'preview' ? <span className="loading loading-spinner loading-xs" /> : null}
-              {t('maintenance.previewDryRun')}
-            </button>
-            <button className="btn btn-sm btn-error" disabled={cleanupRunning !== null || clearingCache} onClick={() => runCleanup(false)}>
-              {cleanupRunning === 'real' ? <span className="loading loading-spinner loading-xs" /> : <TrashIcon className="size-4" />}
-              {t('maintenance.cleanUpNow')}
-            </button>
-          </div>
-          <div className="divider my-1" />
           <p className="text-sm text-base-content/70">{t('maintenance.autoremoveDescription')}</p>
           <div className="flex gap-2">
             <button className="btn btn-sm" disabled={cleanupRunning !== null || clearingCache} onClick={() => runAutoremove(true)}>
