@@ -2,7 +2,8 @@ import { useState } from 'react'
 import { Trans, useTranslation } from 'react-i18next'
 import { api, AdoptCandidate } from '../lib/api'
 import { useJobs } from '../context/JobsContext'
-import { DownloadIcon, ImportIcon } from '../components/Icons'
+import { useConfirm } from '../context/ConfirmContext'
+import { DownloadIcon, ImportIcon, AlertIcon } from '../components/Icons'
 
 interface Props {
   bump: () => void
@@ -11,6 +12,7 @@ interface Props {
 export default function Adopt({ bump }: Props) {
   const { t } = useTranslation()
   const { runAction } = useJobs()
+  const confirm = useConfirm()
   const [candidates, setCandidates] = useState<AdoptCandidate[] | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -30,6 +32,20 @@ export default function Adopt({ bump }: Props) {
   }
 
   async function adopt(c: AdoptCandidate) {
+    if (c.possibleDowngrade) {
+      const { ok } = await confirm({
+        title: t('adopt.downgradeWarningTitle'),
+        body: t('adopt.downgradeWarningBody', {
+          appName: c.appName,
+          installed: c.installedVersion,
+          caskToken: c.caskToken,
+          cask: c.caskVersion,
+        }),
+        danger: true,
+        confirmLabel: t('adopt.downgradeConfirmLabel'),
+      })
+      if (!ok) return
+    }
     setAdopting(c.caskToken)
     await runAction(() => api.adoptCask(c.caskToken))
     setAdopting(null)
@@ -38,7 +54,7 @@ export default function Adopt({ bump }: Props) {
   }
 
   return (
-    <div className="p-6 max-w-3xl">
+    <div className="p-6 max-w-4xl">
       <h1 className="text-2xl font-bold mb-1">{t('adopt.title')}</h1>
       <p className="text-base-content/60 text-sm mb-4">
         <Trans i18nKey="adopt.subtitle" components={{ path: <span className="font-mono" /> }} />
@@ -69,8 +85,9 @@ export default function Adopt({ bump }: Props) {
               <table className="table table-sm table-fixed">
                 <colgroup>
                   <col />
-                  <col className="w-40" />
+                  <col className="w-36" />
                   <col className="w-28" />
+                  <col className="w-32" />
                   <col className="w-28" />
                 </colgroup>
                 <thead>
@@ -78,6 +95,7 @@ export default function Adopt({ bump }: Props) {
                     <th>{t('adopt.colApp')}</th>
                     <th>{t('adopt.colMatchedCask')}</th>
                     <th>{t('adopt.colVersion')}</th>
+                    <th>{t('adopt.colMatch')}</th>
                     <th className="text-right">{t('adopt.colAction')}</th>
                   </tr>
                 </thead>
@@ -91,8 +109,26 @@ export default function Adopt({ bump }: Props) {
                       <td className="font-mono text-xs truncate" title={c.caskToken}>
                         {c.caskToken}
                       </td>
-                      <td className="font-mono text-xs truncate" title={c.caskVersion}>
-                        {c.caskVersion}
+                      <td className="font-mono text-xs">
+                        <div className="truncate" title={c.installedVersion || undefined}>
+                          {t('adopt.installedVersionLabel')} {c.installedVersion || t('adopt.versionUnknown')}
+                        </div>
+                        <div
+                          className={`truncate flex items-center gap-1 ${c.possibleDowngrade ? 'text-warning' : 'text-base-content/50'}`}
+                          title={c.caskVersion || undefined}
+                        >
+                          {c.possibleDowngrade && <AlertIcon className="size-3 shrink-0" />}
+                          {t('adopt.caskVersionLabel')} {c.caskVersion || t('adopt.versionUnknown')}
+                        </div>
+                      </td>
+                      <td>
+                        {c.matchConfidence === 'possible' ? (
+                          <span className="badge badge-warning badge-soft badge-sm" title={c.matchReason || undefined}>
+                            {t('adopt.matchPossible')}
+                          </span>
+                        ) : (
+                          <span className="badge badge-success badge-soft badge-sm">{t('adopt.matchExact')}</span>
+                        )}
                       </td>
                       <td className="text-right">
                         <button

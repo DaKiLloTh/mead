@@ -2,6 +2,7 @@ package brew
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -12,6 +13,28 @@ import (
 )
 
 var slugNonAlnum = regexp.MustCompile(`[^a-z0-9]+`)
+
+// fuzzyMatchThreshold is the minimum name-similarity score (see
+// stringSimilarity) a known cask token must clear before it's offered as a
+// fallback match when no slug variant matches exactly.
+//
+// This is set high on purpose, from a real failure observed while testing
+// this against a real /Applications directory: at a looser 0.75 threshold,
+// short, generic app names matched short, *unrelated* real cask tokens
+// just one character off -- "Docker.app" matched cask "dockey", "Keynote"
+// matched "heynote", "Xcode" matched "zcode". A single-character edit on a
+// 5-7 character word already clears 0.75 (1 - 1/6 = 0.83, 1 - 1/7 = 0.86)
+// even though the two names are unrelated products; the token space is
+// dense enough with short real words that this isn't a rare edge case. At
+// 0.9, all three of those false positives are correctly rejected while
+// genuinely close near-misses -- a missing/extra separator character in a
+// longer name -- still clear the bar (a single inserted/deleted character
+// in a 10+ character slug is already >= 0.9 similar). A loose match here
+// doesn't silently pass as certain either way -- it always shows up tagged
+// "possible match" with a reason in the UI (see buildMatchConfidence) --
+// but a threshold that routinely offers unrelated apps as "possible
+// matches" isn't a useful signal, so this is deliberately conservative.
+const fuzzyMatchThreshold = 0.9
 
 // adoptInfoBatchSize caps how many cask tokens go into a single `brew info`
 // invocation. Homebrew happily accepts far more, but a huge argv (someone
@@ -45,9 +68,164 @@ func stripAccents(s string) string {
 func slugifyAppName(appDirName string) string {
 	name := strings.TrimSuffix(appDirName, ".app")
 	name = stripAccents(name)
+	return normalizeToSlug(name)
+}
+
+// normalizeToSlug does the lowercase/collapse-non-alnum/trim part of
+// slugifying, shared by slugifyAppName and slugVariants below. The caller
+// is responsible for anything that needs to happen before this (accent
+// stripping, camelCase splitting, ampersand expansion, ...).
+func normalizeToSlug(name string) string {
 	name = strings.ToLower(name)
 	name = slugNonAlnum.ReplaceAllString(name, "-")
 	return strings.Trim(name, "-")
+}
+
+// splitCamelCase inserts a space at camelCase word boundaries: a lowercase
+// letter immediately followed by an uppercase letter (e.g. "BambuStudio"
+// -> "Bambu Studio"), or an uppercase acronym run followed by a new
+// capitalized word (e.g. "HTTPServer" -> "HTTP Server"). Those inserted
+// spaces become hyphens once run through normalizeToSlug.
+//
+// This deliberately doesn't split every letter-case transition. A digit
+// immediately followed by an uppercase letter is not treated as a
+// boundary -- "Löve2D" (a real app name) would wrongly become "Löve2 D" ->
+// "love2-d" instead of the real cask token "love2d". And plain
+// "iTerm2" would become "i Term2" -> "i-term2" this way too, which is also
+// wrong (the real cask token is "iterm2"). That's why this is offered as
+// one slug variant tried alongside the unsplit plain slug, not a
+// replacement for it: slugVariants tries the plain slug first, and only
+// falls through to this one if the plain slug isn't a known token.
+func splitCamelCase(s string) string {
+	runes := []rune(s)
+	var b strings.Builder
+	for i, r := range runes {
+		if i > 0 {
+			prev := runes[i-1]
+			boundary := false
+			switch {
+			case unicode.IsLower(prev) && unicode.IsUpper(r):
+				boundary = true
+			case unicode.IsUpper(prev) && unicode.IsUpper(r) && i+1 < len(runes) && unicode.IsLower(runes[i+1]):
+				boundary = true
+			}
+			if boundary && !unicode.IsSpace(prev) {
+				b.WriteRune(' ')
+			}
+		}
+		b.WriteRune(r)
+	}
+	return b.String()
+}
+
+// expandAmpersand replaces "&" with " and ", so "Bob & Bob.app" is also
+// tried as "bob-and-bob" alongside the plain "bob-bob" slug (where "&"
+// just collapses into the surrounding hyphen and the word is lost). Many
+// real cask tokens spell out "and" rather than using "&".
+func expandAmpersand(s string) string {
+	return strings.ReplaceAll(s, "&", " and ")
+}
+
+// slugVariants returns the ordered, deduplicated set of plausible cask
+// token slugs for an app directory name, most-plausible first: the plain
+// slug (unchanged from before), then the plain slug with camelCase words
+// split apart, then with "&" expanded to "and", then both combined. Each
+// variant is checked against the real known-token set in this order by
+// matchCaskToken -- the first one that's a real token wins -- rather than
+// only ever trying one guess, so a single naming quirk (camelCase, "&" vs
+// "and") doesn't sink the whole match the way it used to.
+func slugVariants(appDirName string) []string {
+	base := strings.TrimSuffix(appDirName, ".app")
+	base = stripAccents(base)
+
+	var variants []string
+	seen := map[string]bool{}
+	add := func(s string) {
+		slug := normalizeToSlug(s)
+		if slug != "" && !seen[slug] {
+			seen[slug] = true
+			variants = append(variants, slug)
+		}
+	}
+
+	add(base)
+	add(splitCamelCase(base))
+	add(expandAmpersand(base))
+	add(splitCamelCase(expandAmpersand(base)))
+	return variants
+}
+
+// matchCaskToken finds the best known-cask token for an app directory name
+// (e.g. "BambuStudio.app"). It tries slugVariants in preference order
+// first -- an exact match there is a strong signal, since it means some
+// plausible spelling of the app's own name really is that cask's token.
+// If nothing matches exactly, it falls back to the known token most
+// similar to the plain slug by string similarity (see bestFuzzyToken),
+// which catches naming mismatches no slug variant anticipates
+// (abbreviations, minor spelling/punctuation differences) by leaning on
+// Homebrew's own real token list rather than one more hand-rolled pattern.
+//
+// ok is false if nothing cleared either bar. exact reports which path
+// produced the match; callers (see buildMatchConfidence) treat an exact
+// variant match as a strictly stronger signal than a fuzzy one.
+func matchCaskToken(appDirName string, knownTokens map[string]bool) (token string, exact bool, ok bool) {
+	for _, v := range slugVariants(appDirName) {
+		if knownTokens[v] {
+			return v, true, true
+		}
+	}
+	best, score := bestFuzzyToken(slugifyAppName(appDirName), knownTokens)
+	if best != "" && score >= fuzzyMatchThreshold {
+		return best, false, true
+	}
+	return "", false, false
+}
+
+// buildMatchConfidence turns a token match into a user-facing confidence
+// tier plus a plain-language reason for anything short of full confidence.
+//
+// "exact" requires both an exact slug/token match and the cask's own
+// artifacts data (info.AppPaths, parsed from `brew info`'s "artifacts"
+// array -- the cask's own stated ground truth about what .app it drops in
+// /Applications) confirming the same app filename that's actually on
+// disk. Anything short of that -- a fuzzy token match, a cask whose
+// artifacts don't mention an app at all, or one whose app filename
+// doesn't match byte for byte (different case, separator, name entirely)
+// -- comes back "possible", with a reason, rather than either being
+// upgraded to a false certainty or silently dropped. A cask installing a
+// different filename than what's on disk (e.g. cask lists
+// "My_Application.app" but /Applications has "MyApplication.app") is
+// exactly the kind of mismatch this is meant to catch and flag, not hide.
+func buildMatchConfidence(tokenExact bool, appDirName string, info BrewPackage) (confidence string, reason string) {
+	filenameVerified := len(info.AppPaths) > 0
+	filenameExact := false
+	otherName := ""
+	for _, p := range info.AppPaths {
+		base := filepath.Base(p)
+		if base == appDirName {
+			filenameExact = true
+			break
+		}
+		if otherName == "" {
+			otherName = base
+		}
+	}
+
+	if tokenExact && filenameExact {
+		return "exact", ""
+	}
+
+	var reasons []string
+	if !tokenExact {
+		reasons = append(reasons, "matched by name similarity, not an exact cask identifier")
+	}
+	switch {
+	case !filenameVerified:
+		reasons = append(reasons, "cask doesn't list an app filename to verify against")
+	case !filenameExact:
+		reasons = append(reasons, fmt.Sprintf("cask installs %q, found %q here", otherName, appDirName))
+	}
+	return "possible", strings.Join(reasons, "; ")
 }
 
 // batchSlugs partitions slugs into consecutive chunks of at most size,
@@ -95,44 +273,16 @@ func ScanAdoptableApps(ctx context.Context) ([]AdoptCandidate, error) {
 		trackedCaskApps[strings.ToLower(p.Name)] = true
 	}
 
-	type candidate struct {
-		appName string
-		appPath string
-		slug    string
-	}
-	var candidates []candidate
-	for _, e := range entries {
-		if !e.IsDir() || !strings.HasSuffix(e.Name(), ".app") {
-			continue
-		}
-		appName := strings.TrimSuffix(e.Name(), ".app")
-		if trackedCaskApps[strings.ToLower(appName)] {
-			continue
-		}
-		slug := slugifyAppName(e.Name())
-		if slug == "" {
-			continue
-		}
-		candidates = append(candidates, candidate{
-			appName: appName,
-			appPath: filepath.Join("/Applications", e.Name()),
-			slug:    slug,
-		})
-	}
-
-	if len(candidates) == 0 {
-		return []AdoptCandidate{}, nil
-	}
-
 	// `brew info` aborts its entire invocation -- with no JSON on stdout at
 	// all -- the moment any one requested token doesn't exist as a real
 	// cask (it doesn't just omit the bad token from the response). Since
-	// most slugified app names in a typical /Applications won't correspond
-	// to a real cask, batching info calls directly over every candidate
-	// slug would make nearly every batch fail outright. So the token list
-	// is checked against Homebrew's actual set of known cask tokens first
-	// (a single fast, local `brew casks` call) and only real tokens are
-	// ever passed to `brew info`, keeping every batched info call valid.
+	// most slug guesses for a typical /Applications entry won't correspond
+	// to a real cask, batching info calls directly over every guess would
+	// make nearly every batch fail outright. So the token list is checked
+	// against Homebrew's actual set of known cask tokens first (a single
+	// fast, local `brew casks` call), matchCaskToken only ever returns a
+	// token from that real set, and only those are ever passed to
+	// `brew info`, keeping every batched info call valid.
 	knownTokens, err := runBrewLines(ctx, "casks")
 	if err != nil {
 		return nil, err
@@ -142,25 +292,46 @@ func ScanAdoptableApps(ctx context.Context) ([]AdoptCandidate, error) {
 		knownTokenSet[strings.ToLower(strings.TrimSpace(t))] = true
 	}
 
+	type candidate struct {
+		appName string
+		appPath string
+		appDir  string // e.g. "BambuStudio.app" -- the raw /Applications entry name
+		token   string
+		exact   bool
+	}
 	var matched []candidate
-	seenSlug := map[string]bool{}
-	var uniqueSlugs []string
-	for _, c := range candidates {
-		if !knownTokenSet[c.slug] {
+	seenToken := map[string]bool{}
+	var uniqueTokens []string
+	for _, e := range entries {
+		if !e.IsDir() || !strings.HasSuffix(e.Name(), ".app") {
 			continue
 		}
-		matched = append(matched, c)
-		if !seenSlug[c.slug] {
-			seenSlug[c.slug] = true
-			uniqueSlugs = append(uniqueSlugs, c.slug)
+		appName := strings.TrimSuffix(e.Name(), ".app")
+		if trackedCaskApps[strings.ToLower(appName)] {
+			continue
+		}
+		token, exact, ok := matchCaskToken(e.Name(), knownTokenSet)
+		if !ok {
+			continue
+		}
+		matched = append(matched, candidate{
+			appName: appName,
+			appPath: filepath.Join("/Applications", e.Name()),
+			appDir:  e.Name(),
+			token:   token,
+			exact:   exact,
+		})
+		if !seenToken[token] {
+			seenToken[token] = true
+			uniqueTokens = append(uniqueTokens, token)
 		}
 	}
 	if len(matched) == 0 {
 		return []AdoptCandidate{}, nil
 	}
 
-	infoByToken := make(map[string]BrewPackage, len(uniqueSlugs))
-	for _, batch := range batchSlugs(uniqueSlugs, adoptInfoBatchSize) {
+	infoByToken := make(map[string]BrewPackage, len(uniqueTokens))
+	for _, batch := range batchSlugs(uniqueTokens, adoptInfoBatchSize) {
 		args := append([]string{"info", "--json=v2", "--cask"}, batch...)
 		out, err := RunBrew(ctx, args...)
 		if err != nil {
@@ -183,16 +354,22 @@ func ScanAdoptableApps(ctx context.Context) ([]AdoptCandidate, error) {
 
 	results := make([]AdoptCandidate, 0, len(matched))
 	for _, c := range matched {
-		info, ok := infoByToken[c.slug]
+		info, ok := infoByToken[c.token]
 		if !ok {
 			continue
 		}
+		confidence, reason := buildMatchConfidence(c.exact, c.appDir, info)
+		installedVersion := readInstalledAppVersion(ctx, c.appPath)
 		results = append(results, AdoptCandidate{
-			AppName:     c.appName,
-			AppPath:     c.appPath,
-			CaskToken:   info.Name,
-			CaskDesc:    info.Desc,
-			CaskVersion: info.Version,
+			AppName:           c.appName,
+			AppPath:           c.appPath,
+			CaskToken:         info.Name,
+			CaskDesc:          info.Desc,
+			CaskVersion:       info.Version,
+			InstalledVersion:  installedVersion,
+			MatchConfidence:   confidence,
+			MatchReason:       reason,
+			PossibleDowngrade: PossibleDowngrade(installedVersion, info.Version),
 		})
 	}
 
