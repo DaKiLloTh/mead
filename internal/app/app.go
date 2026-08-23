@@ -241,11 +241,14 @@ func (a *App) Install(name string, isCask bool) string {
 	return a.jobs.StartTracked(fmt.Sprintf("Install %s", name), a.record("install", name, isCask), args...)
 }
 
-func (a *App) Uninstall(name string, isCask bool, zap bool, force bool) string {
-	if err := brew.ValidName(name); err != nil {
-		return a.jobs.Fail(fmt.Sprintf("Uninstall %s", name), err.Error())
-	}
-	args := []string{"uninstall"}
+// buildUninstallArgsAndTitle builds the `brew uninstall ...` argument list
+// and a human-readable job title for the given options. Shared by Uninstall
+// and UninstallElevated, which run identically apart from how the resulting
+// argv is executed (a plain subprocess vs. one wrapped in an administrator
+// privileges prompt) -- pulled out so that shared shape is directly unit
+// testable and can't drift between the two as either evolves.
+func buildUninstallArgsAndTitle(name string, isCask bool, zap bool, force bool, elevated bool) (args []string, title string) {
+	args = []string{"uninstall"}
 	if isCask {
 		args = append(args, "--cask")
 		if zap {
@@ -256,16 +259,53 @@ func (a *App) Uninstall(name string, isCask bool, zap bool, force bool) string {
 		args = append(args, "--force")
 	}
 	args = append(args, name)
-	title := fmt.Sprintf("Uninstall %s", name)
-	switch {
-	case zap && force:
-		title = fmt.Sprintf("Uninstall %s (all versions, and its data)", name)
-	case zap:
-		title = fmt.Sprintf("Uninstall %s (and its data)", name)
-	case force:
-		title = fmt.Sprintf("Uninstall %s (all versions)", name)
+
+	// Build up the parenthetical suffix (if any) from whichever of these
+	// apply, so an elevated zap+force uninstall reads as one clause --
+	// "(all versions, and its data, with administrator privileges)" --
+	// rather than two separate parentheticals bolted together.
+	var clauses []string
+	if force {
+		clauses = append(clauses, "all versions")
 	}
+	if zap {
+		clauses = append(clauses, "and its data")
+	}
+	if elevated {
+		clauses = append(clauses, "with administrator privileges")
+	}
+	title = fmt.Sprintf("Uninstall %s", name)
+	if len(clauses) > 0 {
+		title += fmt.Sprintf(" (%s)", strings.Join(clauses, ", "))
+	}
+	return args, title
+}
+
+func (a *App) Uninstall(name string, isCask bool, zap bool, force bool) string {
+	if err := brew.ValidName(name); err != nil {
+		return a.jobs.Fail(fmt.Sprintf("Uninstall %s", name), err.Error())
+	}
+	args, title := buildUninstallArgsAndTitle(name, isCask, zap, force, false)
 	return a.jobs.StartTracked(title, a.record("uninstall", name, isCask), args...)
+}
+
+// UninstallElevated runs the exact same uninstall as Uninstall, but through
+// jobs.Manager.StartElevatedTracked, so the underlying `brew uninstall ...`
+// runs with a native Touch-ID-or-password authorization prompt instead of as
+// a plain subprocess. It's offered by the frontend only as an explicit,
+// user-initiated retry after a plain Uninstall has already failed with
+// sudo's "a terminal is required"/"a password is required" errors -- e.g.
+// uninstalling a JDK cask whose files live outside Homebrew's own prefix
+// under /Library/Java/JavaVirtualMachines. mead never elevates automatically;
+// see StartElevatedTracked for why wrapping the whole uninstall (rather than
+// just Homebrew's internal sudo step) is safe, and for the output-streaming
+// tradeoff this path makes.
+func (a *App) UninstallElevated(name string, isCask bool, zap bool, force bool) string {
+	if err := brew.ValidName(name); err != nil {
+		return a.jobs.Fail(fmt.Sprintf("Uninstall %s", name), err.Error())
+	}
+	args, title := buildUninstallArgsAndTitle(name, isCask, zap, force, true)
+	return a.jobs.StartElevatedTracked(title, a.record("uninstall", name, isCask), args...)
 }
 
 func (a *App) Reinstall(name string, isCask bool) string {

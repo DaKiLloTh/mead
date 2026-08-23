@@ -21,6 +21,7 @@ import ExternalLink from './ExternalLink'
 import PackageIcon from './PackageIcon'
 import DependencyGraph from './DependencyGraph'
 import { deriveChangelogUrl } from '../lib/changelog'
+import { isSudoTerminalRequiredFailure } from '../lib/uninstallElevation'
 
 export interface DetailTarget {
   name: string
@@ -189,7 +190,17 @@ export default function PackageDetailModal({ target, onClose, onChanged }: Props
         notify('error', String(e))
       }
     }
-    await runAction(() => api.uninstall(viewTarget.name, viewTarget.isCask, zap, force))
+    const job = await runAction(() => api.uninstall(viewTarget.name, viewTarget.isCask, zap, force))
+    if (job.status === 'error' && isSudoTerminalRequiredFailure(job.lines)) {
+      const retry = await confirm({
+        title: t('packageDetail.elevateUninstallTitle'),
+        body: t('packageDetail.elevateUninstallBody'),
+        confirmLabel: t('packageDetail.elevateUninstallConfirmLabel'),
+      })
+      if (retry.ok) {
+        await runAction(() => api.uninstallElevated(viewTarget.name, viewTarget.isCask, zap, force))
+      }
+    }
     setBusy(false)
     refresh()
   }

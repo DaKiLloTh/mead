@@ -88,19 +88,35 @@ func ResolveMasPath() (string, error) {
 	return p, nil
 }
 
+// fixedEnvVars are the HOMEBREW_*/NONINTERACTIVE overrides Env applies on
+// top of the inherited environment -- see Env's doc comment for why. Kept as
+// a single literal list so Env and FixedEnvVars can't drift apart.
+var fixedEnvVars = []string{
+	"HOMEBREW_NO_COLOR=1",
+	"HOMEBREW_NO_EMOJI=1",
+	"NONINTERACTIVE=1",
+	"HOMEBREW_NO_ANALYTICS=1",
+	"HOMEBREW_NO_AUTO_UPDATE=1",
+}
+
 // Env returns a stable, non-interactive environment for brew subprocesses.
 // Without HOMEBREW_NO_AUTO_UPDATE, any brew command can silently trigger a
 // full `brew update` first if it's been a while -- surprising and slow for a
 // GUI where updating should be an explicit, visible action. We suppress that
 // everywhere except the one job that IS an explicit update.
 func Env() []string {
-	return append(baseEnv(),
-		"HOMEBREW_NO_COLOR=1",
-		"HOMEBREW_NO_EMOJI=1",
-		"NONINTERACTIVE=1",
-		"HOMEBREW_NO_ANALYTICS=1",
-		"HOMEBREW_NO_AUTO_UPDATE=1",
-	)
+	return append(baseEnv(), fixedEnvVars...)
+}
+
+// FixedEnvVars returns a copy of the fixed HOMEBREW_*/NONINTERACTIVE
+// overrides Env applies, as "KEY=value" strings. It exists for callers that
+// can't just set cmd.Env because the subprocess doesn't inherit this
+// process's environment at all -- namely the jobs package's elevated
+// uninstall path, which re-enters a shell via `osascript ... do shell
+// script`, so the same defaults have to be embedded literally in the shell
+// command text instead.
+func FixedEnvVars() []string {
+	return append([]string{}, fixedEnvVars...)
 }
 
 // EnvAllowingAutoUpdate is Env() without the auto-update suppression, for
