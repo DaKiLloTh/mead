@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { JobsProvider } from './context/JobsContext'
+import { JobsProvider, useJobs } from './context/JobsContext'
 import { ConfirmProvider } from './context/ConfirmContext'
 import { UserDataProvider } from './context/UserDataContext'
 import { InstalledPackagesProvider, useInstalledPackages } from './context/InstalledPackagesContext'
@@ -25,6 +25,18 @@ import History from './views/History'
 import Settings from './views/Settings'
 import { api } from './lib/api'
 
+// How often to refresh Homebrew's own local update index in the background
+// (`brew update`, a real network call against Homebrew's taps -- not to be
+// confused with InstalledPackagesContext/SystemInfoContext's own 60-second
+// polls, which are cheap local checks). `brew outdated` only ever compares
+// against whatever this index already has cached, so without a periodic
+// refresh a long-running session never sees genuinely new releases unless
+// the user clicks "Update Homebrew" themselves. 30 minutes is far less
+// frequent than the local polls above, but frequent enough that the
+// Dashboard's "last updated" indicator (see issue #77) stays meaningfully
+// fresh across a session. See issue #88.
+const BACKGROUND_HOMEBREW_UPDATE_INTERVAL_MS = 30 * 60 * 1000
+
 const viewTitleKeys: Record<ViewKey, string> = {
   dashboard: 'app.viewTitles.dashboard',
   installed: 'app.viewTitles.installed',
@@ -44,6 +56,7 @@ const viewTitleKeys: Record<ViewKey, string> = {
 
 function AppShell() {
   const { t } = useTranslation()
+  const { runAction } = useJobs()
   const [view, setView] = useState<ViewKey>('dashboard')
   const [refreshToken, setRefreshToken] = useState(0)
   const [outdatedCount, setOutdatedCount] = useState(0)
@@ -75,6 +88,36 @@ function AppShell() {
       .then((o) => setOutdatedCount(o.length))
       .catch(() => {})
   }, [refreshToken])
+
+  // Periodically refresh Homebrew's own update index in the background (see
+  // issue #88 and BACKGROUND_HOMEBREW_UPDATE_INTERVAL_MS above), for as long
+  // as this component is mounted -- i.e. for the life of the app session.
+  // mead is a normal desktop app that's closed rather than backgrounded on
+  // macOS, so tying this to the frontend's own lifecycle is a reasonable
+  // stand-in for "only while the window is actually open and in front of the
+  // user" without needing to detect OS-level window focus.
+  //
+  // Runs as a quiet job (api.updateQuiet(), not api.update()) so it doesn't
+  // pop open the job console or a toast every time it fires -- see
+  // jobTracker.ts's handling of JobState.quiet. Once it completes, `bump()`
+  // is called regardless of success or failure: it's the app's existing
+  // "something changed" signal, and re-running it is harmless even when the
+  // update itself failed (e.g. offline). A failure is only logged, mirroring
+  // how systemInfoCache.ts/installedPackagesCache.ts already keep background
+  // fetch failures silent.
+  useEffect(() => {
+    const interval = setInterval(() => {
+      runAction(() => api.updateQuiet())
+        .catch((e) => {
+          console.error('Background Homebrew update failed:', e)
+        })
+        .finally(() => {
+          bump()
+        })
+    }, BACKGROUND_HOMEBREW_UPDATE_INTERVAL_MS)
+    return () => clearInterval(interval)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   return (
     <div className="h-full flex flex-col bg-base-100 text-base-content">

@@ -32,6 +32,11 @@ export interface JobState {
   error?: string
   startedAt: number
   endedAt?: number
+  /**
+   * True for a job that shouldn't interrupt the user -- see handleStart and
+   * handleDone below. It still appears in the job list like any other job.
+   */
+  quiet: boolean
 }
 
 export type ToastType = 'success' | 'error' | 'info'
@@ -39,6 +44,7 @@ export type ToastType = 'success' | 'error' | 'info'
 export interface JobStartPayload {
   id: string
   title: string
+  quiet?: boolean
 }
 
 export interface JobOutputPayload {
@@ -85,11 +91,17 @@ export class JobTracker {
   }
 
   handleStart = (payload: JobStartPayload): void => {
+    const quiet = payload.quiet ?? false
     this.setJobs([
       ...this.jobs,
-      { id: payload.id, title: payload.title, lines: [], status: 'running', startedAt: this.now() },
+      { id: payload.id, title: payload.title, lines: [], status: 'running', startedAt: this.now(), quiet },
     ])
-    this.callbacks.onJobStarted?.(payload.id)
+    // A quiet job (e.g. the periodic background `brew update`, see
+    // App.UpdateQuiet) still lands in the job list above, but shouldn't pop
+    // open the console / steal focus the way a user-initiated action does.
+    if (!quiet) {
+      this.callbacks.onJobStarted?.(payload.id)
+    }
   }
 
   handleOutput = (payload: JobOutputPayload): void => {
@@ -122,6 +134,12 @@ export class JobTracker {
       resolve(job)
       this.resolvers.delete(payload.id)
     }
+
+    // A quiet job never surfaces a completion toast, success or failure --
+    // that's the whole point of it being quiet (see handleStart). The
+    // caller (App.tsx's periodic background update) is responsible for
+    // logging a failure itself if it wants that visible for debugging.
+    if (job.quiet) return
 
     this.callbacks.onNotify(
       payload.success ? 'success' : 'error',
