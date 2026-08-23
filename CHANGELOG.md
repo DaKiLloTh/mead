@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.7.0](https://github.com/DaKiLloTh/mead/compare/v0.6.0...v0.7.0) (2026-08-23)
+
+
+### Features
+
+* build and release an Intel (x86_64) DMG alongside Apple Silicon ([8f8a1df](https://github.com/DaKiLloTh/mead/commit/8f8a1df8327d4096d0399b67776bb5f70a2cdb24))
+* improve Adopt matching, add version comparison and downgrade warning ([1e4177f](https://github.com/DaKiLloTh/mead/commit/1e4177f49c29d35780cbb0afb864ba285534e142))
+* prefetch cask icons, make Deprecated/Disabled/Pinned permanent tabs ([8566de5](https://github.com/DaKiLloTh/mead/commit/8566de5e2ebd2916d979d579b918ebb0eb208b59))
+
 ## [0.6.0](https://github.com/DaKiLloTh/mead/compare/v0.5.0...v0.6.0) (2026-08-23)
 
 
