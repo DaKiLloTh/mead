@@ -45,6 +45,8 @@ export const api = {
 
   install: (name: string, isCask: boolean) => App.Install(name, isCask),
   uninstall: (name: string, isCask: boolean, zap = false, force = false) => App.Uninstall(name, isCask, zap, force),
+  uninstallElevated: (name: string, isCask: boolean, zap = false, force = false) =>
+    App.UninstallElevated(name, isCask, zap, force),
   reinstall: (name: string, isCask: boolean) => App.Reinstall(name, isCask),
   upgrade: (name: string, isCask: boolean) => App.Upgrade(name, isCask),
   upgradeAll: (greedy = false) => App.UpgradeAll(greedy),

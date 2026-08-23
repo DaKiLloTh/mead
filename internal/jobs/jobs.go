@@ -7,6 +7,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"io"
 	"os/exec"
 	"sync"
@@ -120,6 +121,50 @@ func (jm *Manager) StartWithEnv(title string, env []string, args ...string) stri
 // itself has no knowledge of.
 func (jm *Manager) StartMas(title string, args ...string) string {
 	return jm.start(masTarget, title, false, nil, nil, args...)
+}
+
+// osascriptTarget runs `osascript` for StartElevatedTracked below. It has no
+// use for brew's HOMEBREW_* overrides (those are embedded directly in the
+// shell command text StartElevatedTracked builds, since the elevated shell
+// doesn't inherit this process's environment), so, like masTarget, it leaves
+// defaultEnv nil.
+var osascriptTarget = binaryTarget{
+	resolve: func() (string, error) {
+		p, err := exec.LookPath("osascript")
+		if err != nil {
+			return "", errors.New("could not find the `osascript` executable on this system")
+		}
+		return p, nil
+	},
+}
+
+// StartElevatedTracked runs `brew <brewArgs...>` the same way StartTracked
+// does, except the brew invocation is wrapped in
+// `osascript -e 'do shell script "..." with administrator privileges'` so it
+// runs with a native Touch-ID-or-password authorization prompt -- for the
+// one case mead needs that: a cask uninstall whose Generic Artifact removal
+// step needs `sudo` to delete files outside Homebrew's own prefix, which
+// fails outright when brew runs as a plain background subprocess with no
+// attached terminal for sudo to prompt on. See BuildElevatedShellScript for
+// the escaping/wrapping approach and why wrapping the whole `brew uninstall`
+// call (rather than just its internal sudo step) is safe here.
+//
+// This trades away real-time output streaming. Start/StartTracked stream
+// job:output events line-by-line as brew runs; here, `do shell script`
+// buffers the whole command's combined stdout/stderr internally and only
+// hands it back once the privileged command has completely finished, so an
+// elevated job's job:output events all arrive in one burst immediately
+// before its job:done rather than progressively. That's an accepted
+// tradeoff for this one path, not a regression to fix -- there's no way to
+// stream through `do shell script`.
+func (jm *Manager) StartElevatedTracked(title string, onDone func(success bool), brewArgs ...string) string {
+	brewPath, err := brew.ResolveBrewPath()
+	if err != nil {
+		return jm.Fail(title, err.Error())
+	}
+	argv := append([]string{brewPath}, brewArgs...)
+	script := BuildElevatedShellScript(brew.FixedEnvVars(), argv)
+	return jm.start(osascriptTarget, title, false, nil, onDone, "-e", script)
 }
 
 func (jm *Manager) start(target binaryTarget, title string, lenient bool, env []string, onDone func(success bool), args ...string) string {

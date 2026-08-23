@@ -132,7 +132,10 @@
     "confirmBulkUninstallTitle_one": "Uninstall {{count}} package?",
     "confirmBulkUninstallTitle_other": "Uninstall {{count}} packages?",
     "confirmBulkUninstallLabel": "Uninstall all",
-    "checkboxRemoveAppDataCasks": "Also remove app data for any casks (preferences, caches, support files)"
+    "checkboxRemoveAppDataCasks": "Also remove app data for any casks (preferences, caches, support files)",
+    "elevateUninstallTitle": "Administrator permission needed",
+    "elevateUninstallBody": "This needs administrator permission to remove some files. Retry with permission?",
+    "elevateUninstallConfirmLabel": "Retry with permission"
   },
   "search": {
     "title": "Search",
@@ -444,7 +447,10 @@
     "checkboxRemoveAppData": "Also remove app data (preferences, caches, support files)",
     "checkboxRemoveAllVersions": "Remove all installed versions",
     "checkboxSnapshot": "Create a local safety snapshot first (Time Machine)",
-    "localSnapshotCreated": "Local snapshot created"
+    "localSnapshotCreated": "Local snapshot created",
+    "elevateUninstallTitle": "Administrator permission needed",
+    "elevateUninstallBody": "This needs administrator permission to remove some files. Retry with permission?",
+    "elevateUninstallConfirmLabel": "Retry with permission"
   },
   "jobConsole": {
     "activity": "Activity",

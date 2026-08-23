@@ -8,6 +8,7 @@ import { useInstalledPackages } from '../context/InstalledPackagesContext'
 import PackageDetailModal, { DetailTarget } from '../components/PackageDetailModal'
 import PackageIcon from '../components/PackageIcon'
 import { ArrowUpCircleIcon, PinIcon, RefreshIcon, SearchIcon, StarIcon, TrashIcon, XIcon } from '../components/Icons'
+import { isSudoTerminalRequiredFailure } from '../lib/uninstallElevation'
 
 export type Filter = 'all' | 'formula' | 'cask' | 'outdated' | 'favorites' | 'deprecated' | 'disabled' | 'pinned'
 
@@ -115,8 +116,19 @@ export default function Installed({ refreshToken, bump, initialFilter }: Props) 
       checkboxes: p.isCask ? [{ label: t('installed.checkboxRemoveAppData') }] : [],
     })
     if (!ok) return
+    const zap = checked[0] ?? false
     setRowBusy(p.name)
-    await runAction(() => api.uninstall(p.name, p.isCask, checked[0] ?? false))
+    const job = await runAction(() => api.uninstall(p.name, p.isCask, zap))
+    if (job.status === 'error' && isSudoTerminalRequiredFailure(job.lines)) {
+      const retry = await confirm({
+        title: t('installed.elevateUninstallTitle'),
+        body: t('installed.elevateUninstallBody'),
+        confirmLabel: t('installed.elevateUninstallConfirmLabel'),
+      })
+      if (retry.ok) {
+        await runAction(() => api.uninstallElevated(p.name, p.isCask, zap))
+      }
+    }
     setRowBusy(null)
     loadLeaves()
     bump()
