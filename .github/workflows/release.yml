@@ -63,21 +63,21 @@ jobs:
       - name: Install Wails CLI
         run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.15.0
 
-      - name: Build
-        run: wails build
-
-      - name: Zip app bundle
-        working-directory: build/bin
-        run: ditto -c -k --sequesterRsrc --keepParent mead.app "mead-${{ needs.release-please.outputs.tag_name }}-macos-arm64.zip"
-
       - name: Install create-dmg
         run: brew install create-dmg
+
+      - name: Build (arm64)
+        run: wails build
+
+      - name: Zip app bundle (arm64)
+        working-directory: build/bin
+        run: ditto -c -k --sequesterRsrc --keepParent mead.app "mead-${{ needs.release-please.outputs.tag_name }}-macos-arm64.zip"
 
       # create-dmg drives Finder over AppleScript to style the window, which
       # can hang instead of failing on some runner/permission quirks -- cap
       # it and don't let a styling hiccup block the release; the zip above
       # is always there as a fallback deliverable.
-      - name: Build DMG installer
+      - name: Build DMG installer (arm64)
         working-directory: build/bin
         timeout-minutes: 5
         continue-on-error: true
@@ -91,6 +91,35 @@ jobs:
             --hide-extension "mead.app" \
             --app-drop-link 450 190 \
             "mead-${{ needs.release-please.outputs.tag_name }}-macos-arm64.dmg" \
+            "mead.app"
+
+      # Cross-compiled from the same arm64 runner rather than using a second
+      # Intel runner. GitHub no longer offers a hosted Intel macOS image at
+      # this project's usual pinned version (macos-13 has been retired), and
+      # a plain `wails build -platform darwin/amd64` was verified locally to
+      # produce a correctly linked x86_64 binary with no extra C toolchain
+      # flags needed, even though this is a Cgo/webview app.
+      - name: Build (amd64)
+        run: wails build -platform darwin/amd64
+
+      - name: Zip app bundle (amd64)
+        working-directory: build/bin
+        run: ditto -c -k --sequesterRsrc --keepParent mead.app "mead-${{ needs.release-please.outputs.tag_name }}-macos-amd64.zip"
+
+      - name: Build DMG installer (amd64)
+        working-directory: build/bin
+        timeout-minutes: 5
+        continue-on-error: true
+        run: |
+          create-dmg \
+            --volname "mead" \
+            --window-pos 200 120 \
+            --window-size 600 400 \
+            --icon-size 100 \
+            --icon "mead.app" 150 190 \
+            --hide-extension "mead.app" \
+            --app-drop-link 450 190 \
+            "mead-${{ needs.release-please.outputs.tag_name }}-macos-amd64.dmg" \
             "mead.app"
 
       - name: Upload release assets
@@ -118,8 +147,8 @@ jobs:
           xattr -dr com.apple.quarantine /Applications/mead.app
           ```
 
-          Requires [Homebrew](https://brew.sh) already installed. Apple Silicon
-          (arm64) only.
+          Requires [Homebrew](https://brew.sh) already installed. Builds are
+          provided for both Apple Silicon (arm64) and Intel (amd64) Macs.
           EOF
           gh release edit "${{ needs.release-please.outputs.tag_name }}" --notes-file /tmp/notes.md
 
@@ -180,11 +209,13 @@ jobs:
         run: |
           VERSION="${{ needs.release-please.outputs.tag_name }}"
           VERSION="${VERSION#v}"
-          SHA256=$(shasum -a 256 assets/*.dmg | awk '{ print $1 }')
+          SHA256_ARM64=$(shasum -a 256 assets/*macos-arm64.dmg | awk '{ print $1 }')
+          SHA256_AMD64=$(shasum -a 256 assets/*macos-amd64.dmg | awk '{ print $1 }')
 
           cd tap
           sed -i '' "s/version \".*\"/version \"${VERSION}\"/" Casks/mead.rb
-          sed -i '' "s/sha256 \".*\"/sha256 \"${SHA256}\"/" Casks/mead.rb
+          sed -i '' "s/^\(  sha256 arm: *\)\"[^\"]*\"/\1\"${SHA256_ARM64}\"/" Casks/mead.rb
+          sed -i '' "s/^\( *intel: *\)\"[^\"]*\"/\1\"${SHA256_AMD64}\"/" Casks/mead.rb
 
           if git diff --quiet; then
             echo "No cask changes needed."
