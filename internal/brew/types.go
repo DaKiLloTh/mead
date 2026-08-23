@@ -90,6 +90,10 @@ type SystemInfo struct {
 	DeprecatedCount int    `json:"deprecatedCount"`
 	DisabledCount   int    `json:"disabledCount"`
 	PinnedCount     int    `json:"pinnedCount"`
+	// HomebrewLastUpdated is when `brew update` was last run against this
+	// installation, RFC3339 formatted in UTC, or "" if it can't be
+	// determined. See GetHomebrewLastUpdated for how it's sourced.
+	HomebrewLastUpdated string `json:"homebrewLastUpdated"`
 }
 
 // AdoptCandidate is an app in /Applications that looks like it matches an

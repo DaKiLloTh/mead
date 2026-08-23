@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
 import { api } from '../lib/api'
 import { useJobs } from '../context/JobsContext'
 import { useSystemInfo } from '../context/SystemInfoContext'
 import { ArrowUpCircleIcon, ExternalLinkIcon, RefreshIcon, WrenchIcon } from '../components/Icons'
 import ExternalLink from '../components/ExternalLink'
+import { relativeTimeFrom } from '../lib/relativeTime'
 import type { ViewKey } from '../components/Sidebar'
 import type { Filter as InstalledFilter } from './Installed'
 
@@ -12,6 +14,26 @@ interface Props {
   onNavigate: (v: ViewKey) => void
   onNavigateInstalled: (filter?: InstalledFilter) => void
   refreshToken: number
+}
+
+// Maps the pure relativeTimeFrom bucket to a translated string. Not itself
+// pure (reads the current time and an i18n TFunction), so it isn't unit
+// tested directly -- the bucketing logic it delegates to (relativeTimeFrom)
+// is, in lib/relativeTime.test.ts. See issue #77.
+function formatLastUpdated(t: TFunction, homebrewLastUpdated: string): string {
+  const rel = relativeTimeFrom(homebrewLastUpdated, new Date())
+  switch (rel.unit) {
+    case 'unknown':
+      return t('dashboard.lastUpdatedUnknown')
+    case 'justNow':
+      return t('dashboard.lastUpdatedJustNow')
+    case 'minutes':
+      return t('dashboard.lastUpdatedMinutesAgo', { count: rel.count })
+    case 'hours':
+      return t('dashboard.lastUpdatedHoursAgo', { count: rel.count })
+    case 'days':
+      return t('dashboard.lastUpdatedDaysAgo', { count: rel.count })
+  }
 }
 
 export default function Dashboard({ onNavigate, onNavigateInstalled, refreshToken }: Props) {
@@ -95,7 +117,14 @@ export default function Dashboard({ onNavigate, onNavigateInstalled, refreshToke
 
           <div className="card bg-base-200 mb-6">
             <div className="card-body">
-              <h2 className="card-title text-base">{t('dashboard.quickActionsTitle')}</h2>
+              <div className="flex items-center justify-between flex-wrap gap-x-4 gap-y-1">
+                <h2 className="card-title text-base">{t('dashboard.quickActionsTitle')}</h2>
+                <div className="text-xs font-mono text-base-content/60">
+                  {info.brewVersion}
+                  <span className="mx-1.5 text-base-content/30">·</span>
+                  {t('dashboard.lastUpdatedLabel')}: {formatLastUpdated(t, info.homebrewLastUpdated)}
+                </div>
+              </div>
               <div className="flex flex-wrap gap-2 mt-1">
                 <button
                   className="btn btn-sm btn-primary"

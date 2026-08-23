@@ -16,6 +16,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"time"
 )
 
 // ---- generic map helpers for defensively decoding brew's JSON ----
@@ -718,6 +719,57 @@ func cellarAndCaskroomPaths(ctx context.Context) (prefix, cellar, caskroom strin
 	return prefix, filepath.Join(prefix, "Cellar"), filepath.Join(prefix, "Caskroom"), nil
 }
 
+// homebrewLastUpdatedString is the pure decision logic behind
+// GetHomebrewLastUpdated: given the mtime of brew's own FETCH_HEAD file and
+// the error (if any) from stat'ing it, decides the SystemInfo.
+// HomebrewLastUpdated value.
+//
+// Homebrew doesn't expose a separate "latest available Homebrew version" to
+// diff against the installed one -- `brew update` updates Homebrew's own
+// source alongside formula/cask definitions, so there's no clean "you're on
+// vX, latest is vY" the way there is for individual outdated packages.
+// What it does reliably track is when it was last updated: `brew --repo`
+// is itself a git checkout, and git touches FETCH_HEAD inside that
+// checkout's .git directory on every fetch it performs, including a fetch
+// that finds nothing new and reports "Already up-to-date". That was
+// confirmed empirically (see the PR description) rather than assumed --
+// FETCH_HEAD's mtime moved to the current time after running `brew update`
+// even when no new commits landed, which is exactly the "last checked"
+// semantics wanted here. A plain `git log -1` commit date would instead
+// reflect when upstream last shipped a commit to Homebrew's own source,
+// which can lag well behind an up-to-date local checkout and would
+// understate how recently the user actually updated.
+//
+// A stat error (non-git install, brew update never run and the file
+// doesn't exist yet, permissions, ...) yields "" rather than an error --
+// this is a nice-to-have indicator, not something a stat hiccup should
+// turn into a failed GetSystemInfo call.
+func homebrewLastUpdatedString(mtime time.Time, statErr error) string {
+	if statErr != nil {
+		return ""
+	}
+	return mtime.UTC().Format(time.RFC3339)
+}
+
+// GetHomebrewLastUpdated returns the RFC3339 timestamp of the last time
+// `brew update` ran against this installation, or "" if it can't be
+// determined. See homebrewLastUpdatedString for the reasoning behind the
+// FETCH_HEAD-mtime approach.
+func GetHomebrewLastUpdated(ctx context.Context) string {
+	repoOut, err := RunBrew(ctx, "--repo")
+	if err != nil {
+		return ""
+	}
+	repo := strings.TrimSpace(repoOut)
+	fetchHead := filepath.Join(repo, ".git", "FETCH_HEAD")
+	info, statErr := os.Stat(fetchHead)
+	var mtime time.Time
+	if statErr == nil {
+		mtime = info.ModTime()
+	}
+	return homebrewLastUpdatedString(mtime, statErr)
+}
+
 // GetSystemInfo assembles a dashboard summary.
 func GetSystemInfo(ctx context.Context) (*SystemInfo, error) {
 	path, err := ResolveBrewPath()
@@ -729,11 +781,12 @@ func GetSystemInfo(ctx context.Context) (*SystemInfo, error) {
 	prefix, cellar, caskroom, _ := cellarAndCaskroomPaths(ctx)
 
 	base := &SystemInfo{
-		BrewPath:    path,
-		BrewVersion: version,
-		Prefix:      prefix,
-		Cellar:      cellar,
-		Caskroom:    caskroom,
+		BrewPath:            path,
+		BrewVersion:         version,
+		Prefix:              prefix,
+		Cellar:              cellar,
+		Caskroom:            caskroom,
+		HomebrewLastUpdated: GetHomebrewLastUpdated(ctx),
 	}
 
 	pkgs, pkgsErr := ListInstalled(ctx)
