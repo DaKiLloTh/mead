@@ -9,7 +9,7 @@ import JobConsole from './components/JobConsole'
 import Toasts from './components/Toasts'
 import CommandPalette from './components/CommandPalette'
 import Dashboard from './views/Dashboard'
-import Installed from './views/Installed'
+import Installed, { type Filter as InstalledFilter } from './views/Installed'
 import Search from './views/Search'
 import Collections from './views/Collections'
 import Updates from './views/Updates'
@@ -46,7 +46,18 @@ function AppShell() {
   const [view, setView] = useState<ViewKey>('dashboard')
   const [refreshToken, setRefreshToken] = useState(0)
   const [outdatedCount, setOutdatedCount] = useState(0)
+  const [installedInitialFilter, setInstalledInitialFilter] = useState<InstalledFilter | undefined>(undefined)
   const installedPackages = useInstalledPackages()
+
+  // Dashboard's Health tile needs to land on Installed pre-filtered (e.g. to
+  // the deprecated/disabled/pinned subset), while every other caller of
+  // onNavigate (Sidebar, CommandPalette, Dashboard's own other stats) just
+  // wants a plain view switch. Keep setView as the simple path and only give
+  // Dashboard this extra capability.
+  const navigateToInstalled = (filter?: InstalledFilter) => {
+    setInstalledInitialFilter(filter)
+    setView('installed')
+  }
 
   // The single "something changed, refresh now" signal for the whole app.
   // Views still on the per-view fetch-on-refreshToken pattern pick this up
@@ -77,8 +88,12 @@ function AppShell() {
             </span>
           </div>
           <div className="flex-1 min-h-0 overflow-y-auto">
-            {view === 'dashboard' && <Dashboard onNavigate={setView} refreshToken={refreshToken} />}
-            {view === 'installed' && <Installed refreshToken={refreshToken} bump={bump} />}
+            {view === 'dashboard' && (
+              <Dashboard onNavigate={setView} onNavigateInstalled={navigateToInstalled} refreshToken={refreshToken} />
+            )}
+            {view === 'installed' && (
+              <Installed refreshToken={refreshToken} bump={bump} initialFilter={installedInitialFilter} />
+            )}
             {view === 'search' && <Search refreshToken={refreshToken} bump={bump} />}
             {view === 'collections' && <Collections bump={bump} />}
             {view === 'updates' && <Updates refreshToken={refreshToken} bump={bump} />}
