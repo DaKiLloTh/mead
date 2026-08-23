@@ -91,40 +91,51 @@ func (jm *Manager) failDone(id string, onDone func(success bool), errMsg string)
 // output to the frontend as job:output events, and returns the job id
 // immediately so the caller (App method) can hand it back to JS.
 func (jm *Manager) Start(title string, args ...string) string {
-	return jm.start(brewTarget, title, false, nil, nil, args...)
+	return jm.start(brewTarget, title, false, false, nil, nil, args...)
 }
 
 // StartLenient behaves like Start, but a non-zero exit code is still
 // reported as Success so the UI doesn't flag it as a failure (e.g. `brew
 // doctor` exits 1 merely to signal it found something worth mentioning).
 func (jm *Manager) StartLenient(title string, args ...string) string {
-	return jm.start(brewTarget, title, true, nil, nil, args...)
+	return jm.start(brewTarget, title, true, false, nil, nil, args...)
 }
 
 // StartTracked behaves like Start, but additionally invokes onDone with the
 // final success flag once the job finishes — used to record history entries
 // without threading that concern through every call site.
 func (jm *Manager) StartTracked(title string, onDone func(success bool), args ...string) string {
-	return jm.start(brewTarget, title, false, nil, onDone, args...)
+	return jm.start(brewTarget, title, false, false, nil, onDone, args...)
 }
 
 // StartWithEnv behaves like Start, but replaces the default brew.Env() with
 // env -- used only by the explicit "Update Homebrew" action, which is the
 // one place we actually want brew's auto-update behavior to run.
 func (jm *Manager) StartWithEnv(title string, env []string, args ...string) string {
-	return jm.start(brewTarget, title, false, env, nil, args...)
+	return jm.start(brewTarget, title, false, false, env, nil, args...)
+}
+
+// StartQuietWithEnv behaves like StartWithEnv, but marks the job "quiet" in
+// its job:start event (see StartEvent.Quiet), telling the frontend not to
+// auto-open the job console or pop a completion toast for it -- used by the
+// periodic background `brew update` (see App.UpdateQuiet), which should
+// stay unobtrusive rather than interrupting the user's session every time it
+// fires. It still runs through the normal job machinery, so it's visible in
+// job history if the user opens the console themselves.
+func (jm *Manager) StartQuietWithEnv(title string, env []string, args ...string) string {
+	return jm.start(brewTarget, title, false, true, env, nil, args...)
 }
 
 // StartMas behaves like Start, but launches the `mas` CLI (Mac App Store
 // bridge) instead of brew -- used for App Store app upgrades, which brew
 // itself has no knowledge of.
 func (jm *Manager) StartMas(title string, args ...string) string {
-	return jm.start(masTarget, title, false, nil, nil, args...)
+	return jm.start(masTarget, title, false, false, nil, nil, args...)
 }
 
-func (jm *Manager) start(target binaryTarget, title string, lenient bool, env []string, onDone func(success bool), args ...string) string {
+func (jm *Manager) start(target binaryTarget, title string, lenient bool, quiet bool, env []string, onDone func(success bool), args ...string) string {
 	id := newJobID()
-	runtime.EventsEmit(jm.ctx, eventJobStart, StartEvent{ID: id, Title: title})
+	runtime.EventsEmit(jm.ctx, eventJobStart, StartEvent{ID: id, Title: title, Quiet: quiet})
 
 	path, err := target.resolve()
 	if err != nil {

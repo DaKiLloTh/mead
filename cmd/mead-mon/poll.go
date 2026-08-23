@@ -8,9 +8,11 @@ import (
 	"mead/internal/brew"
 )
 
-// checkTimeout bounds a single `brew outdated` call so a hung/slow brew
-// invocation can't wedge the polling loop indefinitely.
-const checkTimeout = 2 * time.Minute
+// checkTimeout bounds a single check -- a `brew update` refresh followed by
+// `brew outdated` -- so a hung/slow brew invocation can't wedge the polling
+// loop indefinitely. Wider than a bare `brew outdated` alone would need,
+// since `brew update` does a real network fetch.
+const checkTimeout = 5 * time.Minute
 
 // poller owns the mutable state a real polling loop needs (the last-seen
 // outdated set, for shouldNotify to compare against) and drives brew
@@ -34,6 +36,17 @@ func newPoller(cfg Config, tr *tray) *poller {
 func (p *poller) checkOnce() {
 	ctx, cancel := context.WithTimeout(context.Background(), checkTimeout)
 	defer cancel()
+
+	// Refresh Homebrew's own local index before checking for outdated
+	// packages. `brew outdated` only ever compares against whatever's
+	// already cached locally, and unlike the main GUI app's own polling,
+	// nothing else keeps that cache fresh for mead-mon (see issue #88). A
+	// failure here isn't fatal -- Outdated() below just falls back to
+	// whatever's already cached, same as it always has, and the failure is
+	// only logged.
+	if err := brew.Update(ctx); err != nil {
+		log.Printf("mead-mon: refreshing Homebrew's update index: %v", err)
+	}
 
 	pkgs, err := brew.Outdated(ctx, p.cfg.Greedy)
 	if err != nil {
