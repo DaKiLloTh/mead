@@ -2,6 +2,8 @@
 
 A native Homebrew GUI for macOS, built with Go + [Wails](https://wails.io) + React.
 
+[getmead.app](https://getmead.app)
+
 ## Features
 
 - **Dashboard**: installed/outdated counts, a health tile (deprecated/disabled/pinned), one-click update/upgrade-all/doctor
