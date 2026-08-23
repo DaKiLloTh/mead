@@ -5,13 +5,15 @@ import { useJobs } from '../context/JobsContext'
 import { ArrowUpCircleIcon, ExternalLinkIcon, RefreshIcon, WrenchIcon } from '../components/Icons'
 import ExternalLink from '../components/ExternalLink'
 import type { ViewKey } from '../components/Sidebar'
+import type { Filter as InstalledFilter } from './Installed'
 
 interface Props {
   onNavigate: (v: ViewKey) => void
+  onNavigateInstalled: (filter?: InstalledFilter) => void
   refreshToken: number
 }
 
-export default function Dashboard({ onNavigate, refreshToken }: Props) {
+export default function Dashboard({ onNavigate, onNavigateInstalled, refreshToken }: Props) {
   const { t } = useTranslation()
   const { runAction } = useJobs()
   const [info, setInfo] = useState<SystemInfo | null>(null)
@@ -132,37 +134,37 @@ export default function Dashboard({ onNavigate, refreshToken }: Props) {
           </div>
 
           <div className="card bg-base-200 mb-6">
-            <div className="card-body">
-              <h2 className="card-title text-base">{t('dashboard.healthTitle')}</h2>
-              <div className="stats stats-vertical sm:stats-horizontal bg-transparent">
-                <div
-                  className="stat px-0 pr-6 cursor-pointer"
-                  onClick={() => onNavigate('installed')}
+            <div className="card-body py-3">
+              <h3 className="font-medium text-xs uppercase text-base-content/50">{t('dashboard.healthTitle')}</h3>
+              <div className="flex flex-wrap gap-2 mt-1">
+                <button
+                  className="btn btn-sm btn-ghost justify-start gap-2"
+                  onClick={() => onNavigateInstalled('deprecated')}
                   title={t('dashboard.deprecatedTooltip')}
                 >
-                  <div className="stat-title">{t('dashboard.deprecated')}</div>
-                  <div className={`stat-value text-lg ${info.deprecatedCount > 0 ? 'text-warning' : ''}`}>
+                  <span className={`font-mono font-semibold ${info.deprecatedCount > 0 ? 'text-warning' : 'text-base-content/60'}`}>
                     {info.deprecatedCount}
-                  </div>
-                </div>
-                <div
-                  className="stat px-0 pr-6 cursor-pointer"
-                  onClick={() => onNavigate('installed')}
+                  </span>
+                  {t('dashboard.deprecated')}
+                </button>
+                <button
+                  className="btn btn-sm btn-ghost justify-start gap-2"
+                  onClick={() => onNavigateInstalled('disabled')}
                   title={t('dashboard.disabledTooltip')}
                 >
-                  <div className="stat-title">{t('dashboard.disabled')}</div>
-                  <div className={`stat-value text-lg ${info.disabledCount > 0 ? 'text-error' : ''}`}>
+                  <span className={`font-mono font-semibold ${info.disabledCount > 0 ? 'text-error' : 'text-base-content/60'}`}>
                     {info.disabledCount}
-                  </div>
-                </div>
-                <div
-                  className="stat px-0 cursor-pointer"
-                  onClick={() => onNavigate('installed')}
+                  </span>
+                  {t('dashboard.disabled')}
+                </button>
+                <button
+                  className="btn btn-sm btn-ghost justify-start gap-2"
+                  onClick={() => onNavigateInstalled('pinned')}
                   title={t('dashboard.pinnedTooltip')}
                 >
-                  <div className="stat-title">{t('dashboard.pinned')}</div>
-                  <div className="stat-value text-lg">{info.pinnedCount}</div>
-                </div>
+                  <span className="font-mono font-semibold text-base-content/60">{info.pinnedCount}</span>
+                  {t('dashboard.pinned')}
+                </button>
               </div>
             </div>
           </div>

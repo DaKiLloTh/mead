@@ -7,20 +7,27 @@ import { useUserData } from '../context/UserDataContext'
 import { useInstalledPackages } from '../context/InstalledPackagesContext'
 import PackageDetailModal, { DetailTarget } from '../components/PackageDetailModal'
 import PackageIcon from '../components/PackageIcon'
-import { ArrowUpCircleIcon, PinIcon, RefreshIcon, SearchIcon, StarIcon, TrashIcon } from '../components/Icons'
+import { ArrowUpCircleIcon, PinIcon, RefreshIcon, SearchIcon, StarIcon, TrashIcon, XIcon } from '../components/Icons'
 
-type Filter = 'all' | 'formula' | 'cask' | 'outdated' | 'favorites'
+export type Filter = 'all' | 'formula' | 'cask' | 'outdated' | 'favorites' | 'deprecated' | 'disabled' | 'pinned'
 
 interface Props {
   refreshToken: number
   bump: () => void
+  initialFilter?: Filter
 }
 
 function rowKey(p: BrewPackage) {
   return `${p.isCask ? 'c' : 'f'}:${p.name}`
 }
 
-export default function Installed({ refreshToken, bump }: Props) {
+// Filters not exposed as permanent tabs — only reachable programmatically
+// (e.g. clicking a Dashboard Health stat). When active, they're surfaced as
+// a dismissible chip next to the regular tabs instead of cluttering the
+// tab bar with edge-case options for everyday browsing.
+const HIDDEN_FILTERS = new Set<Filter>(['deprecated', 'disabled', 'pinned'])
+
+export default function Installed({ refreshToken, bump, initialFilter }: Props) {
   const { t } = useTranslation()
   const { runAction } = useJobs()
   const confirm = useConfirm()
@@ -28,7 +35,16 @@ export default function Installed({ refreshToken, bump }: Props) {
   const { packages: cachedPkgs, loading, error, refresh: refreshPackages } = useInstalledPackages()
   const pkgs = cachedPkgs ?? []
   const [leaves, setLeaves] = useState<Set<string>>(new Set())
-  const [filter, setFilter] = useState<Filter>('all')
+  const [filter, setFilter] = useState<Filter>(initialFilter ?? 'all')
+
+  // Installed is unmounted/remounted on every view switch (App.tsx renders
+  // it conditionally), so the useState initializer above covers the normal
+  // navigation case. This effect is a cheap safety net in case that ever
+  // changes and the component stays mounted across an initialFilter update.
+  useEffect(() => {
+    if (initialFilter) setFilter(initialFilter)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialFilter])
   const [query, setQuery] = useState('')
   const [detail, setDetail] = useState<DetailTarget | null>(null)
   const [rowBusy, setRowBusy] = useState<string | null>(null)
@@ -61,6 +77,9 @@ export default function Installed({ refreshToken, bump }: Props) {
       if (filter === 'cask' && !p.isCask) return false
       if (filter === 'outdated' && !p.outdated) return false
       if (filter === 'favorites' && !userData.isFavorite(p.name, p.isCask)) return false
+      if (filter === 'deprecated' && !p.deprecated) return false
+      if (filter === 'disabled' && !p.disabled) return false
+      if (filter === 'pinned' && !p.pinned) return false
       if (q && !p.name.toLowerCase().includes(q) && !p.fullName?.toLowerCase().includes(q) && !p.desc?.toLowerCase().includes(q)) return false
       return true
     })
@@ -157,6 +176,17 @@ export default function Installed({ refreshToken, bump }: Props) {
   const caskCount = pkgs.filter((p) => p.isCask).length
   const outdatedCount = pkgs.filter((p) => p.outdated).length
   const favoriteCount = pkgs.filter((p) => userData.isFavorite(p.name, p.isCask)).length
+  const hiddenFilterCount = pkgs.filter((p) => {
+    if (filter === 'deprecated') return p.deprecated
+    if (filter === 'disabled') return p.disabled
+    if (filter === 'pinned') return p.pinned
+    return false
+  }).length
+  const hiddenFilterLabelKeys: Record<'deprecated' | 'disabled' | 'pinned', string> = {
+    deprecated: 'installed.tabDeprecated',
+    disabled: 'installed.tabDisabled',
+    pinned: 'installed.tabPinned',
+  }
 
   return (
     <div className="p-6">
@@ -207,6 +237,12 @@ export default function Installed({ refreshToken, bump }: Props) {
           >
             {t('installed.tabFavorites', { count: favoriteCount })}
           </button>
+          {HIDDEN_FILTERS.has(filter) && (
+            <button role="tab" className="tab tab-active gap-1.5" onClick={() => setFilter('all')}>
+              {t(hiddenFilterLabelKeys[filter as 'deprecated' | 'disabled' | 'pinned'], { count: hiddenFilterCount })}
+              <XIcon className="size-3.5" />
+            </button>
+          )}
         </div>
 
         {selected.size > 0 && (
