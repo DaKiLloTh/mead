@@ -1,6 +1,161 @@
 @import "tailwindcss";
-@plugin "daisyui" {
-  themes: light --default, dark --prefersdark;
+@plugin "daisyui";
+
+/*
+ * Custom "light" and "dark" themes replacing daisyUI's built-ins, built
+ * from the mead visual identity tokens (see GitHub issue #95 and the
+ * design handoff at design_handoff_mead_icons/README.md): honey amber,
+ * aged wood, glass, taproom warmth, rather than daisyUI's default
+ * indigo/violet palette.
+ *
+ * Token -> daisyUI slot mapping:
+ *   - primary: accent amber #D4A24C (the honey/mead color itself), with
+ *     primary-content set to the theme's own dark text color rather than
+ *     white -- white-on-amber falls short of readable contrast, dark
+ *     text clears it comfortably.
+ *   - secondary: accent dark #8B6224 (aged wood/bronze), content cream.
+ *   - accent (daisyUI's third slot, distinct from the "accent amber"
+ *     token above): accent darker #6B4B1B, a deeper wood tone so it
+ *     reads as a different color from primary rather than a lighter/
+ *     darker copy of the same amber.
+ *   - neutral: accent darker #6B4B1B, cream content -- kept identical
+ *     across both themes, matching how daisyUI's own built-in themes
+ *     keep `neutral` constant between light and dark.
+ *   - base-100/200/300: bg/card/border tokens. base-200 (card) is
+ *     lighter than base-100 (bg) in both themes, since the app already
+ *     renders the sidebar and cards as a translucent panel floating over
+ *     the page background (see Sidebar.tsx's bg-base-200/70 backdrop
+ *     blur) -- a bright glass panel over a warmer floor in light mode,
+ *     and a warm-lit panel over a near-black floor in dark mode.
+ *   - success: success green #4E9B6E. error: error red #C1503D.
+ *   - warning: reuses the amber accent, matching the handoff's own
+ *     badge-outdated icon (accent-colored up arrow).
+ *   - info: the handoff has no dedicated info color, so this reuses the
+ *     muted-text token as a background -- info badges are rare in this
+ *     app (a single fallback branch in Services.tsx), so a low-emphasis
+ *     neutral tone fits better than inventing a new hue.
+ */
+@plugin "daisyui/theme" {
+  name: "light";
+  default: true;
+  color-scheme: light;
+
+  --color-base-100: #F7F1E6;
+  --color-base-200: #FFFFFF;
+  --color-base-300: #E9E0CE;
+  --color-base-content: #241C13;
+
+  --color-primary: #D4A24C;
+  --color-primary-content: #241C13;
+  --color-secondary: #8B6224;
+  --color-secondary-content: #F6E7CC;
+  --color-accent: #6B4B1B;
+  --color-accent-content: #F6E7CC;
+  --color-neutral: #6B4B1B;
+  --color-neutral-content: #F6E7CC;
+
+  --color-info: #847A67;
+  --color-info-content: #241C13;
+  --color-success: #4E9B6E;
+  --color-success-content: #241C13;
+  --color-warning: #D4A24C;
+  --color-warning-content: #241C13;
+  --color-error: #C1503D;
+  --color-error-content: #FFFFFF;
+
+  --radius-selector: 0.5rem;
+  --radius-field: 0.25rem;
+  --radius-box: 0.5rem;
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+  --border: 1px;
+  --depth: 1;
+  --noise: 0;
+}
+
+@plugin "daisyui/theme" {
+  name: "dark";
+  prefersdark: true;
+  color-scheme: dark;
+
+  --color-base-100: #17130F;
+  --color-base-200: #211B15;
+  --color-base-300: #3A3126;
+  --color-base-content: #F3EADA;
+
+  --color-primary: #D4A24C;
+  --color-primary-content: #17130F;
+  --color-secondary: #8B6224;
+  --color-secondary-content: #F6E7CC;
+  --color-accent: #6B4B1B;
+  --color-accent-content: #F6E7CC;
+  --color-neutral: #6B4B1B;
+  --color-neutral-content: #F6E7CC;
+
+  --color-info: #AFA28A;
+  --color-info-content: #17130F;
+  --color-success: #4E9B6E;
+  --color-success-content: #17130F;
+  --color-warning: #D4A24C;
+  --color-warning-content: #17130F;
+  --color-error: #C1503D;
+  --color-error-content: #FFFFFF;
+
+  --radius-selector: 0.5rem;
+  --radius-field: 0.25rem;
+  --radius-box: 0.5rem;
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+  --border: 1px;
+  --depth: 1;
+  --noise: 0;
+}
+
+/*
+ * Manrope for all UI text, Instrument Serif (italic) for the "mead"
+ * wordmark only (see .font-wordmark, used in Sidebar.tsx). Both vendored
+ * locally under src/assets/fonts (SIL OFL licensed) rather than fetched
+ * from Google Fonts at runtime, so the app looks the same fully offline.
+ */
+@font-face {
+  font-family: 'Manrope';
+  src: url('./assets/fonts/manrope-400.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Manrope';
+  src: url('./assets/fonts/manrope-500.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Manrope';
+  src: url('./assets/fonts/manrope-600.woff2') format('woff2');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Manrope';
+  src: url('./assets/fonts/manrope-700.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Instrument Serif';
+  src: url('./assets/fonts/instrument-serif-italic.woff2') format('woff2');
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+
+.font-wordmark {
+  font-family: 'Instrument Serif', ui-serif, Georgia, serif;
+  font-style: italic;
 }
 
 html, body, #root {
@@ -21,6 +176,7 @@ html {
 body {
   overscroll-behavior: none;
   background: transparent;
+  font-family: 'Manrope', ui-sans-serif, system-ui, sans-serif;
 }
 
 .drag-region {
