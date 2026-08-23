@@ -32,6 +32,19 @@ export default function Adopt({ bump }: Props) {
   }
 
   async function adopt(c: AdoptCandidate) {
+    if (c.matchConfidence === 'possible') {
+      const { ok } = await confirm({
+        title: t('adopt.possibleMatchWarningTitle'),
+        body: t('adopt.possibleMatchWarningBody', {
+          appName: c.appName,
+          caskToken: c.caskToken,
+          reason: c.matchReason || '',
+        }),
+        danger: true,
+        confirmLabel: t('adopt.possibleMatchConfirmLabel'),
+      })
+      if (!ok) return
+    }
     if (c.possibleDowngrade) {
       const { ok } = await confirm({
         title: t('adopt.downgradeWarningTitle'),
@@ -87,6 +100,7 @@ export default function Adopt({ bump }: Props) {
                   <col />
                   <col className="w-36" />
                   <col className="w-28" />
+                  <col className="w-28" />
                   <col className="w-32" />
                   <col className="w-28" />
                 </colgroup>
@@ -94,7 +108,8 @@ export default function Adopt({ bump }: Props) {
                   <tr>
                     <th>{t('adopt.colApp')}</th>
                     <th>{t('adopt.colMatchedCask')}</th>
-                    <th>{t('adopt.colVersion')}</th>
+                    <th>{t('adopt.colInstalledVersion')}</th>
+                    <th>{t('adopt.colHomebrewVersion')}</th>
                     <th>{t('adopt.colMatch')}</th>
                     <th className="text-right">{t('adopt.colAction')}</th>
                   </tr>
@@ -109,16 +124,13 @@ export default function Adopt({ bump }: Props) {
                       <td className="font-mono text-xs truncate" title={c.caskToken}>
                         {c.caskToken}
                       </td>
-                      <td className="font-mono text-xs">
-                        <div className="truncate" title={c.installedVersion || undefined}>
-                          {t('adopt.installedVersionLabel')} {c.installedVersion || t('adopt.versionUnknown')}
-                        </div>
-                        <div
-                          className={`truncate flex items-center gap-1 ${c.possibleDowngrade ? 'text-warning' : 'text-base-content/50'}`}
-                          title={c.caskVersion || undefined}
-                        >
+                      <td className="font-mono text-xs truncate" title={c.installedVersion || undefined}>
+                        {c.installedVersion || t('adopt.versionUnknown')}
+                      </td>
+                      <td className="font-mono text-xs" title={c.caskVersion || undefined}>
+                        <div className={`truncate flex items-center gap-1 ${c.possibleDowngrade ? 'text-warning' : ''}`}>
                           {c.possibleDowngrade && <AlertIcon className="size-3 shrink-0" />}
-                          {t('adopt.caskVersionLabel')} {c.caskVersion || t('adopt.versionUnknown')}
+                          {c.caskVersion || t('adopt.versionUnknown')}
                         </div>
                       </td>
                       <td>
