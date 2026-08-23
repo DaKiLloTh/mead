@@ -4,6 +4,7 @@ import { JobsProvider } from './context/JobsContext'
 import { ConfirmProvider } from './context/ConfirmContext'
 import { UserDataProvider } from './context/UserDataContext'
 import { InstalledPackagesProvider, useInstalledPackages } from './context/InstalledPackagesContext'
+import { SystemInfoProvider } from './context/SystemInfoContext'
 import Sidebar, { type ViewKey } from './components/Sidebar'
 import JobConsole from './components/JobConsole'
 import Toasts from './components/Toasts'
@@ -122,7 +123,9 @@ export default function App() {
       <ConfirmProvider>
         <UserDataProvider>
           <InstalledPackagesProvider>
-            <AppShell />
+            <SystemInfoProvider>
+              <AppShell />
+            </SystemInfoProvider>
           </InstalledPackagesProvider>
         </UserDataProvider>
       </ConfirmProvider>

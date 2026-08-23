@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { api, SystemInfo } from '../lib/api'
+import { api } from '../lib/api'
 import { useJobs } from '../context/JobsContext'
+import { useSystemInfo } from '../context/SystemInfoContext'
 import { ArrowUpCircleIcon, ExternalLinkIcon, RefreshIcon, WrenchIcon } from '../components/Icons'
 import ExternalLink from '../components/ExternalLink'
 import type { ViewKey } from '../components/Sidebar'
@@ -16,28 +17,23 @@ interface Props {
 export default function Dashboard({ onNavigate, onNavigateInstalled, refreshToken }: Props) {
   const { t } = useTranslation()
   const { runAction } = useJobs()
-  const [info, setInfo] = useState<SystemInfo | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const { info, loading, error, refresh } = useSystemInfo()
   const [busy, setBusy] = useState<string | null>(null)
 
-  function load() {
-    setLoading(true)
-    setError(null)
-    api
-      .getSystemInfo()
-      .then(setInfo)
-      .catch((e) => setError(String(e)))
-      .finally(() => setLoading(false))
-  }
-
-  useEffect(load, [refreshToken])
+  // refreshToken is the app's shared "something changed" signal (see
+  // App.tsx's bump()). Dashboard used to refetch its own local copy of
+  // system info on this signal; now it just forces the shared cache to
+  // re-fetch, same as InstalledPackagesProvider is refreshed from bump().
+  useEffect(() => {
+    refresh()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refreshToken])
 
   async function run(key: string, action: () => Promise<string>) {
     setBusy(key)
     await runAction(action)
     setBusy(null)
-    load()
+    refresh()
   }
 
   if (!loading && error) {
@@ -60,7 +56,7 @@ export default function Dashboard({ onNavigate, onNavigateInstalled, refreshToke
           <ExternalLink className="link inline-flex items-center gap-1 text-sm" href="https://brew.sh">
             brew.sh <ExternalLinkIcon className="size-3" />
           </ExternalLink>
-          <button className="btn btn-sm" onClick={load}>
+          <button className="btn btn-sm" onClick={refresh}>
             <RefreshIcon className="size-4" /> {t('common.tryAgain')}
           </button>
         </div>
