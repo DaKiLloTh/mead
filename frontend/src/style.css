@@ -7,6 +7,17 @@ html, body, #root {
   height: 100%;
 }
 
+/*
+ * overscroll-behavior must be set on both html and body: WKWebView
+ * treats the document element as the native scroll/bounce boundary,
+ * and setting it only on body leaves the outer WKWebView container
+ * free to rubber-band/elastic-bounce on wheel scroll over content
+ * that isn't itself scrollable (see GitHub issue #62).
+ */
+html {
+  overscroll-behavior: none;
+}
+
 body {
   overscroll-behavior: none;
   background: transparent;
