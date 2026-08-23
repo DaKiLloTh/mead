@@ -25,7 +25,7 @@ except the OSV.dev vulnerability lookups (formula name + version only).
 ## Requirements
 
 - [Homebrew](https://brew.sh) already installed
-- macOS on Apple Silicon (arm64)
+- macOS on Apple Silicon (arm64) or Intel (x86_64)
 
 ## Install
 
@@ -71,8 +71,9 @@ Every merge to `master` updates a standing "Release PR" with the next
 version and changelog. Merging *that* PR is what actually cuts the release.
 `.github/workflows/release.yml` then marks the GitHub Release as a
 pre-release (title prefixed `Pre-Alpha`, every release stays labeled
-pre-alpha until the project is stable), builds `mead.app`, zips it, builds a
-DMG installer, and attaches both to the release.
+pre-alpha until the project is stable), builds `mead.app` for both Apple
+Silicon (arm64, native) and Intel (amd64, cross-compiled), zips each, builds
+a DMG installer for each, and attaches all four to the release.
 
 Release builds are unsigned (no Apple Developer ID in this project), so
 Gatekeeper will block a plain double-click. See the release notes on each
