@@ -6,6 +6,7 @@ import { useConfirm } from '../context/ConfirmContext'
 import { useUserData } from '../context/UserDataContext'
 import { useInstalledPackages } from '../context/InstalledPackagesContext'
 import PackageDetailModal, { DetailTarget } from '../components/PackageDetailModal'
+import PackageIcon from '../components/PackageIcon'
 import { ArrowUpCircleIcon, PinIcon, RefreshIcon, SearchIcon, StarIcon, TrashIcon } from '../components/Icons'
 
 type Filter = 'all' | 'formula' | 'cask' | 'outdated' | 'favorites'
@@ -282,6 +283,7 @@ export default function Installed({ refreshToken, bump }: Props) {
                     </td>
                     <td className="cursor-pointer" onClick={() => setDetail({ name: p.name, isCask: p.isCask })}>
                       <div className="font-medium flex items-center gap-1.5 min-w-0">
+                        <PackageIcon name={p.name} isCask={p.isCask} className="size-5" />
                         {favorite && <StarIcon filled className="size-3.5 text-warning shrink-0" />}
                         <span className="truncate">{p.name}</span>
                       </div>

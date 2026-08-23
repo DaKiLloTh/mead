@@ -39,6 +39,7 @@
       "search": "Search",
       "collections": "Collections",
       "updates": "Updates",
+      "applications": "Applications",
       "taps": "Taps",
       "services": "Services",
       "adopt": "Adopt Apps",
@@ -56,6 +57,7 @@
       "search": "Search",
       "collections": "Collections",
       "updates": "Updates",
+      "applications": "Applications",
       "taps": "Taps",
       "services": "Services",
       "adopt": "Adopt Existing Apps",
@@ -161,6 +163,15 @@
     "snoozeOneDay": "1 day",
     "snoozeOneWeek": "1 week",
     "snoozeOneMonth": "1 month"
+  },
+  "applications": {
+    "title": "Applications",
+    "subtitleError": "Couldn't load installed applications.",
+    "subtitleCount_one": "{{count}} application",
+    "subtitleCount_other": "{{count}} applications",
+    "filterPlaceholder": "Filter applications…",
+    "errorTitle": "Couldn't load installed applications",
+    "noMatches": "No applications match."
   },
   "taps": {
     "title": "Taps",

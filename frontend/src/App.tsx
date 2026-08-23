@@ -13,6 +13,7 @@ import Installed from './views/Installed'
 import Search from './views/Search'
 import Collections from './views/Collections'
 import Updates from './views/Updates'
+import Applications from './views/Applications'
 import Taps from './views/Taps'
 import Services from './views/Services'
 import Adopt from './views/Adopt'
@@ -29,6 +30,7 @@ const viewTitleKeys: Record<ViewKey, string> = {
   search: 'app.viewTitles.search',
   collections: 'app.viewTitles.collections',
   updates: 'app.viewTitles.updates',
+  applications: 'app.viewTitles.applications',
   taps: 'app.viewTitles.taps',
   services: 'app.viewTitles.services',
   adopt: 'app.viewTitles.adopt',
@@ -80,6 +82,7 @@ function AppShell() {
             {view === 'search' && <Search refreshToken={refreshToken} bump={bump} />}
             {view === 'collections' && <Collections bump={bump} />}
             {view === 'updates' && <Updates refreshToken={refreshToken} bump={bump} />}
+            {view === 'applications' && <Applications bump={bump} />}
             {view === 'taps' && <Taps refreshToken={refreshToken} bump={bump} />}
             {view === 'services' && <Services refreshToken={refreshToken} bump={bump} />}
             {view === 'adopt' && <Adopt bump={bump} />}
