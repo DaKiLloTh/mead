@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.6.0](https://github.com/DaKiLloTh/mead/compare/v0.5.0...v0.6.0) (2026-08-23)
+
+
+### Features
+
+* add globally-accessible Homebrew refresh icon to the top bar ([e46ad2d](https://github.com/DaKiLloTh/mead/commit/e46ad2df6068e54466c68b2b1f926fef293839df))
+* add real mead app icon, replacing the Wails placeholder ([5495446](https://github.com/DaKiLloTh/mead/commit/5495446a7e384bd35febf603062a114eb27759bf))
+* adopt honey/mead visual identity (theme, fonts, icon set) ([29548f6](https://github.com/DaKiLloTh/mead/commit/29548f6ca1491873dcc7471b66c1c10121ea00df))
+* offer administrator-privileged retry when cask uninstall needs sudo ([c6783a8](https://github.com/DaKiLloTh/mead/commit/c6783a81971ef8fba78f53309a390a44786cd13e))
+* periodically refresh Homebrew's update index in the background ([4b25857](https://github.com/DaKiLloTh/mead/commit/4b25857805bfcf4e4750eefca3b83fa136e0ce08))
+
 ## [0.5.0](https://github.com/DaKiLloTh/mead/compare/v0.4.0...v0.5.0) (2026-08-23)
 
 
