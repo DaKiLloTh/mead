@@ -15,7 +15,6 @@ import {
   SearchIcon,
   StarIcon,
   TrashIcon,
-  XIcon,
 } from '../components/Icons'
 import { isSudoTerminalRequiredFailure } from '../lib/uninstallElevation'
 
@@ -30,12 +29,6 @@ interface Props {
 function rowKey(p: BrewPackage) {
   return `${p.isCask ? 'c' : 'f'}:${p.name}`
 }
-
-// Filters not exposed as permanent tabs — only reachable programmatically
-// (e.g. clicking a Dashboard Health stat). When active, they're surfaced as
-// a dismissible chip next to the regular tabs instead of cluttering the
-// tab bar with edge-case options for everyday browsing.
-const HIDDEN_FILTERS = new Set<Filter>(['deprecated', 'disabled', 'pinned'])
 
 export default function Installed({ refreshToken, bump, initialFilter }: Props) {
   const { t } = useTranslation()
@@ -197,17 +190,9 @@ export default function Installed({ refreshToken, bump, initialFilter }: Props) 
   const caskCount = pkgs.filter((p) => p.isCask).length
   const outdatedCount = pkgs.filter((p) => p.outdated).length
   const favoriteCount = pkgs.filter((p) => userData.isFavorite(p.name, p.isCask)).length
-  const hiddenFilterCount = pkgs.filter((p) => {
-    if (filter === 'deprecated') return p.deprecated
-    if (filter === 'disabled') return p.disabled
-    if (filter === 'pinned') return p.pinned
-    return false
-  }).length
-  const hiddenFilterLabelKeys: Record<'deprecated' | 'disabled' | 'pinned', string> = {
-    deprecated: 'installed.tabDeprecated',
-    disabled: 'installed.tabDisabled',
-    pinned: 'installed.tabPinned',
-  }
+  const deprecatedCount = pkgs.filter((p) => p.deprecated).length
+  const disabledCount = pkgs.filter((p) => p.disabled).length
+  const pinnedCount = pkgs.filter((p) => p.pinned).length
 
   return (
     <div className="p-6">
@@ -258,12 +243,27 @@ export default function Installed({ refreshToken, bump, initialFilter }: Props) 
           >
             {t('installed.tabFavorites', { count: favoriteCount })}
           </button>
-          {HIDDEN_FILTERS.has(filter) && (
-            <button role="tab" className="tab tab-active gap-1.5" onClick={() => setFilter('all')}>
-              {t(hiddenFilterLabelKeys[filter as 'deprecated' | 'disabled' | 'pinned'], { count: hiddenFilterCount })}
-              <XIcon className="size-3.5" />
-            </button>
-          )}
+          <button
+            role="tab"
+            className={`tab ${filter === 'deprecated' ? 'tab-active' : ''}`}
+            onClick={() => setFilter('deprecated')}
+          >
+            {t('installed.tabDeprecated', { count: deprecatedCount })}
+          </button>
+          <button
+            role="tab"
+            className={`tab ${filter === 'disabled' ? 'tab-active' : ''}`}
+            onClick={() => setFilter('disabled')}
+          >
+            {t('installed.tabDisabled', { count: disabledCount })}
+          </button>
+          <button
+            role="tab"
+            className={`tab ${filter === 'pinned' ? 'tab-active' : ''}`}
+            onClick={() => setFilter('pinned')}
+          >
+            {t('installed.tabPinned', { count: pinnedCount })}
+          </button>
         </div>
 
         {selected.size > 0 && (
