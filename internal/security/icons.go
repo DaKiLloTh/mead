@@ -34,14 +34,26 @@ func parseCFBundleIconFile(plistXML string) string {
 	return strings.TrimSpace(m[1])
 }
 
-// readCFBundleIconFile shells out to `plutil -convert xml1 -o -` to read an
-// app bundle's Info.plist regardless of whether it's stored as XML or
-// binary (bplist00) on disk -- both are common depending on how the app was
-// built -- and extracts CFBundleIconFile from the normalized XML text.
-func readCFBundleIconFile(ctx context.Context, plistPath string) (string, error) {
-	xmlOut, err := system.RunCmd(ctx, "plutil", "-convert", "xml1", "-o", "-", plistPath)
+// readPlistXML shells out to `plutil -convert xml1 -o -` to read a property
+// list regardless of whether it's stored as XML or binary (bplist00) on
+// disk -- both are common depending on how the app was built -- and returns
+// the normalized XML text. Shared by every plist reader in this package
+// (icon extraction here, and CFBundleIdentifier lookup in leftovers.go) so
+// there's exactly one place that knows how to normalize a plist.
+func readPlistXML(ctx context.Context, plistPath string) (string, error) {
+	out, err := system.RunCmd(ctx, "plutil", "-convert", "xml1", "-o", "-", plistPath)
 	if err != nil {
-		return "", fmt.Errorf("couldn't read Info.plist: %w", err)
+		return "", fmt.Errorf("couldn't read %s: %w", plistPath, err)
+	}
+	return out, nil
+}
+
+// readCFBundleIconFile reads an app bundle's Info.plist via readPlistXML and
+// extracts CFBundleIconFile from the normalized XML text.
+func readCFBundleIconFile(ctx context.Context, plistPath string) (string, error) {
+	xmlOut, err := readPlistXML(ctx, plistPath)
+	if err != nil {
+		return "", err
 	}
 	iconFile := parseCFBundleIconFile(xmlOut)
 	if iconFile == "" {
