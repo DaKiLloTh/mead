@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Trans, useTranslation } from 'react-i18next'
 import { api, DuplicateApp, VulnResult } from '../lib/api'
 import { AlertIcon, CopyIcon, ExternalLinkIcon, ShieldIcon, WrenchIcon } from '../components/Icons'
 import ExternalLink from '../components/ExternalLink'
@@ -6,6 +7,7 @@ import ExternalLink from '../components/ExternalLink'
 type Tab = 'vulns' | 'duplicates' | 'missing'
 
 export default function Security() {
+  const { t } = useTranslation()
   const [tab, setTab] = useState<Tab>('vulns')
 
   const [vulns, setVulns] = useState<VulnResult[] | null>(null)
@@ -52,50 +54,46 @@ export default function Security() {
 
   return (
     <div className="p-6 max-w-3xl">
-      <h1 className="text-2xl font-bold mb-1">Security</h1>
-      <p className="text-base-content/60 text-sm mb-4">
-        Vulnerability scanning and duplicate-install detection for what you have installed.
-      </p>
+      <h1 className="text-2xl font-bold mb-1">{t('security.title')}</h1>
+      <p className="text-base-content/60 text-sm mb-4">{t('security.subtitle')}</p>
 
       <div role="tablist" className="tabs tabs-box tabs-sm w-fit mb-4">
         <button role="tab" className={`tab ${tab === 'vulns' ? 'tab-active' : ''}`} onClick={() => setTab('vulns')}>
-          <ShieldIcon className="size-3.5 mr-1" /> Vulnerabilities
+          <ShieldIcon className="size-3.5 mr-1" /> {t('security.tabVulnerabilities')}
         </button>
         <button
           role="tab"
           className={`tab ${tab === 'duplicates' ? 'tab-active' : ''}`}
           onClick={() => setTab('duplicates')}
         >
-          <CopyIcon className="size-3.5 mr-1" /> Duplicates
+          <CopyIcon className="size-3.5 mr-1" /> {t('security.tabDuplicates')}
         </button>
         <button role="tab" className={`tab ${tab === 'missing' ? 'tab-active' : ''}`} onClick={() => setTab('missing')}>
-          <WrenchIcon className="size-3.5 mr-1" /> Missing deps
+          <WrenchIcon className="size-3.5 mr-1" /> {t('security.tabMissingDeps')}
         </button>
       </div>
 
       {tab === 'vulns' && (
         <div className="space-y-3">
           <p className="text-sm text-base-content/70">
-            Checks installed formulae against{' '}
-            <ExternalLink className="link" href="https://osv.dev">
-              OSV.dev
-            </ExternalLink>
-            's public advisory database. Best-effort: casks aren't covered, and a clean scan doesn't guarantee
-            there's nothing wrong, just nothing known.
+            <Trans
+              i18nKey="security.vulnsDescription"
+              components={{ link: <ExternalLink className="link" href="https://osv.dev">OSV.dev</ExternalLink> }}
+            />
           </p>
           <button className="btn btn-sm btn-primary" disabled={vulnsLoading} onClick={scanVulns}>
             {vulnsLoading ? <span className="loading loading-spinner loading-xs" /> : <ShieldIcon className="size-4" />}
-            Scan installed formulae
+            {t('security.scanFormulae')}
           </button>
 
           {vulns && (
             <div className="mt-2">
               <div className="text-sm text-base-content/60 mb-2">
-                Scanned {vulns.length} formulae, {affected.length} with known advisories
-                {errored.length > 0 && `, ${errored.length} couldn't be checked`}.
+                {t('security.scanSummary', { count: vulns.length, affectedCount: affected.length })}
+                {errored.length > 0 && t('security.scanSummaryErroredSuffix', { count: errored.length })}.
               </div>
               {affected.length === 0 ? (
-                <div className="alert alert-success alert-soft text-sm">No known vulnerabilities found.</div>
+                <div className="alert alert-success alert-soft text-sm">{t('security.noVulnerabilities')}</div>
               ) : (
                 <div className="overflow-x-auto rounded-box border border-base-300">
                   <table className="table table-sm table-fixed">
@@ -106,9 +104,9 @@ export default function Security() {
                     </colgroup>
                     <thead>
                       <tr>
-                        <th>Package</th>
-                        <th>Version</th>
-                        <th>Advisories</th>
+                        <th>{t('security.colPackage')}</th>
+                        <th>{t('security.colVersion')}</th>
+                        <th>{t('security.colAdvisories')}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -144,18 +142,16 @@ export default function Security() {
 
       {tab === 'duplicates' && (
         <div className="space-y-3">
-          <p className="text-sm text-base-content/70">
-            Flags names installed as both a formula and a cask, usually the same tool pulled in twice.
-          </p>
+          <p className="text-sm text-base-content/70">{t('security.duplicatesDescription')}</p>
           <button className="btn btn-sm btn-primary" disabled={dupesLoading} onClick={scanDupes}>
             {dupesLoading ? <span className="loading loading-spinner loading-xs" /> : <CopyIcon className="size-4" />}
-            Scan for duplicates
+            {t('security.scanDuplicates')}
           </button>
 
           {dupes && (
             <div className="mt-2">
               {dupes.length === 0 ? (
-                <div className="alert alert-success alert-soft text-sm">No duplicates found.</div>
+                <div className="alert alert-success alert-soft text-sm">{t('security.noDuplicates')}</div>
               ) : (
                 <div className="overflow-x-auto rounded-box border border-base-300">
                   <table className="table table-sm table-fixed">
@@ -166,9 +162,9 @@ export default function Security() {
                     </colgroup>
                     <thead>
                       <tr>
-                        <th>Name</th>
-                        <th>Formula version</th>
-                        <th>Cask version</th>
+                        <th>{t('security.colName')}</th>
+                        <th>{t('security.colFormulaVersion')}</th>
+                        <th>{t('security.colCaskVersion')}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -196,19 +192,16 @@ export default function Security() {
 
       {tab === 'missing' && (
         <div className="space-y-3">
-          <p className="text-sm text-base-content/70">
-            Checks installed formulae for a dependency that's supposed to be installed but isn't -- usually the sign
-            of an interrupted install or a manually removed dependency.
-          </p>
+          <p className="text-sm text-base-content/70">{t('security.missingDescription')}</p>
           <button className="btn btn-sm btn-primary" disabled={missingLoading} onClick={scanMissing}>
             {missingLoading ? <span className="loading loading-spinner loading-xs" /> : <WrenchIcon className="size-4" />}
-            Check for missing dependencies
+            {t('security.checkMissing')}
           </button>
 
           {missing && (
             <div className="mt-2">
               {missing.length === 0 ? (
-                <div className="alert alert-success alert-soft text-sm">Nothing missing.</div>
+                <div className="alert alert-success alert-soft text-sm">{t('security.nothingMissing')}</div>
               ) : (
                 <pre className="mockup-code text-xs overflow-x-auto max-h-96">
                   <code className="whitespace-pre px-4">{missing.join('\n')}</code>

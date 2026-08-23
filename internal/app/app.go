@@ -19,6 +19,7 @@ import (
 	"mead/internal/jobs"
 	"mead/internal/security"
 	"mead/internal/store"
+	"mead/internal/system"
 )
 
 // gistURLRe matches a gist.github.com URL embedded in `brew gist-logs`
@@ -124,6 +125,14 @@ func (a *App) LargestInstalledPackages() ([]brew.PackageSize, error) {
 
 func (a *App) Config() (string, error) {
 	return brew.Config(a.ctx)
+}
+
+// SystemLocale reports the current macOS user's preferred locale (e.g.
+// "en-US"), or "" if it can't be determined. The frontend calls this once
+// at startup to seed i18next's initial language -- see system.SystemLocale
+// for why this is more reliable here than the webview's navigator.language.
+func (a *App) SystemLocale() string {
+	return system.SystemLocale(a.ctx)
 }
 
 // ---- streaming (long-running) actions; each returns a job id, and the

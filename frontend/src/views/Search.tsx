@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { api, SearchResult } from '../lib/api'
 import { useJobs } from '../context/JobsContext'
 import PackageDetailModal, { DetailTarget } from '../components/PackageDetailModal'
@@ -12,6 +13,7 @@ interface Props {
 }
 
 export default function Search({ refreshToken, bump }: Props) {
+  const { t } = useTranslation()
   const { runAction } = useJobs()
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<SearchResult[] | null>(null)
@@ -66,14 +68,14 @@ export default function Search({ refreshToken, bump }: Props) {
 
   return (
     <div className="p-6">
-      <h1 className="text-2xl font-bold mb-1">Search</h1>
-      <p className="text-base-content/60 text-sm mb-4">Search Homebrew formulae and casks.</p>
+      <h1 className="text-2xl font-bold mb-1">{t('search.title')}</h1>
+      <p className="text-base-content/60 text-sm mb-4">{t('search.subtitle')}</p>
 
       <label className="input w-full max-w-lg mb-4">
         <SearchIcon className="size-4 opacity-50" />
         <input
           type="text"
-          placeholder="e.g. wget, visual-studio-code, postgresql…"
+          placeholder={t('search.placeholder')}
           value={query}
           autoFocus
           onChange={(e) => setQuery(e.target.value)}
@@ -88,29 +90,29 @@ export default function Search({ refreshToken, bump }: Props) {
           checked={searchDesc}
           onChange={(e) => setSearchDesc(e.target.checked)}
         />
-        <span className="label-text">Search descriptions too</span>
+        <span className="label-text">{t('search.searchDescLabel')}</span>
       </label>
 
       {results && (
         <div role="tablist" className="tabs tabs-box tabs-sm w-fit mb-4">
           <button role="tab" className={`tab ${filter === 'all' ? 'tab-active' : ''}`} onClick={() => setFilter('all')}>
-            All ({results.length})
+            {t('search.tabAll', { count: results.length })}
           </button>
           <button
             role="tab"
             className={`tab ${filter === 'formula' ? 'tab-active' : ''}`}
             onClick={() => setFilter('formula')}
           >
-            Formulae ({results.filter((r) => !r.isCask).length})
+            {t('search.tabFormulae', { count: results.filter((r) => !r.isCask).length })}
           </button>
           <button role="tab" className={`tab ${filter === 'cask' ? 'tab-active' : ''}`} onClick={() => setFilter('cask')}>
-            Casks ({results.filter((r) => r.isCask).length})
+            {t('search.tabCasks', { count: results.filter((r) => r.isCask).length })}
           </button>
         </div>
       )}
 
       {!results && !loading && (
-        <div className="text-base-content/50 text-sm py-8 text-center">Start typing to search Homebrew.</div>
+        <div className="text-base-content/50 text-sm py-8 text-center">{t('search.emptyPrompt')}</div>
       )}
 
       {results && (
@@ -128,11 +130,11 @@ export default function Search({ refreshToken, bump }: Props) {
                   <div className="min-w-0">
                     <div className="font-medium truncate">{r.name}</div>
                     <span className={`badge badge-xs badge-outline ${r.isCask ? 'badge-accent' : 'badge-primary'}`}>
-                      {r.isCask ? 'cask' : 'formula'}
+                      {r.isCask ? t('common.cask') : t('common.formula')}
                     </span>
                   </div>
                   {isInstalled ? (
-                    <span className="badge badge-success badge-outline shrink-0">installed</span>
+                    <span className="badge badge-success badge-outline shrink-0">{t('common.badgeInstalled')}</span>
                   ) : (
                     <button
                       className="btn btn-xs btn-primary shrink-0"
@@ -147,7 +149,7 @@ export default function Search({ refreshToken, bump }: Props) {
                       ) : (
                         <DownloadIcon className="size-3.5" />
                       )}
-                      Install
+                      {t('common.install')}
                     </button>
                   )}
                 </div>
@@ -155,7 +157,7 @@ export default function Search({ refreshToken, bump }: Props) {
             )
           })}
           {filtered.length === 0 && !loading && (
-            <div className="text-base-content/50 text-sm py-8 text-center col-span-full">No results.</div>
+            <div className="text-base-content/50 text-sm py-8 text-center col-span-full">{t('search.noResults')}</div>
           )}
         </div>
       )}

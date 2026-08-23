@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { api, BrewPackage } from '../lib/api'
 import { useJobs } from '../context/JobsContext'
 import { useConfirm } from '../context/ConfirmContext'
@@ -19,6 +20,7 @@ function rowKey(p: BrewPackage) {
 }
 
 export default function Installed({ refreshToken, bump }: Props) {
+  const { t } = useTranslation()
   const { runAction } = useJobs()
   const confirm = useConfirm()
   const userData = useUserData()
@@ -86,11 +88,11 @@ export default function Installed({ refreshToken, bump }: Props) {
 
   async function quickUninstall(p: BrewPackage) {
     const { ok, checked } = await confirm({
-      title: `Uninstall ${p.name}?`,
-      body: 'This removes the package from your system.',
+      title: t('installed.confirmUninstallTitle', { name: p.name }),
+      body: t('installed.confirmUninstallBody'),
       danger: true,
-      confirmLabel: 'Uninstall',
-      checkboxes: p.isCask ? [{ label: 'Also remove app data (preferences, caches, support files)' }] : [],
+      confirmLabel: t('common.uninstall'),
+      checkboxes: p.isCask ? [{ label: t('installed.checkboxRemoveAppData') }] : [],
     })
     if (!ok) return
     setRowBusy(p.name)
@@ -111,11 +113,11 @@ export default function Installed({ refreshToken, bump }: Props) {
   async function bulkUninstall() {
     const anyCasks = selectedPkgs.some((p) => p.isCask)
     const { ok, checked } = await confirm({
-      title: `Uninstall ${selectedPkgs.length} packages?`,
+      title: t('installed.confirmBulkUninstallTitle', { count: selectedPkgs.length }),
       body: selectedPkgs.map((p) => p.name).join(', '),
       danger: true,
-      confirmLabel: 'Uninstall all',
-      checkboxes: anyCasks ? [{ label: 'Also remove app data for any casks (preferences, caches, support files)' }] : [],
+      confirmLabel: t('installed.confirmBulkUninstallLabel'),
+      checkboxes: anyCasks ? [{ label: t('installed.checkboxRemoveAppDataCasks') }] : [],
     })
     if (!ok) return
     const zap = checked[0] ?? false
@@ -159,16 +161,16 @@ export default function Installed({ refreshToken, bump }: Props) {
     <div className="p-6">
       <div className="flex items-center justify-between mb-4 gap-4">
         <div>
-          <h1 className="text-2xl font-bold">Installed</h1>
+          <h1 className="text-2xl font-bold">{t('installed.title')}</h1>
           <p className="text-base-content/60 text-sm">
-            {error ? "Couldn't load installed packages." : `${pkgs.length} packages installed`}
+            {error ? t('installed.subtitleError') : t('installed.subtitleCount', { count: pkgs.length })}
           </p>
         </div>
         <label className="input input-sm w-64">
           <SearchIcon className="size-4 opacity-50" />
           <input
             type="text"
-            placeholder="Filter installed…"
+            placeholder={t('installed.filterPlaceholder')}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
@@ -178,45 +180,45 @@ export default function Installed({ refreshToken, bump }: Props) {
       <div className="flex items-center justify-between mb-4 gap-4 flex-wrap">
         <div role="tablist" className="tabs tabs-box tabs-sm w-fit">
           <button role="tab" className={`tab ${filter === 'all' ? 'tab-active' : ''}`} onClick={() => setFilter('all')}>
-            All ({pkgs.length})
+            {t('installed.tabAll', { count: pkgs.length })}
           </button>
           <button
             role="tab"
             className={`tab ${filter === 'formula' ? 'tab-active' : ''}`}
             onClick={() => setFilter('formula')}
           >
-            Formulae ({formulaCount})
+            {t('installed.tabFormulae', { count: formulaCount })}
           </button>
           <button role="tab" className={`tab ${filter === 'cask' ? 'tab-active' : ''}`} onClick={() => setFilter('cask')}>
-            Casks ({caskCount})
+            {t('installed.tabCasks', { count: caskCount })}
           </button>
           <button
             role="tab"
             className={`tab ${filter === 'outdated' ? 'tab-active' : ''}`}
             onClick={() => setFilter('outdated')}
           >
-            Outdated ({outdatedCount})
+            {t('installed.tabOutdated', { count: outdatedCount })}
           </button>
           <button
             role="tab"
             className={`tab ${filter === 'favorites' ? 'tab-active' : ''}`}
             onClick={() => setFilter('favorites')}
           >
-            Favorites ({favoriteCount})
+            {t('installed.tabFavorites', { count: favoriteCount })}
           </button>
         </div>
 
         {selected.size > 0 && (
           <div className="flex items-center gap-2 text-sm">
-            <span className="text-base-content/60">{selected.size} selected</span>
+            <span className="text-base-content/60">{t('installed.selectedCount', { count: selected.size })}</span>
             <button className="btn btn-xs" disabled={bulkBusy} onClick={bulkUpgrade}>
-              Upgrade
+              {t('common.upgrade')}
             </button>
             <button className="btn btn-xs" disabled={bulkBusy} onClick={bulkPin}>
-              Pin
+              {t('common.pin')}
             </button>
             <button className="btn btn-xs btn-error" disabled={bulkBusy} onClick={bulkUninstall}>
-              Uninstall
+              {t('common.uninstall')}
             </button>
           </div>
         )}
@@ -225,16 +227,16 @@ export default function Installed({ refreshToken, bump }: Props) {
       {error ? (
         <div className="alert alert-error alert-soft">
           <div>
-            <div className="font-medium">Couldn't load installed packages</div>
+            <div className="font-medium">{t('installed.errorTitle')}</div>
             <p className="text-sm mt-1">{error}</p>
           </div>
           <button className="btn btn-sm" onClick={load}>
-            <RefreshIcon className="size-4" /> Try again
+            <RefreshIcon className="size-4" /> {t('common.tryAgain')}
           </button>
         </div>
       ) : loading && pkgs.length === 0 ? (
         <div className="flex items-center gap-2 text-base-content/60">
-          <span className="loading loading-spinner loading-sm" /> Loading…
+          <span className="loading loading-spinner loading-sm" /> {t('common.loading')}
         </div>
       ) : (
         <div className="overflow-x-auto rounded-box border border-base-300">
@@ -257,11 +259,11 @@ export default function Installed({ refreshToken, bump }: Props) {
                     onChange={toggleSelectAll}
                   />
                 </th>
-                <th>Name</th>
-                <th>Type</th>
-                <th>Version</th>
-                <th>Status</th>
-                <th className="text-right">Actions</th>
+                <th>{t('installed.colName')}</th>
+                <th>{t('installed.colType')}</th>
+                <th>{t('installed.colVersion')}</th>
+                <th>{t('installed.colStatus')}</th>
+                <th className="text-right">{t('installed.colActions')}</th>
               </tr>
             </thead>
             <tbody>
@@ -287,7 +289,7 @@ export default function Installed({ refreshToken, bump }: Props) {
                     </td>
                     <td>
                       <span className={`badge badge-sm badge-outline ${p.isCask ? 'badge-accent' : 'badge-primary'}`}>
-                        {p.isCask ? 'cask' : 'formula'}
+                        {p.isCask ? t('common.cask') : t('common.formula')}
                       </span>
                     </td>
                     <td className="font-mono text-xs truncate" title={p.installedVersion || p.version}>
@@ -295,13 +297,13 @@ export default function Installed({ refreshToken, bump }: Props) {
                     </td>
                     <td>
                       <div className="flex gap-1 flex-wrap">
-                        {p.outdated && <span className="badge badge-sm badge-warning">outdated</span>}
-                        {p.pinned && <span className="badge badge-sm badge-ghost">pinned</span>}
-                        {!p.isCask && leaves.has(p.name) && <span className="badge badge-sm badge-ghost">leaf</span>}
+                        {p.outdated && <span className="badge badge-sm badge-warning">{t('common.badgeOutdated')}</span>}
+                        {p.pinned && <span className="badge badge-sm badge-ghost">{t('common.badgePinned')}</span>}
+                        {!p.isCask && leaves.has(p.name) && <span className="badge badge-sm badge-ghost">{t('installed.badgeLeaf')}</span>}
                         {!p.isCask && !p.linked && (
-                          <span className="badge badge-sm badge-warning badge-outline">unlinked</span>
+                          <span className="badge badge-sm badge-warning badge-outline">{t('common.badgeUnlinked')}</span>
                         )}
-                        {p.isCask && p.autoUpdates && <span className="badge badge-sm badge-ghost">auto-updates</span>}
+                        {p.isCask && p.autoUpdates && <span className="badge badge-sm badge-ghost">{t('common.badgeAutoUpdates')}</span>}
                       </div>
                     </td>
                     <td>
@@ -311,7 +313,7 @@ export default function Installed({ refreshToken, bump }: Props) {
                             className="btn btn-xs btn-ghost text-warning"
                             disabled={rowBusy === p.name}
                             onClick={() => quickUpgrade(p)}
-                            title="Upgrade"
+                            title={t('installed.upgradeTooltip')}
                           >
                             <ArrowUpCircleIcon className="size-4" />
                           </button>
@@ -326,7 +328,7 @@ export default function Installed({ refreshToken, bump }: Props) {
                               setRowBusy(null)
                               load()
                             }}
-                            title={p.pinned ? 'Unpin' : 'Pin'}
+                            title={p.pinned ? t('installed.unpinTooltip') : t('installed.pinTooltip')}
                           >
                             <PinIcon className="size-4" />
                           </button>
@@ -335,7 +337,7 @@ export default function Installed({ refreshToken, bump }: Props) {
                           className="btn btn-xs btn-ghost text-error"
                           disabled={rowBusy === p.name}
                           onClick={() => quickUninstall(p)}
-                          title="Uninstall"
+                          title={t('installed.uninstallTooltip')}
                         >
                           <TrashIcon className="size-4" />
                         </button>
@@ -347,7 +349,7 @@ export default function Installed({ refreshToken, bump }: Props) {
               {filtered.length === 0 && (
                 <tr>
                   <td colSpan={6} className="text-center text-base-content/50 py-8">
-                    No packages match.
+                    {t('installed.noMatches')}
                   </td>
                 </tr>
               )}

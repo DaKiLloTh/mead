@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { filterNavItems, filterPackages } from '../lib/paletteFilter'
 import { useInstalledPackages } from '../context/InstalledPackagesContext'
 import { navItems, type ViewKey } from './Sidebar'
@@ -27,6 +28,7 @@ type ResultRow =
  * since nothing else in the app needs to read or drive it.
  */
 export default function CommandPalette({ onNavigate, bump }: Props) {
+  const { t, i18n } = useTranslation()
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [activeIndex, setActiveIndex] = useState(0)
@@ -64,8 +66,14 @@ export default function CommandPalette({ onNavigate, bump }: Props) {
     inputRef.current?.focus()
   }, [open])
 
+  // Translated nav labels, recomputed whenever the active language changes.
+  const translatedNavItems = useMemo(
+    () => navItems.map((item) => ({ ...item, label: t(item.labelKey) })),
+    [t, i18n.language]
+  )
+
   const results = useMemo<ResultRow[]>(() => {
-    const navRows: ResultRow[] = filterNavItems(navItems, query).map((item) => ({
+    const navRows: ResultRow[] = filterNavItems(translatedNavItems, query).map((item) => ({
       kind: 'nav',
       rowKey: `nav:${item.key}`,
       label: item.label,
@@ -76,12 +84,12 @@ export default function CommandPalette({ onNavigate, bump }: Props) {
       kind: 'package',
       rowKey: `pkg:${p.isCask ? 'cask' : 'formula'}:${p.name}`,
       label: p.name,
-      sublabel: p.isCask ? 'cask' : 'formula',
+      sublabel: p.isCask ? t('common.cask') : t('common.formula'),
       name: p.name,
       isCask: p.isCask,
     }))
     return [...navRows, ...pkgRows]
-  }, [query, packages])
+  }, [query, packages, translatedNavItems, t])
 
   useEffect(() => {
     setActiveIndex(0)
@@ -119,7 +127,7 @@ export default function CommandPalette({ onNavigate, bump }: Props) {
             <input
               ref={inputRef}
               type="text"
-              placeholder="Jump to a view or an installed package…"
+              placeholder={t('commandPalette.placeholder')}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={handleInputKeyDown}
@@ -128,7 +136,7 @@ export default function CommandPalette({ onNavigate, bump }: Props) {
           <ul className="max-h-80 overflow-y-auto py-2">
             {results.length === 0 && (
               <li className="px-4 py-6 text-center text-sm text-base-content/50">
-                {packagesLoading ? 'Loading packages…' : 'No matches.'}
+                {packagesLoading ? t('commandPalette.loadingPackages') : t('commandPalette.noMatches')}
               </li>
             )}
             {results.map((row, i) => (

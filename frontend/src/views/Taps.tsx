@@ -1,4 +1,5 @@
 import { useEffect, useState, type SyntheticEvent } from 'react'
+import { useTranslation } from 'react-i18next'
 import { api, TapDetail } from '../lib/api'
 import { useJobs } from '../context/JobsContext'
 import { useConfirm } from '../context/ConfirmContext'
@@ -11,6 +12,7 @@ interface Props {
 }
 
 export default function Taps({ refreshToken, bump }: Props) {
+  const { t } = useTranslation()
   const { runAction } = useJobs()
   const confirm = useConfirm()
   const [taps, setTaps] = useState<string[]>([])
@@ -65,14 +67,14 @@ export default function Taps({ refreshToken, bump }: Props) {
   }
 
   async function removeTap(name: string) {
-    const { ok } = await confirm({ title: `Remove tap ${name}?`, danger: true, confirmLabel: 'Remove' })
+    const { ok } = await confirm({ title: t('taps.confirmRemoveTitle', { name }), danger: true, confirmLabel: t('taps.confirmRemoveLabel') })
     if (!ok) return
     setRowBusy(name)
     setRemoveError((prev) => ({ ...prev, [name]: '' }))
     const job = await runAction(() => api.tapRemove(name))
     setRowBusy(null)
     if (job.status === 'error') {
-      setRemoveError((prev) => ({ ...prev, [name]: job.error || 'Untap failed. It may still have installed formulae from it.' }))
+      setRemoveError((prev) => ({ ...prev, [name]: job.error || t('taps.removeFailedFallback') }))
       return
     }
     load()
@@ -81,10 +83,10 @@ export default function Taps({ refreshToken, bump }: Props) {
 
   async function forceRemoveTap(name: string) {
     const { ok } = await confirm({
-      title: `Force-remove tap ${name}?`,
-      body: 'This untaps it even though it still has installed formulae from it. Those formulae stay installed but become untracked.',
+      title: t('taps.confirmForceRemoveTitle', { name }),
+      body: t('taps.confirmForceRemoveBody'),
       danger: true,
-      confirmLabel: 'Force remove',
+      confirmLabel: t('taps.confirmForceRemoveLabel'),
     })
     if (!ok) return
     setRowBusy(name)
@@ -97,62 +99,62 @@ export default function Taps({ refreshToken, bump }: Props) {
 
   return (
     <div className="p-6 max-w-2xl">
-      <h1 className="text-2xl font-bold mb-1">Taps</h1>
-      <p className="text-base-content/60 text-sm mb-4">Third-party repositories Homebrew can install from.</p>
+      <h1 className="text-2xl font-bold mb-1">{t('taps.title')}</h1>
+      <p className="text-base-content/60 text-sm mb-4">{t('taps.subtitle')}</p>
 
       <form onSubmit={addTap} className="flex gap-2 mb-6">
         <label className="input input-sm flex-1">
           <TapIcon className="size-4 opacity-50" />
           <input
             type="text"
-            placeholder="user/repo, e.g. homebrew/cask-fonts"
+            placeholder={t('taps.addPlaceholder')}
             value={newTap}
             onChange={(e) => setNewTap(e.target.value)}
           />
         </label>
         <button className="btn btn-sm btn-primary" type="submit" disabled={adding || !newTap.trim()}>
-          {adding ? <span className="loading loading-spinner loading-xs" /> : 'Add tap'}
+          {adding ? <span className="loading loading-spinner loading-xs" /> : t('taps.addButton')}
         </button>
       </form>
 
       {loading ? (
         <div className="flex items-center gap-2 text-base-content/60">
-          <span className="loading loading-spinner loading-sm" /> Loading…
+          <span className="loading loading-spinner loading-sm" /> {t('common.loading')}
         </div>
       ) : error ? (
         <div className="alert alert-error alert-soft">
           <div>
-            <div className="font-medium">Couldn't load taps</div>
+            <div className="font-medium">{t('taps.errorTitle')}</div>
             <p className="text-sm mt-1">{error}</p>
           </div>
           <button className="btn btn-sm" onClick={load}>
-            <RefreshIcon className="size-4" /> Try again
+            <RefreshIcon className="size-4" /> {t('common.tryAgain')}
           </button>
         </div>
       ) : (
         <ul className="menu bg-base-200 rounded-box w-full">
-          {taps.map((t) => (
-            <li key={t}>
+          {taps.map((tapName) => (
+            <li key={tapName}>
               <div className="flex flex-col items-stretch p-0!">
                 <div className="flex items-center justify-between px-3 py-2">
-                  <button className="flex items-center gap-1.5 font-mono text-sm" onClick={() => toggleExpand(t)}>
-                    <ChevronDownIcon className={`size-3.5 transition-transform ${expanded === t ? '' : '-rotate-90'}`} />
-                    {t}
+                  <button className="flex items-center gap-1.5 font-mono text-sm" onClick={() => toggleExpand(tapName)}>
+                    <ChevronDownIcon className={`size-3.5 transition-transform ${expanded === tapName ? '' : '-rotate-90'}`} />
+                    {tapName}
                   </button>
                   <button
                     className="btn btn-xs btn-ghost text-error"
-                    disabled={rowBusy === t}
-                    onClick={() => removeTap(t)}
-                    title="Untap"
+                    disabled={rowBusy === tapName}
+                    onClick={() => removeTap(tapName)}
+                    title={t('taps.untapTooltip')}
                   >
                     <TrashIcon className="size-4" />
                   </button>
                 </div>
-                {expanded === t && (
+                {expanded === tapName && (
                   <div className="px-3 pb-3 text-xs text-base-content/60">
                     {detailLoading ? (
                       <span className="flex items-center gap-2">
-                        <span className="loading loading-spinner loading-xs" /> Loading…
+                        <span className="loading loading-spinner loading-xs" /> {t('common.loading')}
                       </span>
                     ) : detail ? (
                       <div className="space-y-0.5">
@@ -164,22 +166,22 @@ export default function Taps({ refreshToken, bump }: Props) {
                           </div>
                         )}
                         <div>
-                          {detail.formulaCount} formulae · {detail.caskCount} casks
-                          {detail.official && ' · official'}
+                          {t('taps.formulaCaskCounts', { formulaCount: detail.formulaCount, caskCount: detail.caskCount })}
+                          {detail.official && t('taps.officialSuffix')}
                         </div>
-                        {detail.lastCommit && <div>Last commit: {detail.lastCommit}</div>}
+                        {detail.lastCommit && <div>{t('taps.lastCommit', { commit: detail.lastCommit })}</div>}
                       </div>
                     ) : (
-                      <span>No detail available.</span>
+                      <span>{t('taps.noDetail')}</span>
                     )}
                   </div>
                 )}
-                {removeError[t] && (
+                {removeError[tapName] && (
                   <div className="px-3 pb-3">
                     <div className="alert alert-warning alert-soft text-xs flex items-center justify-between gap-2">
-                      <span>{removeError[t]}</span>
-                      <button className="btn btn-xs" onClick={() => forceRemoveTap(t)}>
-                        Force untap
+                      <span>{removeError[tapName]}</span>
+                      <button className="btn btn-xs" onClick={() => forceRemoveTap(tapName)}>
+                        {t('taps.forceUntap')}
                       </button>
                     </div>
                   </div>
@@ -187,7 +189,7 @@ export default function Taps({ refreshToken, bump }: Props) {
               </div>
             </li>
           ))}
-          {taps.length === 0 && <li className="text-base-content/50 text-sm px-3 py-2">No taps installed.</li>}
+          {taps.length === 0 && <li className="text-base-content/50 text-sm px-3 py-2">{t('taps.noTaps')}</li>}
         </ul>
       )}
     </div>
