@@ -273,6 +273,17 @@ export function AlertIcon(p: IconProps) {
   )
 }
 
+export function AppWindowIcon(p: IconProps) {
+  return (
+    <svg {...base} {...p}>
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <path d="M3 9h18" />
+      <circle cx="6.5" cy="6.5" r="0.4" fill="currentColor" stroke="currentColor" />
+      <circle cx="9" cy="6.5" r="0.4" fill="currentColor" stroke="currentColor" />
+    </svg>
+  )
+}
+
 export function GearIcon(p: IconProps) {
   return (
     <svg {...base} {...p}>

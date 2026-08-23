@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
@@ -34,6 +35,14 @@ type App struct {
 	ctx   context.Context
 	jobs  *jobs.Manager
 	store *store.Store
+
+	// iconsMu guards icons, an in-memory cache of extracted cask app icons
+	// keyed by cask name (see CaskIcon). Extraction shells out to plutil
+	// and sips, so it's worth caching -- but only for the life of this
+	// process: it's cheap enough to regenerate on next launch that
+	// persisting it to disk isn't worth the complexity.
+	iconsMu sync.Mutex
+	icons   map[string]string
 }
 
 // New creates a new App application struct.
@@ -564,6 +573,79 @@ func (a *App) RevealPackage(name string, isCask bool) error {
 	}
 	kegPath := filepath.Join(strings.TrimSpace(prefixOut), "Cellar", name, pkg.InstalledVersion)
 	return security.RevealInFinder(a.ctx, kegPath)
+}
+
+// CaskIcon returns a cask's app icon as a base64 "data:image/png;base64,..."
+// URI, extracted lazily from the installed .app bundle the first time it's
+// requested and cached in-memory (keyed by cask name) after that. It's
+// called per-row/per-grid-cell as the frontend renders (the Installed list,
+// the package detail pane, the Applications grid) rather than fetched for
+// every installed cask up front in one batch call -- that spreads the cost
+// of shelling out to plutil/sips for potentially dozens of casks across
+// individual renders instead of one big call blocking the whole UI, and
+// lets each view render progressively as icons resolve. The frontend caps
+// how many of these it has in flight at once (see
+// frontend/src/hooks/useCaskIcon.ts) rather than firing one per row
+// unbounded.
+//
+// A miss -- no resolvable .app, no CFBundleIconFile, a corrupt Info.plist,
+// a sips failure, anything -- returns "" with a nil error rather than
+// propagating the underlying error. From the frontend's point of view "no
+// icon" and "icon extraction failed" are the same outcome: fall back to the
+// colored monogram tile. The empty result is cached too, so a cask that
+// can't produce an icon isn't re-attempted (and re-shelled-out-to) on every
+// render.
+func (a *App) CaskIcon(name string) (string, error) {
+	a.iconsMu.Lock()
+	if cached, ok := a.icons[name]; ok {
+		a.iconsMu.Unlock()
+		return cached, nil
+	}
+	a.iconsMu.Unlock()
+
+	dataURI := a.extractCaskIcon(name)
+
+	a.iconsMu.Lock()
+	if a.icons == nil {
+		a.icons = map[string]string{}
+	}
+	a.icons[name] = dataURI
+	a.iconsMu.Unlock()
+
+	return dataURI, nil
+}
+
+// extractCaskIcon does the actual (uncached) lookup + extraction for
+// CaskIcon, folding every failure mode into "" rather than an error.
+func (a *App) extractCaskIcon(name string) string {
+	pkg, err := brew.GetInfo(a.ctx, name, true)
+	if err != nil {
+		return ""
+	}
+	appPath := security.ResolveCaskAppPath(pkg)
+	if appPath == "" {
+		return ""
+	}
+	dataURI, err := security.ExtractAppIcon(a.ctx, appPath)
+	if err != nil {
+		return ""
+	}
+	return dataURI
+}
+
+// OpenCaskApp launches an installed cask's .app bundle via `open`, the
+// double-click action in the Applications grid -- distinct from
+// RevealPackage, which only selects the app in Finder without launching it.
+func (a *App) OpenCaskApp(name string) error {
+	pkg, err := brew.GetInfo(a.ctx, name, true)
+	if err != nil {
+		return err
+	}
+	appPath := security.ResolveCaskAppPath(pkg)
+	if appPath == "" {
+		return fmt.Errorf("couldn't find an installed .app for %s", name)
+	}
+	return security.OpenApp(a.ctx, appPath)
 }
 
 // GistLogs uploads a formula's most recent build/install logs to a GitHub

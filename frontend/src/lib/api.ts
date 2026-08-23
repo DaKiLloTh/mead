@@ -105,6 +105,10 @@ export const api = {
   revealLocalDataFile: () => App.RevealLocalDataFile(),
   createSnapshot: () => App.CreateSnapshot(),
 
+  // app icons / launching
+  caskIcon: (name: string) => App.CaskIcon(name),
+  openCaskApp: (name: string) => App.OpenCaskApp(name),
+
   // settings
   setCaskAppDir: (dir: string) => App.SetCaskAppDir(dir),
   clearAllData: () => App.ClearAllData(),

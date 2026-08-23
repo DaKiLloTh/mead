@@ -1,6 +1,7 @@
 import type { ReactElement } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
+  AppWindowIcon,
   ClockIcon,
   DashboardIcon,
   GearIcon,
@@ -22,6 +23,7 @@ export type ViewKey =
   | 'search'
   | 'collections'
   | 'updates'
+  | 'applications'
   | 'taps'
   | 'services'
   | 'adopt'
@@ -51,6 +53,7 @@ const groups: NavGroup[] = [
       { key: 'search', labelKey: 'nav.items.search', icon: SearchIcon },
       { key: 'collections', labelKey: 'nav.items.collections', icon: GridIcon },
       { key: 'updates', labelKey: 'nav.items.updates', icon: LayersIcon },
+      { key: 'applications', labelKey: 'nav.items.applications', icon: AppWindowIcon },
     ],
   },
   {

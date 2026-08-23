@@ -145,6 +145,7 @@ describe('en translation resource file', () => {
       'search',
       'collections',
       'updates',
+      'applications',
       'taps',
       'services',
       'adopt',

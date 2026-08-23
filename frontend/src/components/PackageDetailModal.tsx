@@ -18,6 +18,7 @@ import {
   XIcon,
 } from './Icons'
 import ExternalLink from './ExternalLink'
+import PackageIcon from './PackageIcon'
 
 export interface DetailTarget {
   name: string
@@ -246,7 +247,8 @@ export default function PackageDetailModal({ target, onClose, onChanged }: Props
 
         {!loading && pkg && (
           <>
-            <div className="flex items-start gap-2 pr-8">
+            <div className="flex items-start gap-3 pr-8">
+              <PackageIcon name={target.name} isCask={target.isCask} className="size-10 mt-0.5" />
               <button
                 className="btn btn-sm btn-circle btn-ghost mt-0.5"
                 onClick={() => userData.toggleFavorite(target.name, target.isCask)}
