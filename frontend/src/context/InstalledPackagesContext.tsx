@@ -1,6 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react'
 import { api } from '../lib/api'
 import { applyFetchOutcome, initialInstalledPackagesState, type InstalledPackagesState } from './installedPackagesCache'
+import { prefetchCaskIcons } from '../lib/useCaskIcon'
 
 // Poll interval for picking up changes made outside mead (e.g. a `brew
 // install` run in a real Terminal while the app is open). Chosen to be
@@ -39,7 +40,15 @@ export function InstalledPackagesProvider({ children }: { children: React.ReactN
   const fetchAndApply = useCallback(() => {
     api
       .listInstalled()
-      .then((packages) => setState((s) => applyFetchOutcome(s, { ok: true, packages })))
+      .then((packages) => {
+        setState((s) => applyFetchOutcome(s, { ok: true, packages }))
+        // Warm the icon cache in the background as soon as we know what's
+        // installed, rather than waiting for Installed/Applications to
+        // actually mount and request each icon on demand, which is what
+        // caused icons to visibly pop in a beat after the rest of the
+        // row/tile. Cheap no-op for names already cached.
+        prefetchCaskIcons(packages.filter((p) => p.isCask).map((p) => p.name))
+      })
       .catch((e) => {
         // Log so a silently-swallowed background poll failure is still
         // visible for debugging, without surfacing a user-facing error for

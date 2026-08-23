@@ -56,6 +56,32 @@ function fetchIcon(name: string): Promise<string> {
 }
 
 /**
+ * Warms the shared icon cache for a batch of cask names in the background,
+ * before any component actually needs them. Without this, a cask's icon
+ * only starts fetching once a `PackageIcon` using it mounts, e.g. the
+ * moment you open Installed or Applications, so every icon visibly pops in
+ * a beat after the rest of the row/tile. Calling this as soon as the
+ * installed-packages list is known (see InstalledPackagesContext) means
+ * the cache is already warm by the time the user actually navigates to a
+ * view that renders icons.
+ *
+ * Goes through the same `fetchIcon`/cache/concurrency-limit/dedupe path a
+ * real `useCaskIcon` call would, it's not a second, parallel fetch
+ * mechanism, just triggering the existing one early. Already-cached or
+ * already-inflight names are skipped for free (`fetchIcon` itself dedupes),
+ * this loop just avoids bothering to call it for names we can already see
+ * are cached, to keep the common case (mostly-warm cache) cheap.
+ */
+export function prefetchCaskIcons(names: string[]): void {
+  for (const name of names) {
+    if (cache.has(name)) continue
+    fetchIcon(name).then((uri) => {
+      cache.set(name, uri)
+    })
+  }
+}
+
+/**
  * Fetches (and caches) a cask's real app icon as a data URI. Returns null
  * while loading, while unavailable (extraction failed, or this isn't a
  * cask at all -- formulae never have an app icon), or once a lookup comes
