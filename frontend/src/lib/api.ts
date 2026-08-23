@@ -21,6 +21,8 @@ export type PackageSize = brew.PackageSize
 export type DependencyGraph = brew.DependencyGraph
 export type DependencyNode = brew.DependencyNode
 export type DependencyEdge = brew.DependencyEdge
+export type LeftoverItem = security.LeftoverItem
+export type LeftoverKind = 'applicationSupport' | 'caches' | 'preferences' | 'logs' | 'savedState'
 
 export const api = {
   getSystemInfo: () => App.GetSystemInfo(),
@@ -83,6 +85,10 @@ export const api = {
   scanAdoptableApps: () => App.ScanAdoptableApps(),
   adoptCask: (name: string) => App.AdoptCask(name),
   findDuplicateApps: () => App.FindDuplicateApps(),
+
+  // leftover files scanner
+  scanLeftovers: () => App.ScanLeftovers(),
+  deleteLeftovers: (paths: string[]) => App.DeleteLeftovers(paths),
 
   // Mac App Store
   masAvailable: () => App.MasAvailable(),
