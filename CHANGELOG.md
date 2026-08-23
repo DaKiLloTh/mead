@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.0](https://github.com/DaKiLloTh/mead/compare/v0.3.0...v0.4.0) (2026-08-23)
+
+
+### Miscellaneous Chores
+
+* gitignore .DS_Store, force release trigger ([#73](https://github.com/DaKiLloTh/mead/issues/73)) ([2678c5a](https://github.com/DaKiLloTh/mead/commit/2678c5a33afc39607ea979214028eb29ad246508))
+
 ## [0.3.0](https://github.com/DaKiLloTh/mead/compare/v0.2.1...v0.3.0) (2026-08-23)
 
 
