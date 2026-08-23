@@ -27,6 +27,20 @@ except the OSV.dev vulnerability lookups (formula name + version only).
 - [Homebrew](https://brew.sh) already installed
 - macOS on Apple Silicon (arm64)
 
+## Install
+
+Via the [homebrew-mead](https://github.com/DaKiLloTh/homebrew-mead) tap:
+
+```sh
+brew tap DaKiLloTh/mead
+brew install --cask mead
+```
+
+This handles the unsigned-build/quarantine situation automatically. If you'd
+rather install manually, grab the DMG or zip from the
+[latest release](../../releases/latest) and see its notes for the one-line
+Gatekeeper fix.
+
 ## Development
 
 ```sh
