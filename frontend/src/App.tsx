@@ -4,7 +4,9 @@ import { JobsProvider, useJobs } from './context/JobsContext'
 import { ConfirmProvider } from './context/ConfirmContext'
 import { UserDataProvider } from './context/UserDataContext'
 import { InstalledPackagesProvider, useInstalledPackages } from './context/InstalledPackagesContext'
-import { SystemInfoProvider } from './context/SystemInfoContext'
+import { SystemInfoProvider, useSystemInfo } from './context/SystemInfoContext'
+import { RefreshIcon } from './components/Icons'
+import { formatHomebrewLastUpdated } from './lib/formatHomebrewLastUpdated'
 import Sidebar, { type ViewKey } from './components/Sidebar'
 import JobConsole from './components/JobConsole'
 import Toasts from './components/Toasts'
@@ -57,10 +59,12 @@ const viewTitleKeys: Record<ViewKey, string> = {
 function AppShell() {
   const { t } = useTranslation()
   const { runAction } = useJobs()
+  const { info: systemInfo } = useSystemInfo()
   const [view, setView] = useState<ViewKey>('dashboard')
   const [refreshToken, setRefreshToken] = useState(0)
   const [outdatedCount, setOutdatedCount] = useState(0)
   const [installedInitialFilter, setInstalledInitialFilter] = useState<InstalledFilter | undefined>(undefined)
+  const [headerUpdateBusy, setHeaderUpdateBusy] = useState(false)
   const installedPackages = useInstalledPackages()
 
   // Dashboard's Health tile needs to land on Installed pre-filtered (e.g. to
@@ -80,6 +84,23 @@ function AppShell() {
   const bump = () => {
     setRefreshToken((t) => t + 1)
     installedPackages.refresh()
+  }
+
+  // Global "Update Homebrew" trigger for the top bar (see issue #89), so the
+  // action is reachable from every view, not just Dashboard's own Quick
+  // Actions button. Mirrors Dashboard's own handler: run the job, then call
+  // bump() so Dashboard and Updates pick up the fresh state, same as
+  // Dashboard's own button does via its local refresh().
+  const runHeaderUpdate = () => {
+    setHeaderUpdateBusy(true)
+    runAction(() => api.update())
+      .catch((e) => {
+        console.error('Homebrew update failed:', e)
+      })
+      .finally(() => {
+        setHeaderUpdateBusy(false)
+        bump()
+      })
   }
 
   useEffect(() => {
@@ -126,10 +147,25 @@ function AppShell() {
         <div className="flex-1 min-w-0 flex flex-col">
           <div className="drag-region h-9 shrink-0 flex items-center px-6">
             <span className="text-sm font-medium text-base-content/60">{t(viewTitleKeys[view])}</span>
-            <span className="ml-auto flex items-center gap-1 text-base-content/40">
-              <kbd className="kbd kbd-xs">⌘</kbd>
-              <kbd className="kbd kbd-xs">K</kbd>
-            </span>
+            <div className="ml-auto flex items-center gap-3">
+              <button
+                className="btn btn-ghost btn-xs btn-square no-drag"
+                disabled={headerUpdateBusy}
+                onClick={runHeaderUpdate}
+                title={
+                  systemInfo
+                    ? `${systemInfo.brewVersion} · ${t('common.lastUpdatedLabel')} ${formatHomebrewLastUpdated(t, systemInfo.homebrewLastUpdated)}`
+                    : t('common.updateHomebrew')
+                }
+                aria-label={t('common.updateHomebrew')}
+              >
+                {headerUpdateBusy ? <span className="loading loading-spinner loading-xs" /> : <RefreshIcon className="size-4" />}
+              </button>
+              <span className="flex items-center gap-1 text-base-content/40">
+                <kbd className="kbd kbd-xs">⌘</kbd>
+                <kbd className="kbd kbd-xs">K</kbd>
+              </span>
+            </div>
           </div>
           <div className="flex-1 min-h-0 overflow-y-auto">
             {view === 'dashboard' && (
