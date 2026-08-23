@@ -263,6 +263,15 @@ func (a *App) Cleanup(dryRun bool) string {
 	return a.jobs.Start(title, args...)
 }
 
+// ClearCache runs `brew cleanup --prune=all`, which removes every cache
+// entry regardless of age -- unlike the plain Cleanup above, it doesn't
+// respect Homebrew's default 120-day retention (or its habit of keeping the
+// most recent download around in case of reinstall). Homebrew's own safety
+// checks around in-use bottles still apply.
+func (a *App) ClearCache() string {
+	return a.jobs.Start("Clear Cache", "cleanup", "--prune=all")
+}
+
 func (a *App) Autoremove(dryRun bool) string {
 	args := []string{"autoremove"}
 	title := "Remove orphaned dependencies"

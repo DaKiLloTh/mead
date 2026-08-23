@@ -21,6 +21,7 @@ export default function Maintenance() {
   const [largestLoading, setLargestLoading] = useState(false)
   const [cleanupOutput, setCleanupOutput] = useState<string[] | null>(null)
   const [cleanupRunning, setCleanupRunning] = useState<'preview' | 'real' | 'autoremove' | 'autoremove-preview' | null>(null)
+  const [clearingCache, setClearingCache] = useState(false)
 
   const [config, setConfig] = useState<string | null>(null)
   const [configLoading, setConfigLoading] = useState(false)
@@ -163,6 +164,15 @@ export default function Maintenance() {
     api.cacheInfo().then(setCache).catch(() => {})
   }
 
+  async function runClearCache() {
+    setClearingCache(true)
+    setCleanupOutput(null)
+    const job = await runAction(() => api.clearCache())
+    setCleanupOutput(job.lines.map((l) => l.text))
+    setClearingCache(false)
+    api.cacheInfo().then(setCache).catch(() => {})
+  }
+
   async function loadConfig() {
     setConfigLoading(true)
     try {
@@ -223,9 +233,16 @@ export default function Maintenance() {
                 <div className="stat-title">{t('maintenance.downloadCache')}</div>
                 <div className="stat-value text-lg">{cache.sizeHuman}</div>
                 <div className="stat-desc font-mono truncate max-w-xs">{cache.path}</div>
+                <div className="stat-actions">
+                  <button className="btn btn-xs" disabled={clearingCache || cleanupRunning !== null} onClick={runClearCache}>
+                    {clearingCache ? <span className="loading loading-spinner loading-xs" /> : <TrashIcon className="size-3.5" />}
+                    {t('maintenance.clearCacheButton')}
+                  </button>
+                </div>
               </div>
             </div>
           )}
+          {cache && <p className="text-xs text-base-content/50">{t('maintenance.clearCacheDescription')}</p>}
 
           <div className="space-y-2">
             <div className="flex items-center justify-between">
@@ -284,11 +301,11 @@ export default function Maintenance() {
 
           <p className="text-sm text-base-content/70">{t('maintenance.cleanupDescription')}</p>
           <div className="flex gap-2">
-            <button className="btn btn-sm" disabled={cleanupRunning !== null} onClick={() => runCleanup(true)}>
+            <button className="btn btn-sm" disabled={cleanupRunning !== null || clearingCache} onClick={() => runCleanup(true)}>
               {cleanupRunning === 'preview' ? <span className="loading loading-spinner loading-xs" /> : null}
               {t('maintenance.previewDryRun')}
             </button>
-            <button className="btn btn-sm btn-error" disabled={cleanupRunning !== null} onClick={() => runCleanup(false)}>
+            <button className="btn btn-sm btn-error" disabled={cleanupRunning !== null || clearingCache} onClick={() => runCleanup(false)}>
               {cleanupRunning === 'real' ? <span className="loading loading-spinner loading-xs" /> : <TrashIcon className="size-4" />}
               {t('maintenance.cleanUpNow')}
             </button>
@@ -296,11 +313,11 @@ export default function Maintenance() {
           <div className="divider my-1" />
           <p className="text-sm text-base-content/70">{t('maintenance.autoremoveDescription')}</p>
           <div className="flex gap-2">
-            <button className="btn btn-sm" disabled={cleanupRunning !== null} onClick={() => runAutoremove(true)}>
+            <button className="btn btn-sm" disabled={cleanupRunning !== null || clearingCache} onClick={() => runAutoremove(true)}>
               {cleanupRunning === 'autoremove-preview' ? <span className="loading loading-spinner loading-xs" /> : null}
               {t('maintenance.previewOrphans')}
             </button>
-            <button className="btn btn-sm btn-warning" disabled={cleanupRunning !== null} onClick={() => runAutoremove(false)}>
+            <button className="btn btn-sm btn-warning" disabled={cleanupRunning !== null || clearingCache} onClick={() => runAutoremove(false)}>
               {cleanupRunning === 'autoremove' ? <span className="loading loading-spinner loading-xs" /> : <TrashIcon className="size-4" />}
               {t('maintenance.removeOrphanedDeps')}
             </button>
