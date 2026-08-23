@@ -11,33 +11,50 @@ const base = {
   viewBox: '0 0 24 24',
 }
 
+// Toolbar action glyphs (install/update/remove/search/refresh) below are
+// redrawn from the mead visual identity handoff's toolbar-*.svg files (see
+// GitHub issue #95), on the handoff's native 32x32 grid. They keep
+// currentColor/fill:none so every existing call site (buttons across
+// Installed/Search/Dashboard/PackageDetailModal/etc, not just a literal
+// toolbar) keeps inheriting its own button color instead of being locked
+// to the handoff's reference amber.
+
+const toolbar32 = {
+  fill: 'none',
+  stroke: 'currentColor',
+  strokeLinecap: 'round' as const,
+  strokeLinejoin: 'round' as const,
+  viewBox: '0 0 32 32',
+}
+
 export function DownloadIcon(p: IconProps) {
   return (
-    <svg {...base} {...p}>
-      <path d="M12 3v12" />
-      <path d="M6 11l6 6 6-6" />
-      <path d="M4 21h16" />
+    <svg {...toolbar32} {...p}>
+      <path d="M16 5 V20" strokeWidth={2.5} />
+      <path d="M10 15 L16 21 L22 15" strokeWidth={2.5} />
+      <path d="M6 25 H26" strokeWidth={2.5} />
     </svg>
   )
 }
 
 export function TrashIcon(p: IconProps) {
   return (
-    <svg {...base} {...p}>
-      <path d="M4 7h16" />
-      <path d="M9 7V4h6v3" />
-      <path d="M6 7l1 13h10l1-13" />
-      <path d="M10 11v6M14 11v6" />
+    <svg {...toolbar32} {...p}>
+      <path d="M9 11 H23" strokeWidth={2.2} />
+      <path d="M12 11 V8.5 C12 7.7 12.7 7 13.5 7 H18.5 C19.3 7 20 7.7 20 8.5 V11" strokeWidth={2.2} />
+      <path d="M11 11 L12 24 C12 24.8 12.7 25.5 13.5 25.5 H18.5 C19.3 25.5 20 24.8 20 24 L21 11" strokeWidth={2.2} />
+      <path d="M14.5 15 V21" strokeWidth={2} />
+      <path d="M17.5 15 V21" strokeWidth={2} />
     </svg>
   )
 }
 
 export function ArrowUpCircleIcon(p: IconProps) {
   return (
-    <svg {...base} {...p}>
-      <circle cx="12" cy="12" r="9" />
-      <path d="M12 16V8" />
-      <path d="M8.5 11.5L12 8l3.5 3.5" />
+    <svg {...toolbar32} {...p}>
+      <circle cx="16" cy="16" r="11" strokeWidth={2.2} />
+      <path d="M16 21 V11" strokeWidth={2.2} />
+      <path d="M11 15 L16 10 L21 15" strokeWidth={2.2} />
     </svg>
   )
 }
@@ -69,18 +86,20 @@ export function SquareIcon(p: IconProps) {
 
 export function RefreshIcon(p: IconProps) {
   return (
-    <svg {...base} {...p}>
-      <path d="M20 11a8 8 0 10-2.6 6.2" />
-      <path d="M20 4v7h-7" />
+    <svg {...toolbar32} {...p}>
+      <path d="M8 12 A9 9 0 0 1 24 9" strokeWidth={2.2} />
+      <path d="M21 6 L24 9 L20.5 11.5" strokeWidth={2.2} />
+      <path d="M24 20 A9 9 0 0 1 8 23" strokeWidth={2.2} />
+      <path d="M11 26 L8 23 L11.5 20.5" strokeWidth={2.2} />
     </svg>
   )
 }
 
 export function SearchIcon(p: IconProps) {
   return (
-    <svg {...base} {...p}>
-      <circle cx="11" cy="11" r="7" />
-      <path d="M21 21l-4.3-4.3" />
+    <svg {...toolbar32} {...p}>
+      <circle cx="14" cy="14" r="8" strokeWidth={2.4} />
+      <path d="M20 20 L26 26" strokeWidth={2.4} />
     </svg>
   )
 }
@@ -300,6 +319,127 @@ export function GearIcon(p: IconProps) {
     <svg {...base} {...p}>
       <circle cx="12" cy="12" r="3" />
       <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09a1.65 1.65 0 00-1-1.51 1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09a1.65 1.65 0 001.51-1 1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" />
+    </svg>
+  )
+}
+
+// Sidebar category tiles below are redrawn from the mead visual identity
+// handoff's sidebar-*.svg files (see GitHub issue #95): a rounded-square
+// amber tile with a white glyph, self-colored rather than currentColor,
+// since the handoff treats these as small illustrations rather than
+// monochrome UI glyphs. Not currently wired into Sidebar.tsx: every nav
+// item there renders the same size-4 currentColor line icon, and swapping
+// only 2 of the sidebar's 13 items (taps/services have a 1:1 match;
+// formulas/casks don't, since "Installed" already covers both formulae
+// and casks together) to filled amber tiles would read as inconsistent
+// rather than intentional. Kept here for a future pass that redoes the
+// whole nav icon set, or a different call site -- see the PR description
+// for the full rationale.
+
+export function SidebarFormulasIcon(p: IconProps) {
+  return (
+    <svg viewBox="0 0 32 32" {...p}>
+      <rect width="32" height="32" rx="7" fill="#D4A24C" />
+      <polygon points="16,8 24,12.5 24,21.5 16,26 8,21.5 8,12.5" fill="white" />
+    </svg>
+  )
+}
+
+export function SidebarCasksIcon(p: IconProps) {
+  return (
+    <svg viewBox="0 0 32 32" {...p}>
+      <rect width="32" height="32" rx="7" fill="#D4A24C" />
+      <path
+        d="M11 8 H21 C22 8 22.5 10 22.5 16 C22.5 22 22 24 21 24 H11 C10 24 9.5 22 9.5 16 C9.5 10 10 8 11 8 Z"
+        fill="none"
+        stroke="white"
+        strokeWidth={1.8}
+      />
+      <path d="M9.5 13 H22.5" stroke="white" strokeWidth={1.4} />
+      <path d="M9.5 19 H22.5" stroke="white" strokeWidth={1.4} />
+    </svg>
+  )
+}
+
+export function SidebarTapsIcon(p: IconProps) {
+  return (
+    <svg viewBox="0 0 32 32" {...p}>
+      <rect width="32" height="32" rx="7" fill="#D4A24C" />
+      <path d="M10 11 H22" stroke="white" strokeWidth={2} strokeLinecap="round" />
+      <path d="M16 11 V16" stroke="white" strokeWidth={2} strokeLinecap="round" />
+      <rect x="13" y="16" width="6" height="3.5" rx="1" fill="white" />
+      <path d="M16 21 C13.5 23.5 13.5 27 16 27 C18.5 27 18.5 23.5 16 21 Z" fill="white" />
+    </svg>
+  )
+}
+
+export function SidebarServicesIcon(p: IconProps) {
+  return (
+    <svg viewBox="0 0 32 32" {...p}>
+      <rect width="32" height="32" rx="7" fill="#D4A24C" />
+      <g fill="white">
+        <circle cx="16" cy="16" r="4.4" />
+        <rect x="14.5" y="4" width="3" height="5.5" rx="1" />
+        <rect x="14.5" y="22.5" width="3" height="5.5" rx="1" />
+        <rect x="14.5" y="4" width="3" height="5.5" rx="1" transform="rotate(60 16 16)" />
+        <rect x="14.5" y="4" width="3" height="5.5" rx="1" transform="rotate(120 16 16)" />
+        <rect x="14.5" y="4" width="3" height="5.5" rx="1" transform="rotate(180 16 16)" />
+        <rect x="14.5" y="4" width="3" height="5.5" rx="1" transform="rotate(240 16 16)" />
+        <rect x="14.5" y="4" width="3" height="5.5" rx="1" transform="rotate(300 16 16)" />
+      </g>
+      <circle cx="16" cy="16" r="2" fill="#D4A24C" />
+    </svg>
+  )
+}
+
+// Status badge glyphs below are redrawn from the mead visual identity
+// handoff's badge-*.svg files (see GitHub issue #95): a small self-colored
+// circle with a white glyph, meant to sit alongside the app's existing
+// text badge-* pills (badge-outline/badge-warning/etc), not replace them.
+// badge-broken (a red exclamation) is used for the "deprecated" state --
+// the app has no separate "broken package" concept, and a deprecated
+// formula/cask flagged upstream is the closest existing match for it.
+
+export function BadgeInstalledIcon(p: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" {...p}>
+      <circle cx="12" cy="12" r="12" fill="#4E9B6E" />
+      <path d="M6 12.5 L10 16.5 L18 8" stroke="white" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" fill="none" />
+    </svg>
+  )
+}
+
+export function BadgeOutdatedIcon(p: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" {...p}>
+      <circle cx="12" cy="12" r="12" fill="#D4A24C" />
+      <path d="M12 17 V7" stroke="white" strokeWidth={2.4} strokeLinecap="round" />
+      <path d="M7 12 L12 7 L17 12" stroke="white" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" fill="none" />
+    </svg>
+  )
+}
+
+export function BadgeBrokenIcon(p: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" {...p}>
+      <circle cx="12" cy="12" r="12" fill="#C1503D" />
+      <line x1="12" y1="6" x2="12" y2="14" stroke="white" strokeWidth={2.6} strokeLinecap="round" />
+      <circle cx="12" cy="18" r="1.4" fill="white" />
+    </svg>
+  )
+}
+
+// Generic package fallback icon, redrawn from the handoff's
+// package-placeholder.svg. Added for future use -- see the PR description
+// for why it isn't wired into PackageIcon.tsx's current fallback (a
+// deterministic colored monogram, see lib/monogram.ts) yet.
+
+export function PackagePlaceholderIcon(p: IconProps) {
+  return (
+    <svg viewBox="0 0 32 32" fill="none" stroke="#847A67" strokeWidth={1.8} strokeLinejoin="round" {...p}>
+      <path d="M16 4 L28 10 L28 22 L16 28 L4 22 L4 10 Z" />
+      <path d="M4 10 L16 16 L28 10" />
+      <path d="M16 16 V28" />
     </svg>
   )
 }

@@ -6,6 +6,9 @@ import { useConfirm } from '../context/ConfirmContext'
 import { useUserData } from '../context/UserDataContext'
 import {
   ArrowUpCircleIcon,
+  BadgeBrokenIcon,
+  BadgeInstalledIcon,
+  BadgeOutdatedIcon,
   CheckIcon,
   DownloadIcon,
   ExternalLinkIcon,
@@ -293,13 +296,28 @@ export default function PackageDetailModal({ target, onClose, onChanged }: Props
                   <span className={`badge badge-sm ${pkg.isCask ? 'badge-accent' : 'badge-primary'} badge-outline`}>
                     {pkg.isCask ? t('common.cask') : t('common.formula')}
                   </span>
-                  {pkg.installed && <span className="badge badge-sm badge-success badge-outline">{t('common.badgeInstalled')}</span>}
-                  {pkg.outdated && <span className="badge badge-sm badge-warning badge-outline">{t('common.badgeOutdated')}</span>}
+                  {pkg.installed && (
+                    <span className="badge badge-sm badge-success badge-outline gap-1">
+                      <BadgeInstalledIcon className="size-3" />
+                      {t('common.badgeInstalled')}
+                    </span>
+                  )}
+                  {pkg.outdated && (
+                    <span className="badge badge-sm badge-warning badge-outline gap-1">
+                      <BadgeOutdatedIcon className="size-3" />
+                      {t('common.badgeOutdated')}
+                    </span>
+                  )}
                   {pkg.pinned && <span className="badge badge-sm badge-outline">{t('common.badgePinned')}</span>}
                   {!pkg.isCask && pkg.installed && !pkg.linked && (
                     <span className="badge badge-sm badge-warning badge-outline">{t('common.badgeUnlinked')}</span>
                   )}
-                  {pkg.deprecated && <span className="badge badge-sm badge-error badge-outline">{t('common.badgeDeprecated')}</span>}
+                  {pkg.deprecated && (
+                    <span className="badge badge-sm badge-error badge-outline gap-1">
+                      <BadgeBrokenIcon className="size-3" />
+                      {t('common.badgeDeprecated')}
+                    </span>
+                  )}
                   {pkg.kegOnly && <span className="badge badge-sm badge-ghost">{t('common.badgeKegOnly')}</span>}
                   {pkg.isCask && pkg.autoUpdates && <span className="badge badge-sm badge-ghost">{t('common.badgeAutoUpdates')}</span>}
                   {tags.map((tag) => (

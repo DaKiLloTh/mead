@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { api, SearchResult } from '../lib/api'
 import { useJobs } from '../context/JobsContext'
 import PackageDetailModal, { DetailTarget } from '../components/PackageDetailModal'
-import { DownloadIcon, SearchIcon } from '../components/Icons'
+import { BadgeInstalledIcon, DownloadIcon, SearchIcon } from '../components/Icons'
 
 type Filter = 'all' | 'formula' | 'cask'
 
@@ -134,7 +134,10 @@ export default function Search({ refreshToken, bump }: Props) {
                     </span>
                   </div>
                   {isInstalled ? (
-                    <span className="badge badge-success badge-outline shrink-0">{t('common.badgeInstalled')}</span>
+                    <span className="badge badge-success badge-outline shrink-0 gap-1">
+                      <BadgeInstalledIcon className="size-3" />
+                      {t('common.badgeInstalled')}
+                    </span>
                   ) : (
                     <button
                       className="btn btn-xs btn-primary shrink-0"

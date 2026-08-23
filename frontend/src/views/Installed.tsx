@@ -7,7 +7,16 @@ import { useUserData } from '../context/UserDataContext'
 import { useInstalledPackages } from '../context/InstalledPackagesContext'
 import PackageDetailModal, { DetailTarget } from '../components/PackageDetailModal'
 import PackageIcon from '../components/PackageIcon'
-import { ArrowUpCircleIcon, PinIcon, RefreshIcon, SearchIcon, StarIcon, TrashIcon, XIcon } from '../components/Icons'
+import {
+  ArrowUpCircleIcon,
+  BadgeOutdatedIcon,
+  PinIcon,
+  RefreshIcon,
+  SearchIcon,
+  StarIcon,
+  TrashIcon,
+  XIcon,
+} from '../components/Icons'
 import { isSudoTerminalRequiredFailure } from '../lib/uninstallElevation'
 
 export type Filter = 'all' | 'formula' | 'cask' | 'outdated' | 'favorites' | 'deprecated' | 'disabled' | 'pinned'
@@ -347,7 +356,12 @@ export default function Installed({ refreshToken, bump, initialFilter }: Props) 
                     </td>
                     <td>
                       <div className="flex gap-1 flex-wrap">
-                        {p.outdated && <span className="badge badge-sm badge-warning">{t('common.badgeOutdated')}</span>}
+                        {p.outdated && (
+                          <span className="badge badge-sm badge-warning gap-1">
+                            <BadgeOutdatedIcon className="size-3" />
+                            {t('common.badgeOutdated')}
+                          </span>
+                        )}
                         {p.pinned && <span className="badge badge-sm badge-ghost">{t('common.badgePinned')}</span>}
                         {!p.isCask && leaves.has(p.name) && <span className="badge badge-sm badge-ghost">{t('installed.badgeLeaf')}</span>}
                         {!p.isCask && !p.linked && (
