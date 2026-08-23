@@ -5,6 +5,7 @@ package app
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -119,6 +120,54 @@ func (a *App) Uses(name string) ([]string, error) {
 
 func (a *App) Deps(name string, isCask bool) (string, error) {
 	return brew.Deps(a.ctx, name, isCask)
+}
+
+// DepsGraph returns a structured node/edge dependency graph for a package,
+// for the dependency graph visualization -- see brew.DepsGraph.
+func (a *App) DepsGraph(name string, isCask bool) (*brew.DependencyGraph, error) {
+	return brew.DepsGraph(a.ctx, name, isCask)
+}
+
+// ExportDependencyGraphPNG saves a PNG snapshot of the dependency graph view
+// (rendered client-side by the frontend's graph library, then handed here as
+// a data URL) to a file the user picks via a native save dialog -- the same
+// dialog-then-write pattern as ExportUserDataToFile/ExportBrewfileToFile.
+// name is used only to suggest a filename. Returns the chosen path, or "" if
+// the user cancelled.
+func (a *App) ExportDependencyGraphPNG(name string, pngDataURL string) (string, error) {
+	raw, err := decodeDataURLPNG(pngDataURL)
+	if err != nil {
+		return "", err
+	}
+	path, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
+		Title:           "Export dependency graph",
+		DefaultFilename: name + "-dependencies.png",
+	})
+	if err != nil {
+		return "", err
+	}
+	if path == "" {
+		return "", nil // user cancelled
+	}
+	if err := os.WriteFile(path, raw, 0644); err != nil {
+		return "", err
+	}
+	return path, nil
+}
+
+// decodeDataURLPNG decodes a "data:image/png;base64,...." data URL (what
+// canvas.toDataURL()/cytoscape's cy.png() produce) into raw PNG bytes. The
+// "data:...;base64," prefix is stripped if present so this also tolerates
+// being handed bare base64.
+func decodeDataURLPNG(dataURL string) ([]byte, error) {
+	if idx := strings.Index(dataURL, ","); idx != -1 && strings.HasPrefix(dataURL, "data:") {
+		dataURL = dataURL[idx+1:]
+	}
+	raw, err := base64.StdEncoding.DecodeString(dataURL)
+	if err != nil {
+		return nil, fmt.Errorf("decoding PNG data: %w", err)
+	}
+	return raw, nil
 }
 
 func (a *App) GetCacheInfo() (*brew.CacheInfo, error) {

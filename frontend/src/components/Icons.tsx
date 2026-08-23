@@ -254,6 +254,17 @@ export function StoreIcon(p: IconProps) {
   )
 }
 
+export function MaximizeIcon(p: IconProps) {
+  return (
+    <svg {...base} {...p}>
+      <path d="M8 3H4v4" />
+      <path d="M16 3h4v4" />
+      <path d="M8 21H4v-4" />
+      <path d="M16 21h4v-4" />
+    </svg>
+  )
+}
+
 export function CopyIcon(p: IconProps) {
   return (
     <svg {...base} {...p}>
