@@ -59,7 +59,7 @@ const viewTitleKeys: Record<ViewKey, string> = {
 function AppShell() {
   const { t } = useTranslation()
   const { runAction } = useJobs()
-  const { info: systemInfo } = useSystemInfo()
+  const { info: systemInfo, refresh: refreshSystemInfo } = useSystemInfo()
   const [view, setView] = useState<ViewKey>('dashboard')
   const [refreshToken, setRefreshToken] = useState(0)
   const [outdatedCount, setOutdatedCount] = useState(0)
@@ -79,11 +79,22 @@ function AppShell() {
 
   // The single "something changed, refresh now" signal for the whole app.
   // Views still on the per-view fetch-on-refreshToken pattern pick this up
-  // via the `refreshToken` prop; the shared installed-packages cache hooks
-  // into the same call rather than exposing a second, parallel signal.
+  // via the `refreshToken` prop; the shared installed-packages and
+  // system-info caches hook into the same call rather than exposing a
+  // second, parallel signal each.
+  //
+  // SystemInfoContext's own refresh() was previously only reached
+  // indirectly, via Dashboard.tsx's local effect on refreshToken -- which
+  // meant clicking the global header's Update Homebrew button (or the
+  // background quiet-update tick) while on any view other than Dashboard
+  // left the outdated count / last-updated text stale until the context's
+  // own 60-second poll caught up. Calling it here directly means bump()
+  // actually refreshes everything it's documented to, regardless of which
+  // view is currently mounted.
   const bump = () => {
     setRefreshToken((t) => t + 1)
     installedPackages.refresh()
+    refreshSystemInfo()
   }
 
   // Global "Update Homebrew" trigger for the top bar (see issue #89), so the
