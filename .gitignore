@@ -6,5 +6,6 @@ frontend/coverage
 frontend/package.json.md5
 /mead
 /brewtender
+/cmd/mead-mon/mead-mon
 .idea/
 .DS_Store
