@@ -389,6 +389,7 @@
     "license": "License: {{license}}",
     "tap": "Tap: {{tap}}",
     "homepage": "Homepage",
+    "releaseNotes": "Release notes",
     "revealInFinder": "Reveal in Finder",
     "tagPlaceholder": "Add a tag and press Enter",
     "tabOverview": "Overview",
