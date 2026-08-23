@@ -122,3 +122,77 @@ jobs:
           (arm64) only.
           EOF
           gh release edit "${{ needs.release-please.outputs.tag_name }}" --notes-file /tmp/notes.md
+
+  # Mirrors the DMG/zip to the public homebrew-mead repo (this repo is
+  # private, so the tap needs its own copy of the assets to point at) and
+  # bumps the cask's version + sha256 to match. Requires a fine-grained PAT
+  # with contents:write on DaKiLloTh/homebrew-mead, stored as the
+  # HOMEBREW_TAP_TOKEN secret -- the default github.token only has access to
+  # this repo. Skips cleanly (rather than failing the release) if that
+  # secret hasn't been set up yet.
+  update-tap:
+    needs: [release-please, build-and-upload]
+    if: ${{ needs.release-please.outputs.release_created }}
+    runs-on: macos-14
+    steps:
+      - name: Check tap token is configured
+        id: check
+        run: |
+          if [ -n "${{ secrets.HOMEBREW_TAP_TOKEN }}" ]; then
+            echo "has_token=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_token=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::HOMEBREW_TAP_TOKEN secret is not set -- skipping tap mirror/update. See homebrew-mead's README for setup."
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.check.outputs.has_token == 'true'
+        with:
+          repository: DaKiLloTh/homebrew-mead
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          path: tap
+
+      - name: Download release assets
+        if: steps.check.outputs.has_token == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p assets
+          gh release download "${{ needs.release-please.outputs.tag_name }}" \
+            --repo ${{ github.repository }} \
+            --pattern "*.dmg" --pattern "*.zip" \
+            --dir assets
+
+      - name: Mirror release to tap repo
+        if: steps.check.outputs.has_token == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          gh release create "${{ needs.release-please.outputs.tag_name }}" \
+            assets/*.dmg assets/*.zip \
+            --repo DaKiLloTh/homebrew-mead \
+            --prerelease \
+            --title "Pre-Alpha ${{ needs.release-please.outputs.tag_name }}" \
+            --notes "Mirrored release assets for the Homebrew tap. Full release notes: https://github.com/${{ github.repository }}/releases/tag/${{ needs.release-please.outputs.tag_name }}"
+
+      - name: Update cask version and checksum
+        if: steps.check.outputs.has_token == 'true'
+        run: |
+          VERSION="${{ needs.release-please.outputs.tag_name }}"
+          VERSION="${VERSION#v}"
+          SHA256=$(shasum -a 256 assets/*.dmg | awk '{ print $1 }')
+
+          cd tap
+          sed -i '' "s/version \".*\"/version \"${VERSION}\"/" Casks/mead.rb
+          sed -i '' "s/sha256 \".*\"/sha256 \"${SHA256}\"/" Casks/mead.rb
+
+          if git diff --quiet; then
+            echo "No cask changes needed."
+            exit 0
+          fi
+
+          git config user.name "mead-release-bot"
+          git config user.email "actions@github.com"
+          git add Casks/mead.rb
+          git commit -m "chore: bump cask to ${VERSION}"
+          git push
