@@ -104,6 +104,23 @@ type AdoptCandidate struct {
 	CaskToken   string `json:"caskToken"`
 	CaskDesc    string `json:"caskDesc"`
 	CaskVersion string `json:"caskVersion"`
+	// InstalledVersion is the app's own version, read from its Info.plist,
+	// for comparison against CaskVersion before adopting. "" if it
+	// couldn't be determined.
+	InstalledVersion string `json:"installedVersion"`
+	// MatchConfidence is "exact" (slug/token matched exactly and the
+	// cask's own artifacts confirm the same app filename that's actually
+	// on disk) or "possible" (matched via fuzzy name similarity, and/or
+	// the cask's artifacts don't confirm the on-disk filename) -- see
+	// buildMatchConfidence in adopt.go.
+	MatchConfidence string `json:"matchConfidence"`
+	// MatchReason explains why MatchConfidence is "possible" rather than
+	// "exact". Empty for an exact match.
+	MatchReason string `json:"matchReason,omitempty"`
+	// PossibleDowngrade is true when InstalledVersion appears newer than
+	// CaskVersion, meaning adopting (and a later `brew upgrade`) could
+	// downgrade the app that's actually running.
+	PossibleDowngrade bool `json:"possibleDowngrade"`
 }
 
 // DuplicateApp flags a name that shows up as both an installed formula and

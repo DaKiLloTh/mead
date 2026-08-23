@@ -232,8 +232,17 @@
     "colApp": "App",
     "colMatchedCask": "Matched cask",
     "colVersion": "Version",
+    "colMatch": "Match",
     "colAction": "Action",
-    "adoptButton": "Adopt"
+    "adoptButton": "Adopt",
+    "installedVersionLabel": "Installed:",
+    "caskVersionLabel": "Cask:",
+    "versionUnknown": "unknown",
+    "matchExact": "Match",
+    "matchPossible": "Possible match",
+    "downgradeWarningTitle": "Installed version is newer than the cask",
+    "downgradeWarningBody": "{{appName}} is installed at version {{installed}}, but the cask {{caskToken}} is only at {{cask}}. Adopting it, and any later brew upgrade, could downgrade the app that's actually running.",
+    "downgradeConfirmLabel": "Adopt anyway"
   },
   "appstore": {
     "title": "App Store",
