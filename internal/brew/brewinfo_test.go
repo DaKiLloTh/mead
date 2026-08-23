@@ -556,3 +556,123 @@ func TestOutdatedDecode_UnknownFieldsIgnored(t *testing.T) {
 		t.Errorf("unexpected cask result: %+v", results[1])
 	}
 }
+
+// ---- parseDepsDot ----
+//
+// These fixtures are verbatim `brew deps --graph --dot <name>` stdout
+// (stderr's env hint/deprecation warnings excluded, exactly as RunBrew
+// separates them), captured for real against Homebrew 6.0.18 on
+// macOS/arm64:
+//   - "bat", a formula with a multi-level nested dependency chain.
+//   - "gcloud-cli", a cask whose (formula) dependencies fan out and share a
+//     common sub-dependency reached two different ways (openssl@3 via
+//     python@3.14, and xz via both python@3.14 and zstd) -- exercising
+//     dedup of a node reached by more than one edge.
+//   - "cmake", a formula with no dependencies at all -- brew still emits
+//     "digraph {\n\n}" with an empty body.
+const depsDotFixtureBat = `digraph {
+  "bat" -> "libgit2"
+  "bat" -> "oniguruma"
+  "libgit2" -> "libssh2"
+  "libgit2" -> "llhttp"
+  "libssh2" -> "openssl@3"
+  "openssl@3" -> "ca-certificates"
+}
+`
+
+const depsDotFixtureGcloudCLI = `digraph {
+  "gcloud-cli" -> "python@3.14"
+  "python@3.14" -> "mpdecimal"
+  "python@3.14" -> "openssl@3"
+  "python@3.14" -> "sqlite"
+  "python@3.14" -> "xz"
+  "python@3.14" -> "zstd"
+  "openssl@3" -> "ca-certificates"
+  "sqlite" -> "readline"
+  "zstd" -> "lz4"
+  "zstd" -> "xz"
+}
+`
+
+const depsDotFixtureCmake = `digraph {
+
+}
+`
+
+func TestParseDepsDot_Formula(t *testing.T) {
+	g := parseDepsDot(depsDotFixtureBat, "bat", false)
+
+	if g.Root != "bat" {
+		t.Errorf("Root = %q, want %q", g.Root, "bat")
+	}
+
+	wantNodes := []string{"bat", "libgit2", "oniguruma", "libssh2", "llhttp", "openssl@3", "ca-certificates"}
+	if len(g.Nodes) != len(wantNodes) {
+		t.Fatalf("got %d nodes, want %d: %+v", len(g.Nodes), len(wantNodes), g.Nodes)
+	}
+	for i, name := range wantNodes {
+		if g.Nodes[i].Name != name {
+			t.Errorf("Nodes[%d].Name = %q, want %q (order should follow first appearance in the dot output)", i, g.Nodes[i].Name, name)
+		}
+		if g.Nodes[i].IsCask {
+			t.Errorf("Nodes[%d] (%s) IsCask = true, want false: a formula's dependency graph should contain no casks", i, name)
+		}
+	}
+
+	wantEdges := []DependencyEdge{
+		{From: "bat", To: "libgit2"},
+		{From: "bat", To: "oniguruma"},
+		{From: "libgit2", To: "libssh2"},
+		{From: "libgit2", To: "llhttp"},
+		{From: "libssh2", To: "openssl@3"},
+		{From: "openssl@3", To: "ca-certificates"},
+	}
+	if len(g.Edges) != len(wantEdges) {
+		t.Fatalf("got %d edges, want %d: %+v", len(g.Edges), len(wantEdges), g.Edges)
+	}
+	for i, e := range wantEdges {
+		if g.Edges[i] != e {
+			t.Errorf("Edges[%d] = %+v, want %+v", i, g.Edges[i], e)
+		}
+	}
+}
+
+func TestParseDepsDot_CaskRootWithSharedSubDependency(t *testing.T) {
+	g := parseDepsDot(depsDotFixtureGcloudCLI, "gcloud-cli", true)
+
+	if len(g.Nodes) != 10 {
+		t.Fatalf("got %d nodes, want 10 (no duplicate for the shared xz/openssl@3 nodes): %+v", len(g.Nodes), g.Nodes)
+	}
+
+	xzCount := 0
+	for _, n := range g.Nodes {
+		if n.Name == "xz" {
+			xzCount++
+		}
+	}
+	if xzCount != 1 {
+		t.Errorf("xz appears %d times in Nodes, want exactly 1 even though it's reached via two different edges", xzCount)
+	}
+
+	if len(g.Edges) != 10 {
+		t.Errorf("got %d edges, want 10 (one per dot line, duplicates in the node list are collapsed but edges are not)", len(g.Edges))
+	}
+
+	for _, n := range g.Nodes {
+		wantCask := n.Name == "gcloud-cli"
+		if n.IsCask != wantCask {
+			t.Errorf("Nodes[%q].IsCask = %v, want %v (only the cask root should be marked as a cask)", n.Name, n.IsCask, wantCask)
+		}
+	}
+}
+
+func TestParseDepsDot_NoDependencies(t *testing.T) {
+	g := parseDepsDot(depsDotFixtureCmake, "cmake", false)
+
+	if len(g.Nodes) != 1 || g.Nodes[0].Name != "cmake" {
+		t.Errorf("Nodes = %+v, want just the root node [cmake]", g.Nodes)
+	}
+	if len(g.Edges) != 0 {
+		t.Errorf("Edges = %+v, want none", g.Edges)
+	}
+}

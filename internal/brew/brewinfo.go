@@ -490,6 +490,106 @@ func Deps(ctx context.Context, name string, isCask bool) (string, error) {
 	return RunBrew(ctx, args...)
 }
 
+// DependencyNode is one package in a structured dependency graph.
+type DependencyNode struct {
+	Name   string `json:"name"`
+	IsCask bool   `json:"isCask"`
+}
+
+// DependencyEdge is a directed edge from a package to one of its direct
+// dependencies in a structured dependency graph.
+type DependencyEdge struct {
+	From string `json:"from"`
+	To   string `json:"to"`
+}
+
+// DependencyGraph is a structured node/edge dependency graph for a package,
+// suitable for graph rendering -- unlike Deps's indented plain-text tree.
+type DependencyGraph struct {
+	Root  string           `json:"root"`
+	Nodes []DependencyNode `json:"nodes"`
+	Edges []DependencyEdge `json:"edges"`
+}
+
+// dotEdgePattern matches one `"parent" -> "child"` edge line from
+// `brew deps --graph --dot` output.
+var dotEdgePattern = regexp.MustCompile(`^\s*"([^"]+)"\s*->\s*"([^"]+)"\s*$`)
+
+// parseDepsDot parses `brew deps --graph --dot`'s stdout into a
+// DependencyGraph. The format is a minimal Graphviz DOT digraph: a
+// "digraph {" header, one `"parent" -> "child"` line per direct dependency
+// edge (quoted, arrow-separated), and a closing "}" -- see
+// brewinfo_test.go for real captured fixtures. Any non-edge line (the
+// digraph header/closing brace, blank lines) is ignored rather than
+// treated as an error, so this stays forward-compatible with cosmetic
+// formatting changes in future brew versions. A package with no
+// dependencies produces an empty body ("digraph {\n\n}"), which yields a
+// graph containing only the root node and no edges.
+//
+// Every non-root name discovered this way is a formula: brew's dependency
+// model never lets a formula depend on a cask, and --graph's recursive
+// walk only follows dependency edges, so every node reached by walking
+// outward from the root is a formula. Only the root itself can be a cask
+// (a cask depending directly on another cask is rare enough, and not
+// distinguishable from this output alone, that it isn't worth chasing
+// here) -- callers pass rootIsCask for it.
+func parseDepsDot(dot string, root string, rootIsCask bool) *DependencyGraph {
+	nodeSeen := map[string]bool{root: true}
+	order := []string{root}
+	edges := []DependencyEdge{}
+
+	addNode := func(name string) {
+		if !nodeSeen[name] {
+			nodeSeen[name] = true
+			order = append(order, name)
+		}
+	}
+
+	for line := range strings.SplitSeq(dot, "\n") {
+		m := dotEdgePattern.FindStringSubmatch(line)
+		if m == nil {
+			continue
+		}
+		from, to := m[1], m[2]
+		addNode(from)
+		addNode(to)
+		edges = append(edges, DependencyEdge{From: from, To: to})
+	}
+
+	nodes := make([]DependencyNode, 0, len(order))
+	for _, name := range order {
+		nodes = append(nodes, DependencyNode{Name: name, IsCask: name == root && rootIsCask})
+	}
+
+	return &DependencyGraph{Root: root, Nodes: nodes, Edges: edges}
+}
+
+// DepsGraph returns a structured node/edge dependency graph for a package,
+// suitable for graph rendering (see parseDepsDot). Unlike Deps, this shells
+// out to `brew deps --graph --dot`, which emits a machine-parseable
+// Graphviz digraph instead of an indented text tree -- no fragile
+// box-drawing-character parsing required. Installed-vs-not status isn't
+// resolved here; the frontend already keeps a cached installed-packages
+// list (via useInstalledPackages()) that it cross-references against by
+// name, so there's no need to re-query per node on the backend.
+func DepsGraph(ctx context.Context, name string, isCask bool) (*DependencyGraph, error) {
+	if err := ValidName(name); err != nil {
+		return nil, err
+	}
+	args := []string{"deps", "--graph", "--dot"}
+	if isCask {
+		args = append(args, "--cask")
+	} else {
+		args = append(args, "--formula")
+	}
+	args = append(args, name)
+	out, err := RunBrew(ctx, args...)
+	if err != nil {
+		return nil, err
+	}
+	return parseDepsDot(out, name, isCask), nil
+}
+
 // GetCacheInfo reports the size of brew's download cache.
 func GetCacheInfo(ctx context.Context) (*CacheInfo, error) {
 	pathOut, err := RunBrew(ctx, "--cache")

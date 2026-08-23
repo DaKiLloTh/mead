@@ -19,6 +19,7 @@ import {
 } from './Icons'
 import ExternalLink from './ExternalLink'
 import PackageIcon from './PackageIcon'
+import DependencyGraph from './DependencyGraph'
 
 export interface DetailTarget {
   name: string
@@ -31,7 +32,7 @@ interface Props {
   onChanged?: () => void
 }
 
-type Tab = 'overview' | 'deps' | 'security'
+type Tab = 'overview' | 'deps' | 'graph' | 'security'
 
 export default function PackageDetailModal({ target, onClose, onChanged }: Props) {
   const { t } = useTranslation()
@@ -51,8 +52,24 @@ export default function PackageDetailModal({ target, onClose, onChanged }: Props
   const [securityLoading, setSecurityLoading] = useState(false)
   const [securityError, setSecurityError] = useState<string | null>(null)
 
+  // The currently-displayed package. Usually just `target` (the prop), but
+  // clicking a node in the dependency graph swaps this to view a different
+  // package's detail *within the same modal* rather than stacking a second
+  // one -- see the 'graph' tab below and DependencyGraph's onSelectPackage.
+  // Reset to `target` whenever the prop's own identity changes (a new
+  // target key means the modal was pointed at a different package from
+  // outside) using the "adjust state during render" pattern, so there's
+  // never a render with a stale viewTarget in between.
+  const [viewTarget, setViewTarget] = useState<DetailTarget | null>(target)
+  const targetKey = target ? `${target.name}:${target.isCask}` : null
+  const [syncedTargetKey, setSyncedTargetKey] = useState(targetKey)
+  if (targetKey !== syncedTargetKey) {
+    setSyncedTargetKey(targetKey)
+    setViewTarget(target)
+  }
+
   useEffect(() => {
-    if (!target) return
+    if (!viewTarget) return
     setLoading(true)
     setTab('overview')
     setUses(null)
@@ -60,34 +77,34 @@ export default function PackageDetailModal({ target, onClose, onChanged }: Props
     setPkg(null)
     setSecurity(null)
     setSecurityError(null)
-    setNote(userData.noteFor(target.name, target.isCask))
+    setNote(userData.noteFor(viewTarget.name, viewTarget.isCask))
     api
-      .getInfo(target.name, target.isCask)
+      .getInfo(viewTarget.name, viewTarget.isCask)
       .then(setPkg)
       .catch(() => setPkg(null))
       .finally(() => setLoading(false))
-    if (!target.isCask) {
+    if (!viewTarget.isCask) {
       api
-        .uses(target.name)
+        .uses(viewTarget.name)
         .then(setUses)
         .catch(() => setUses([]))
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [target?.name, target?.isCask])
+  }, [viewTarget?.name, viewTarget?.isCask])
 
-  if (!target) return null
+  if (!target || !viewTarget) return null
 
   function refresh() {
-    if (!target) return
-    api.getInfo(target.name, target.isCask).then(setPkg).catch(() => {})
+    if (!viewTarget) return
+    api.getInfo(viewTarget.name, viewTarget.isCask).then(setPkg).catch(() => {})
     onChanged?.()
   }
 
   async function loadTree() {
-    if (!target || tree !== null) return
+    if (!viewTarget || tree !== null) return
     setTreeLoading(true)
     try {
-      const out = await api.deps(target.name, target.isCask)
+      const out = await api.deps(viewTarget.name, viewTarget.isCask)
       setTree(out)
     } catch (e) {
       setTree(String(e))
@@ -97,11 +114,11 @@ export default function PackageDetailModal({ target, onClose, onChanged }: Props
   }
 
   async function loadSecurity() {
-    if (!target || security || securityLoading) return
+    if (!viewTarget || security || securityLoading) return
     setSecurityLoading(true)
     setSecurityError(null)
     try {
-      const info = await api.inspectCaskSecurity(target.name)
+      const info = await api.inspectCaskSecurity(viewTarget.name)
       setSecurity(info)
     } catch (e) {
       setSecurityError(String(e))
@@ -111,9 +128,9 @@ export default function PackageDetailModal({ target, onClose, onChanged }: Props
   }
 
   async function doRemoveQuarantine() {
-    if (!security || !target) return
+    if (!security || !viewTarget) return
     try {
-      await api.removeQuarantine(target.name)
+      await api.removeQuarantine(viewTarget.name)
       setSecurity(null)
       void loadSecurity()
     } catch (e) {
@@ -122,36 +139,36 @@ export default function PackageDetailModal({ target, onClose, onChanged }: Props
   }
 
   async function doInstall() {
-    if (!target) return
+    if (!viewTarget) return
     setBusy(true)
-    await runAction(() => api.install(target.name, target.isCask))
+    await runAction(() => api.install(viewTarget.name, viewTarget.isCask))
     setBusy(false)
     refresh()
   }
 
   async function doUpgrade() {
-    if (!target) return
+    if (!viewTarget) return
     setBusy(true)
-    await runAction(() => api.upgrade(target.name, target.isCask))
+    await runAction(() => api.upgrade(viewTarget.name, viewTarget.isCask))
     setBusy(false)
     refresh()
   }
 
   async function doUninstall() {
-    if (!target || !pkg) return
+    if (!viewTarget || !pkg) return
     const checkboxes: { label: string }[] = []
-    const zapIdx = target.isCask ? checkboxes.push({ label: t('packageDetail.checkboxRemoveAppData') }) - 1 : -1
+    const zapIdx = viewTarget.isCask ? checkboxes.push({ label: t('packageDetail.checkboxRemoveAppData') }) - 1 : -1
     const forceIdx = checkboxes.push({ label: t('packageDetail.checkboxRemoveAllVersions') }) - 1
     const snapshotIdx = checkboxes.push({ label: t('packageDetail.checkboxSnapshot') }) - 1
 
     const zapTrashPaths = pkg.zapTrashPaths ?? []
     const body =
-      target.isCask && zapTrashPaths.length > 0
+      viewTarget.isCask && zapTrashPaths.length > 0
         ? t('packageDetail.confirmUninstallBodyWithZap', { paths: zapTrashPaths.join('\n') })
         : t('packageDetail.confirmUninstallBody')
 
     const { ok, checked } = await confirm({
-      title: t('packageDetail.confirmUninstallTitle', { name: target.name }),
+      title: t('packageDetail.confirmUninstallTitle', { name: viewTarget.name }),
       body,
       confirmLabel: t('common.uninstall'),
       danger: true,
@@ -171,64 +188,64 @@ export default function PackageDetailModal({ target, onClose, onChanged }: Props
         notify('error', String(e))
       }
     }
-    await runAction(() => api.uninstall(target.name, target.isCask, zap, force))
+    await runAction(() => api.uninstall(viewTarget.name, viewTarget.isCask, zap, force))
     setBusy(false)
     refresh()
   }
 
   async function doReinstall() {
-    if (!target) return
+    if (!viewTarget) return
     setBusy(true)
-    await runAction(() => api.reinstall(target.name, target.isCask))
+    await runAction(() => api.reinstall(viewTarget.name, viewTarget.isCask))
     setBusy(false)
     refresh()
   }
 
   async function doPinToggle() {
-    if (!target || !pkg) return
+    if (!viewTarget || !pkg) return
     setBusy(true)
-    await runAction(() => (pkg.pinned ? api.unpin(target.name) : api.pin(target.name)))
+    await runAction(() => (pkg.pinned ? api.unpin(viewTarget.name) : api.pin(viewTarget.name)))
     setBusy(false)
     refresh()
   }
 
   async function doLinkToggle() {
-    if (!target || !pkg) return
+    if (!viewTarget || !pkg) return
     setBusy(true)
-    await runAction(() => (pkg.linked ? api.unlink(target.name) : api.link(target.name, true)))
+    await runAction(() => (pkg.linked ? api.unlink(viewTarget.name) : api.link(viewTarget.name, true)))
     setBusy(false)
     refresh()
   }
 
   async function doReveal() {
-    if (!target) return
+    if (!viewTarget) return
     try {
-      await api.revealPackage(target.name, target.isCask)
+      await api.revealPackage(viewTarget.name, viewTarget.isCask)
     } catch (e) {
       notify('error', String(e))
     }
   }
 
-  const tags = target ? userData.tagsFor(target.name, target.isCask) : []
-  const favorite = target ? userData.isFavorite(target.name, target.isCask) : false
+  const tags = userData.tagsFor(viewTarget.name, viewTarget.isCask)
+  const favorite = userData.isFavorite(viewTarget.name, viewTarget.isCask)
 
   function addTag() {
     const t = tagInput.trim()
-    if (!t || !target) return
+    if (!t || !viewTarget) return
     if (!tags.includes(t)) {
-      void userData.setTags(target.name, target.isCask, [...tags, t])
+      void userData.setTags(viewTarget.name, viewTarget.isCask, [...tags, t])
     }
     setTagInput('')
   }
 
   function removeTag(t: string) {
-    if (!target) return
-    void userData.setTags(target.name, target.isCask, tags.filter((x) => x !== t))
+    if (!viewTarget) return
+    void userData.setTags(viewTarget.name, viewTarget.isCask, tags.filter((x) => x !== t))
   }
 
   return (
     <dialog className="modal modal-open">
-      <div className="modal-box max-w-2xl">
+      <div className={`modal-box ${tab === 'graph' ? 'max-w-4xl' : 'max-w-2xl'}`}>
         <button
           className="btn btn-sm btn-circle btn-ghost absolute right-3 top-3"
           onClick={onClose}
@@ -248,10 +265,10 @@ export default function PackageDetailModal({ target, onClose, onChanged }: Props
         {!loading && pkg && (
           <>
             <div className="flex items-start gap-3 pr-8">
-              <PackageIcon name={target.name} isCask={target.isCask} className="size-10 mt-0.5" />
+              <PackageIcon name={viewTarget.name} isCask={viewTarget.isCask} className="size-10 mt-0.5" />
               <button
                 className="btn btn-sm btn-circle btn-ghost mt-0.5"
-                onClick={() => userData.toggleFavorite(target.name, target.isCask)}
+                onClick={() => userData.toggleFavorite(viewTarget.name, viewTarget.isCask)}
                 aria-label={t('packageDetail.toggleFavoriteAriaLabel')}
               >
                 <StarIcon filled={favorite} className={`size-4 ${favorite ? 'text-warning' : ''}`} />
@@ -344,6 +361,13 @@ export default function PackageDetailModal({ target, onClose, onChanged }: Props
               >
                 {t('packageDetail.tabDependencies')}
               </button>
+              <button
+                role="tab"
+                className={`tab ${tab === 'graph' ? 'tab-active' : ''}`}
+                onClick={() => setTab('graph')}
+              >
+                {t('packageDetail.tabDependencyGraph')}
+              </button>
               {pkg.isCask && pkg.installed && (
                 <button
                   role="tab"
@@ -425,7 +449,7 @@ export default function PackageDetailModal({ target, onClose, onChanged }: Props
                     placeholder={t('packageDetail.notePlaceholder')}
                     value={note}
                     onChange={(e) => setNote(e.target.value)}
-                    onBlur={() => void userData.setNote(target.name, target.isCask, note)}
+                    onBlur={() => void userData.setNote(viewTarget.name, viewTarget.isCask, note)}
                   />
                 </div>
               </div>
@@ -443,6 +467,10 @@ export default function PackageDetailModal({ target, onClose, onChanged }: Props
                   </pre>
                 )}
               </div>
+            )}
+
+            {tab === 'graph' && (
+              <DependencyGraph target={viewTarget} onSelectPackage={(t) => setViewTarget(t)} />
             )}
 
             {tab === 'security' && (
