@@ -1,11 +1,28 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { api, BundleCleanupItem, CacheInfo, PackageSize } from '../lib/api'
+import { api, BundleCleanupItem, CacheInfo, LeftoverItem, LeftoverKind, PackageSize } from '../lib/api'
 import { useJobs } from '../context/JobsContext'
 import { useConfirm } from '../context/ConfirmContext'
-import { BeakerIcon, CheckIcon, DownloadIcon, ImportIcon, RefreshIcon, TrashIcon, WrenchIcon } from '../components/Icons'
+import {
+  AppWindowIcon,
+  BeakerIcon,
+  CheckIcon,
+  DownloadIcon,
+  ImportIcon,
+  RefreshIcon,
+  TrashIcon,
+  WrenchIcon,
+} from '../components/Icons'
 
-type Tab = 'doctor' | 'cleanup' | 'brewfile' | 'config'
+type Tab = 'doctor' | 'cleanup' | 'leftovers' | 'brewfile' | 'config'
+
+const leftoverKindLabelKeys: Record<LeftoverKind, string> = {
+  applicationSupport: 'maintenance.kindApplicationSupport',
+  caches: 'maintenance.kindCaches',
+  preferences: 'maintenance.kindPreferences',
+  logs: 'maintenance.kindLogs',
+  savedState: 'maintenance.kindSavedState',
+}
 
 export default function Maintenance() {
   const { t } = useTranslation()
@@ -22,6 +39,11 @@ export default function Maintenance() {
   const [cleanupOutput, setCleanupOutput] = useState<string[] | null>(null)
   const [cleanupRunning, setCleanupRunning] = useState<'preview' | 'real' | 'autoremove' | 'autoremove-preview' | null>(null)
   const [clearingCache, setClearingCache] = useState(false)
+
+  const [leftovers, setLeftovers] = useState<LeftoverItem[] | null>(null)
+  const [leftoversLoading, setLeftoversLoading] = useState(false)
+  const [selectedLeftovers, setSelectedLeftovers] = useState<Set<string>>(new Set())
+  const [deletingLeftovers, setDeletingLeftovers] = useState(false)
 
   const [config, setConfig] = useState<string | null>(null)
   const [configLoading, setConfigLoading] = useState(false)
@@ -183,6 +205,58 @@ export default function Maintenance() {
     }
   }
 
+  async function scanLeftovers() {
+    setLeftoversLoading(true)
+    setSelectedLeftovers(new Set())
+    try {
+      setLeftovers(await api.scanLeftovers())
+    } catch (e) {
+      notify('error', String(e))
+    } finally {
+      setLeftoversLoading(false)
+    }
+  }
+
+  function toggleLeftover(path: string) {
+    setSelectedLeftovers((prev) => {
+      const next = new Set(prev)
+      if (next.has(path)) {
+        next.delete(path)
+      } else {
+        next.add(path)
+      }
+      return next
+    })
+  }
+
+  function toggleAllLeftovers() {
+    if (!leftovers) return
+    setSelectedLeftovers((prev) => (prev.size === leftovers.length ? new Set() : new Set(leftovers.map((l) => l.path))))
+  }
+
+  async function deleteSelectedLeftovers() {
+    if (!leftovers || selectedLeftovers.size === 0) return
+    const selected = leftovers.filter((l) => selectedLeftovers.has(l.path))
+    const { ok } = await confirm({
+      title: t('maintenance.confirmDeleteLeftoversTitle', { count: selected.length }),
+      body: t('maintenance.confirmDeleteLeftoversBody', { names: selected.map((l) => l.name).join(', ') }),
+      confirmLabel: t('maintenance.confirmDeleteLeftoversLabel'),
+      danger: true,
+    })
+    if (!ok) return
+
+    setDeletingLeftovers(true)
+    try {
+      await api.deleteLeftovers(selected.map((l) => l.path))
+      notify('success', t('maintenance.leftoversDeleted', { count: selected.length }))
+      await scanLeftovers()
+    } catch (e) {
+      notify('error', String(e))
+    } finally {
+      setDeletingLeftovers(false)
+    }
+  }
+
   return (
     <div className="p-6 max-w-3xl">
       <h1 className="text-2xl font-bold mb-1">{t('maintenance.title')}</h1>
@@ -194,6 +268,13 @@ export default function Maintenance() {
         </button>
         <button role="tab" className={`tab ${tab === 'cleanup' ? 'tab-active' : ''}`} onClick={() => setTab('cleanup')}>
           <TrashIcon className="size-3.5 mr-1" /> {t('maintenance.tabCleanup')}
+        </button>
+        <button
+          role="tab"
+          className={`tab ${tab === 'leftovers' ? 'tab-active' : ''}`}
+          onClick={() => setTab('leftovers')}
+        >
+          <AppWindowIcon className="size-3.5 mr-1" /> {t('maintenance.tabLeftovers')}
         </button>
         <button role="tab" className={`tab ${tab === 'brewfile' ? 'tab-active' : ''}`} onClick={() => setTab('brewfile')}>
           <ImportIcon className="size-3.5 mr-1" /> {t('maintenance.tabBrewfile')}
@@ -326,6 +407,95 @@ export default function Maintenance() {
             <pre className="mockup-code text-xs overflow-x-auto max-h-96">
               <code className="whitespace-pre px-4">{cleanupOutput.join('\n') || t('maintenance.nothingToCleanUp')}</code>
             </pre>
+          )}
+        </div>
+      )}
+
+      {tab === 'leftovers' && (
+        <div className="space-y-3">
+          <p className="text-sm text-base-content/70">{t('maintenance.leftoversDescription')}</p>
+          <div className="flex items-center gap-2">
+            <button className="btn btn-sm btn-primary" disabled={leftoversLoading} onClick={scanLeftovers}>
+              {leftoversLoading ? <span className="loading loading-spinner loading-xs" /> : <AppWindowIcon className="size-4" />}
+              {t('maintenance.scanLeftovers')}
+            </button>
+            {leftovers && leftovers.length > 0 && (
+              <button className="btn btn-xs" onClick={toggleAllLeftovers}>
+                {selectedLeftovers.size === leftovers.length ? t('maintenance.selectNone') : t('maintenance.selectAll')}
+              </button>
+            )}
+          </div>
+
+          {leftoversLoading && leftovers === null && (
+            <div className="flex items-center gap-2 text-base-content/60">
+              <span className="loading loading-spinner loading-sm" /> {t('maintenance.leftoversScanning')}
+            </div>
+          )}
+
+          {leftovers && leftovers.length === 0 && (
+            <div className="alert alert-success alert-soft text-sm">{t('maintenance.noLeftoversFound')}</div>
+          )}
+
+          {leftovers && leftovers.length > 0 && (
+            <div className="space-y-2">
+              <div className="overflow-x-auto rounded-box border border-base-300">
+                <table className="table table-sm table-fixed">
+                  <colgroup>
+                    <col className="w-8" />
+                    <col />
+                    <col className="w-40" />
+                    <col className="w-24" />
+                  </colgroup>
+                  <thead>
+                    <tr>
+                      <th />
+                      <th>{t('maintenance.colName')}</th>
+                      <th>{t('maintenance.colLocation')}</th>
+                      <th className="text-right">{t('maintenance.colSize')}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {leftovers.map((item) => (
+                      <tr key={item.path} className="hover:bg-base-200">
+                        <td>
+                          <input
+                            type="checkbox"
+                            className="checkbox checkbox-sm"
+                            checked={selectedLeftovers.has(item.path)}
+                            onChange={() => toggleLeftover(item.path)}
+                          />
+                        </td>
+                        <td className="min-w-0">
+                          <div className="font-medium truncate">{item.name}</div>
+                          <div className="font-mono text-xs text-base-content/50 truncate" title={item.path}>
+                            {item.path}
+                          </div>
+                        </td>
+                        <td>
+                          <span className="badge badge-sm badge-outline">
+                            {t(leftoverKindLabelKeys[item.kind as LeftoverKind] ?? item.kind)}
+                          </span>
+                        </td>
+                        <td className="text-right font-mono text-xs">{item.sizeHuman}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-base-content/50">
+                  {selectedLeftovers.size > 0 ? t('maintenance.selectedSummary', { count: selectedLeftovers.size }) : ''}
+                </span>
+                <button
+                  className="btn btn-sm btn-error"
+                  disabled={selectedLeftovers.size === 0 || deletingLeftovers}
+                  onClick={deleteSelectedLeftovers}
+                >
+                  {deletingLeftovers ? <span className="loading loading-spinner loading-xs" /> : <TrashIcon className="size-4" />}
+                  {t('maintenance.removeSelectedButton', { count: selectedLeftovers.size })}
+                </button>
+              </div>
+            </div>
           )}
         </div>
       )}

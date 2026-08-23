@@ -18,6 +18,8 @@ export type Collection = brew.Collection
 export type TapDetail = brew.TapDetail
 export type BundleCleanupItem = brew.BundleCleanupItem
 export type PackageSize = brew.PackageSize
+export type LeftoverItem = security.LeftoverItem
+export type LeftoverKind = 'applicationSupport' | 'caches' | 'preferences' | 'logs' | 'savedState'
 
 export const api = {
   getSystemInfo: () => App.GetSystemInfo(),
@@ -78,6 +80,10 @@ export const api = {
   scanAdoptableApps: () => App.ScanAdoptableApps(),
   adoptCask: (name: string) => App.AdoptCask(name),
   findDuplicateApps: () => App.FindDuplicateApps(),
+
+  // leftover files scanner
+  scanLeftovers: () => App.ScanLeftovers(),
+  deleteLeftovers: (paths: string[]) => App.DeleteLeftovers(paths),
 
   // Mac App Store
   masAvailable: () => App.MasAvailable(),

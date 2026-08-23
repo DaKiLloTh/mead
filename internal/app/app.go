@@ -704,6 +704,26 @@ func (a *App) FindDuplicateApps() ([]brew.DuplicateApp, error) {
 	return brew.FindDuplicateApps(a.ctx)
 }
 
+// ScanLeftovers scans the well-known ~/Library locations for orphaned
+// config/cache/support files left behind by apps no longer installed via
+// Homebrew (or never brew-managed at all) -- see security.ScanLeftovers for
+// exactly which locations and how "orphaned" is decided. The result is a
+// preview only; nothing is removed until the user selects specific items
+// and confirms via DeleteLeftovers.
+func (a *App) ScanLeftovers() ([]security.LeftoverItem, error) {
+	return security.ScanLeftovers(a.ctx)
+}
+
+// DeleteLeftovers permanently removes exactly the given paths, which must
+// come from a prior ScanLeftovers result the user explicitly selected --
+// see security.DeleteLeftovers for the well-known-location safety check
+// applied before anything is touched. This is genuinely destructive and
+// irreversible; the frontend is expected to confirm via its danger-dialog
+// pattern before ever calling this.
+func (a *App) DeleteLeftovers(paths []string) error {
+	return security.DeleteLeftovers(a.ctx, paths)
+}
+
 // ---- Mac App Store bridge (via the `mas` CLI) ----
 
 func (a *App) MasAvailable() bool {
