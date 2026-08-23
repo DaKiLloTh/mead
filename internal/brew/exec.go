@@ -118,12 +118,21 @@ func EnvAllowingAutoUpdate() []string {
 // captured separately for error reporting). It does not stream output; use
 // the jobs package for long-running/interactive commands.
 func RunBrew(ctx context.Context, args ...string) (string, error) {
+	return runBrewWithEnv(ctx, Env(), args...)
+}
+
+// runBrewWithEnv is RunBrew with an explicit environment instead of the
+// default Env(). Split out so Update (below) can run with
+// EnvAllowingAutoUpdate instead of Env's update-suppressing default, the
+// same way the GUI's explicit "Update Homebrew" job already does, without
+// duplicating the process-running logic.
+func runBrewWithEnv(ctx context.Context, env []string, args ...string) (string, error) {
 	path, err := ResolveBrewPath()
 	if err != nil {
 		return "", err
 	}
 	cmd := exec.CommandContext(ctx, path, args...)
-	cmd.Env = Env()
+	cmd.Env = env
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
@@ -139,6 +148,23 @@ func RunBrew(ctx context.Context, args ...string) (string, error) {
 		return stdout.String(), errors.New(msg)
 	}
 	return stdout.String(), nil
+}
+
+// Update runs `brew update`, refreshing Homebrew's local index of available
+// formula/cask versions from its taps -- the index `brew outdated` compares
+// against, and which nothing refreshes on its own (see Env's doc comment
+// above). Like the GUI's explicit "Update Homebrew" job, this needs
+// EnvAllowingAutoUpdate rather than the default Env(), otherwise the very
+// env var that suppresses *other* commands' auto-update side effect would
+// also suppress this explicit one.
+//
+// mead-mon calls this before each outdated check so its notifications don't
+// go stale against a local index nothing else ever refreshes (see issue
+// #88); the main GUI app runs the equivalent job itself, see App.Update and
+// App.UpdateQuiet in internal/app.
+func Update(ctx context.Context) error {
+	_, err := runBrewWithEnv(ctx, EnvAllowingAutoUpdate(), "update")
+	return err
 }
 
 // runBrewLines runs brew and splits stdout into non-empty trimmed lines.

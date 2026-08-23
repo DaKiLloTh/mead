@@ -309,6 +309,18 @@ func (a *App) Update() string {
 	return a.jobs.StartWithEnv("Update Homebrew", brew.EnvAllowingAutoUpdate(), "update")
 }
 
+// UpdateQuiet runs `brew update`, same as Update, but as a quiet job (see
+// jobs.Manager.StartQuietWithEnv) that doesn't pop open the job console or
+// a completion toast. The frontend calls this on a periodic background
+// timer, roughly every 30 minutes while the app is open, so a long-running
+// session picks up genuinely new releases without the user needing to click
+// "Update Homebrew" themselves (see issue #88). The Dashboard's existing
+// "last updated" indicator (sourced from SystemInfo.HomebrewLastUpdated)
+// naturally reflects each run once it completes.
+func (a *App) UpdateQuiet() string {
+	return a.jobs.StartQuietWithEnv("Update Homebrew", brew.EnvAllowingAutoUpdate(), "update")
+}
+
 func (a *App) Cleanup(dryRun bool) string {
 	args := []string{"cleanup"}
 	if dryRun {

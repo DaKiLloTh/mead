@@ -49,6 +49,7 @@ export const api = {
   upgrade: (name: string, isCask: boolean) => App.Upgrade(name, isCask),
   upgradeAll: (greedy = false) => App.UpgradeAll(greedy),
   update: () => App.Update(),
+  updateQuiet: () => App.UpdateQuiet(),
   cleanup: (dryRun: boolean) => App.Cleanup(dryRun),
   clearCache: () => App.ClearCache(),
   doctor: () => App.Doctor(),

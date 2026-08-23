@@ -98,6 +98,64 @@ describe('JobTracker.runAction', () => {
   })
 })
 
+// A quiet job (e.g. the periodic background `brew update`, see
+// App.UpdateQuiet) must still land in the job list -- it's meant to be
+// visible in job history if the user goes looking -- but must not steal
+// focus or pop a toast the way a normal, user-initiated job does.
+describe('quiet jobs', () => {
+  it('does not call onJobStarted, but still appears in the job list', () => {
+    const { tracker, jobsSnapshots } = makeTracker()
+
+    tracker.handleStart({ id: 'job-quiet', title: 'Update Homebrew', quiet: true })
+
+    expect(jobsSnapshots.at(-1)).toEqual([
+      expect.objectContaining({ id: 'job-quiet', title: 'Update Homebrew', quiet: true, status: 'running' }),
+    ])
+  })
+
+  it('does not push a toast on success or failure', () => {
+    const { tracker, notifications } = makeTracker()
+
+    tracker.handleStart({ id: 'job-quiet-ok', title: 'Update Homebrew', quiet: true })
+    tracker.handleDone({ id: 'job-quiet-ok', success: true, exitCode: 0 })
+
+    tracker.handleStart({ id: 'job-quiet-fail', title: 'Update Homebrew', quiet: true })
+    tracker.handleDone({ id: 'job-quiet-fail', success: false, exitCode: 1, error: 'offline' })
+
+    expect(notifications).toEqual([])
+  })
+
+  it('still resolves runAction, so the caller can react to completion (e.g. refresh the UI)', async () => {
+    const { tracker } = makeTracker()
+
+    async function quietAction(): Promise<string> {
+      const id = 'job-quiet-resolve'
+      tracker.handleStart({ id, title: 'Update Homebrew', quiet: true })
+      tracker.handleDone({ id, success: true, exitCode: 0 })
+      return id
+    }
+
+    const result = await withTimeout(tracker.runAction(quietAction), 200)
+    expect(result.status).toBe('success')
+  })
+
+  it('a non-quiet job (the default) still calls onJobStarted and pushes a toast, unaffected by the quiet path', () => {
+    const notifications: Array<{ type: string; message: string }> = []
+    const started: string[] = []
+    const tracker = new JobTracker({
+      onJobsChange: () => {},
+      onNotify: (type, message) => notifications.push({ type, message }),
+      onJobStarted: (id) => started.push(id),
+    })
+
+    tracker.handleStart({ id: 'job-loud', title: 'Install wget' })
+    tracker.handleDone({ id: 'job-loud', success: true, exitCode: 0 })
+
+    expect(started).toEqual(['job-loud'])
+    expect(notifications).toEqual([{ type: 'success', message: 'Install wget — done' }])
+  })
+})
+
 // Reproduces the shape of the ORIGINAL (pre-fix) resolver bookkeeping in
 // JobsContext.tsx: the resolver was registered only *after* `action()`
 // resolved, with no fallback check for a job that had already reached a
@@ -112,6 +170,7 @@ describe('naive (pre-fix) resolver registration', () => {
         id: payload.id,
         title: 'Import Brewfile',
         lines: [],
+        quiet: false,
         status: payload.success ? 'success' : 'error',
         exitCode: payload.exitCode,
         error: payload.error,
