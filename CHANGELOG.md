@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.3.0](https://github.com/DaKiLloTh/mead/compare/v0.2.1...v0.3.0) (2026-08-23)
+
+
+### Features
+
+* add global Cmd+K command palette ([#31](https://github.com/DaKiLloTh/mead/issues/31)) ([b391282](https://github.com/DaKiLloTh/mead/commit/b391282db1f9d2f1ec355201222d16878e9b52b4))
+* add largest installed packages report to Maintenance ([#33](https://github.com/DaKiLloTh/mead/issues/33)) ([62c8060](https://github.com/DaKiLloTh/mead/commit/62c8060cc6e8d422123aa4b18b8bc25dc31bbffe))
+* real app icons, monogram fallback, and Applications grid ([#55](https://github.com/DaKiLloTh/mead/issues/55)) ([#60](https://github.com/DaKiLloTh/mead/issues/60)) ([3e5b89a](https://github.com/DaKiLloTh/mead/commit/3e5b89a221c56c39df0c49af1f913839e3619dc3))
+
+
+### Bug Fixes
+
+* **brew:** stop swallowing cache-size errors and blank cask names ([#38](https://github.com/DaKiLloTh/mead/issues/38)) ([aad3f08](https://github.com/DaKiLloTh/mead/commit/aad3f08e469db584830a290f7404adf0c561ec47))
+* open external links in system browser instead of target=_blank ([#41](https://github.com/DaKiLloTh/mead/issues/41)) ([1dacdaf](https://github.com/DaKiLloTh/mead/commit/1dacdaffd72094c4dc7efcb8df8a34c154ef1671))
+* pin sidebar drag-region and logo, scroll nav content independently ([#43](https://github.com/DaKiLloTh/mead/issues/43)) ([3c660bc](https://github.com/DaKiLloTh/mead/commit/3c660bccfde234c428ba0c10773dc55f0ae93bc0)), closes [#35](https://github.com/DaKiLloTh/mead/issues/35)
+* tighten ValidName against path traversal, move RunCmd out of brew ([#39](https://github.com/DaKiLloTh/mead/issues/39)) ([87ebf55](https://github.com/DaKiLloTh/mead/commit/87ebf55e74fcc9c719452d4ee4a08133d706493b))
+* transliterate accents in slugifyAppName, batch adopt scan's brew info calls ([#40](https://github.com/DaKiLloTh/mead/issues/40)) ([525b467](https://github.com/DaKiLloTh/mead/commit/525b4679df60c77bc796adb104b3bdfb0b919674))
+
 ## [0.2.1](https://github.com/DaKiLloTh/mead/compare/v0.2.0...v0.2.1) (2026-08-22)
 
 
