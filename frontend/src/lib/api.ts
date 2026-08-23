@@ -43,6 +43,7 @@ export const api = {
   upgradeAll: (greedy = false) => App.UpgradeAll(greedy),
   update: () => App.Update(),
   cleanup: (dryRun: boolean) => App.Cleanup(dryRun),
+  clearCache: () => App.ClearCache(),
   doctor: () => App.Doctor(),
   pin: (name: string) => App.Pin(name),
   unpin: (name: string) => App.Unpin(name),

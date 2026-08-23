@@ -258,6 +258,8 @@
     "runDoctor": "Run brew doctor",
     "doctorAllGood": "Your system is ready to brew.",
     "downloadCache": "Download cache",
+    "clearCacheButton": "Clear cache",
+    "clearCacheDescription": "Homebrew's normal cleanup keeps recent downloads around (in case you reinstall), so the cache can still show files right after cleaning up. This removes everything in the cache, regardless of age.",
     "largestDescription": "Largest installed packages. See what's taking up the most disk space.",
     "scanning": "Scanning…",
     "colName": "Name",
