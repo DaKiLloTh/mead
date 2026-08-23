@@ -7,6 +7,7 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestBuildSystemInfo_Success(t *testing.T) {
@@ -118,6 +119,28 @@ func TestBuildSystemInfo_BothFail_ListInstalledErrorTakesPrecedence(t *testing.T
 	}
 	if !errors.Is(err, listErr) {
 		t.Errorf("expected the ListInstalled error to be the one surfaced, got %v", err)
+	}
+}
+
+func TestHomebrewLastUpdatedString_Success(t *testing.T) {
+	mtime := time.Date(2026, 8, 20, 14, 30, 0, 0, time.FixedZone("BST", 3600))
+
+	got := homebrewLastUpdatedString(mtime, nil)
+
+	want := "2026-08-20T13:30:00Z" // normalized to UTC
+	if got != want {
+		t.Errorf("homebrewLastUpdatedString = %q, want %q", got, want)
+	}
+}
+
+func TestHomebrewLastUpdatedString_StatError(t *testing.T) {
+	// A stat error (non-git install, brew update never run, permissions,
+	// ...) must yield "" rather than propagating -- this is a nice-to-have
+	// indicator, not something that should fail GetSystemInfo.
+	got := homebrewLastUpdatedString(time.Now(), os.ErrNotExist)
+
+	if got != "" {
+		t.Errorf("homebrewLastUpdatedString with a stat error = %q, want empty string", got)
 	}
 }
 
