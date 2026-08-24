@@ -86,7 +86,7 @@ export const api = {
 
   // adopt & duplicates
   scanAdoptableApps: () => App.ScanAdoptableApps(),
-  adoptCask: (name: string) => App.AdoptCask(name),
+  adoptCask: (name: string, force: boolean) => App.AdoptCask(name, force),
   findDuplicateApps: () => App.FindDuplicateApps(),
 
   // leftover files scanner

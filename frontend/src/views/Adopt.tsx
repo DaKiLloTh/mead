@@ -10,6 +10,17 @@ interface Props {
   bump: () => void
 }
 
+// Whether the installed app's version differs from the cask's, meaning
+// brew's --adopt (which only succeeds for an identical on-disk version)
+// won't work and AdoptCask needs to pass force=true (--force) instead, to
+// download and overwrite the app with the cask's version. See AdoptCask
+// and buildAdoptCaskArgs in internal/app/app.go for the brew-side half of
+// this: a live adopt attempt on a version-mismatched app failed outright
+// with brew's own "the bundle short version ... is X but is Y" error.
+function needsForceAdopt(c: AdoptCandidate): boolean {
+  return !!c.installedVersion && !!c.caskVersion && c.installedVersion !== c.caskVersion
+}
+
 export default function Adopt({ bump }: Props) {
   const { t } = useTranslation()
   const { runAction } = useJobs()
@@ -34,14 +45,16 @@ export default function Adopt({ bump }: Props) {
   }
 
   async function adopt(c: AdoptCandidate) {
+    const force = needsForceAdopt(c)
     if (c.matchConfidence === 'possible') {
+      const body = t('adopt.possibleMatchWarningBody', {
+        appName: c.appName,
+        caskToken: c.caskToken,
+        reason: c.matchReason || '',
+      })
       const { ok } = await confirm({
         title: t('adopt.possibleMatchWarningTitle'),
-        body: t('adopt.possibleMatchWarningBody', {
-          appName: c.appName,
-          caskToken: c.caskToken,
-          reason: c.matchReason || '',
-        }),
+        body: force ? `${body} ${t('adopt.possibleMatchForceWarningExtra')}` : body,
         danger: true,
         confirmLabel: t('adopt.possibleMatchConfirmLabel'),
       })
@@ -62,7 +75,7 @@ export default function Adopt({ bump }: Props) {
       if (!ok) return
     }
     setAdopting(c.caskToken)
-    await runAction(() => api.adoptCask(c.caskToken))
+    await runAction(() => api.adoptCask(c.caskToken, force))
     setAdopting(null)
     setCandidates((prev) => prev?.filter((x) => x.caskToken !== c.caskToken) ?? null)
     bump()
@@ -98,8 +111,7 @@ export default function Adopt({ bump }: Props) {
           ) : (
             <div className="flex flex-col gap-3">
               {candidates.map((c) => {
-                const versionsDiffer =
-                  !!c.installedVersion && !!c.caskVersion && c.installedVersion !== c.caskVersion
+                const versionsDiffer = needsForceAdopt(c)
                 const adoptLabel = c.possibleDowngrade
                   ? t('adopt.adoptAndDowngradeButton')
                   : versionsDiffer
