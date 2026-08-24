@@ -121,6 +121,13 @@ type AdoptCandidate struct {
 	// CaskVersion, meaning adopting (and a later `brew upgrade`) could
 	// downgrade the app that's actually running.
 	PossibleDowngrade bool `json:"possibleDowngrade"`
+	// IsAppStoreApp is true when the app bundle carries a Mac App Store
+	// receipt (Contents/_MASReceipt/receipt), meaning it was installed
+	// from and updates through the App Store rather than the developer's
+	// own distribution -- Homebrew's cask for the same app is usually a
+	// separate, unofficial download, so the App Store is probably the
+	// preferred way to keep it updated instead of adopting it here.
+	IsAppStoreApp bool `json:"isAppStoreApp"`
 }
 
 // DuplicateApp flags a name that shows up as both an installed formula and
