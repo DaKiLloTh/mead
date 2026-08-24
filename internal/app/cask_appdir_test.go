@@ -67,12 +67,15 @@ func TestCaskFlagsFor(t *testing.T) {
 
 func TestBuildAdoptCaskArgs(t *testing.T) {
 	t.Run("no custom dir", func(t *testing.T) {
-		args := buildAdoptCaskArgs("google-chrome", "")
+		args := buildAdoptCaskArgs("google-chrome", "", false)
 		if !containsFlag(args, "--cask") {
 			t.Errorf("expected --cask in %v", args)
 		}
 		if !containsFlag(args, "--adopt") {
 			t.Errorf("expected --adopt in %v", args)
+		}
+		if containsFlag(args, "--force") {
+			t.Errorf("did not expect --force when force is false: %v", args)
 		}
 		if !containsFlag(args, "google-chrome") {
 			t.Errorf("expected package name in %v", args)
@@ -83,7 +86,7 @@ func TestBuildAdoptCaskArgs(t *testing.T) {
 	})
 
 	t.Run("custom dir", func(t *testing.T) {
-		args := buildAdoptCaskArgs("google-chrome", "/Volumes/Data/Applications")
+		args := buildAdoptCaskArgs("google-chrome", "/Volumes/Data/Applications", false)
 		if !containsFlag(args, "--appdir=/Volumes/Data/Applications") {
 			t.Errorf("expected --appdir=/Volumes/Data/Applications in %v", args)
 		}
@@ -92,6 +95,19 @@ func TestBuildAdoptCaskArgs(t *testing.T) {
 		}
 		if !containsFlag(args, "--adopt") {
 			t.Errorf("expected --adopt in %v", args)
+		}
+	})
+
+	t.Run("force, version mismatch", func(t *testing.T) {
+		args := buildAdoptCaskArgs("bambu-studio", "", true)
+		if !containsFlag(args, "--force") {
+			t.Errorf("expected --force in %v", args)
+		}
+		if containsFlag(args, "--adopt") {
+			t.Errorf("did not expect --adopt when force is true (brew rejects combining them): %v", args)
+		}
+		if !containsFlag(args, "bambu-studio") {
+			t.Errorf("expected package name in %v", args)
 		}
 	})
 }

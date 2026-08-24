@@ -781,23 +781,42 @@ func (a *App) ScanAdoptableApps() ([]brew.AdoptCandidate, error) {
 	return brew.ScanAdoptableApps(a.ctx)
 }
 
-// buildAdoptCaskArgs builds the `brew install --cask --adopt <name>`
-// argument list, including --appdir if a custom cask install directory is
-// configured. Pure so it's directly unit testable.
-func buildAdoptCaskArgs(name string, caskAppDir string) []string {
+// buildAdoptCaskArgs builds the `brew install --cask <name>` argument list
+// for taking over management of an app that's already installed by hand,
+// including --appdir if a custom cask install directory is configured.
+// Pure so it's directly unit testable.
+//
+// Homebrew's --adopt only succeeds when the on-disk app is the exact same
+// version as the cask being installed -- it's meant for "this is already
+// the same app, just start tracking it," and hard-fails otherwise
+// ("The bundle short version of ... is X but is Y for ...!"), which is
+// real behavior confirmed against a live version mismatch. So --adopt is
+// only used when force is false (installed and cask versions already
+// match, or the match couldn't be verified); when force is true (the
+// candidate's installed version differs from the cask's, i.e. adopting
+// also means updating or downgrading it), --force is used instead, which
+// downloads the cask's version and overwrites what's on disk. The two
+// flags can't be combined (brew rejects that outright), so this is a
+// choice between them, not both.
+func buildAdoptCaskArgs(name string, caskAppDir string, force bool) []string {
 	args := []string{"install"}
 	args = append(args, caskFlagsFor(caskAppDir)...)
-	args = append(args, "--adopt", name)
+	if force {
+		args = append(args, "--force", name)
+	} else {
+		args = append(args, "--adopt", name)
+	}
 	return args
 }
 
 // AdoptCask takes over management of an app that's already installed by
-// hand, using brew's own --adopt flag so it doesn't reinstall/overwrite it.
-func (a *App) AdoptCask(name string) string {
+// hand. force should be true when the candidate's installed version
+// differs from the cask's current version (see buildAdoptCaskArgs).
+func (a *App) AdoptCask(name string, force bool) string {
 	if err := brew.ValidName(name); err != nil {
 		return a.jobs.Fail(fmt.Sprintf("Adopt %s", name), err.Error())
 	}
-	args := buildAdoptCaskArgs(name, a.store.CaskAppDir())
+	args := buildAdoptCaskArgs(name, a.store.CaskAppDir(), force)
 	return a.jobs.StartTracked(fmt.Sprintf("Adopt %s", name), a.record("adopt", name, true), args...)
 }
 
