@@ -229,12 +229,8 @@
     "scanningHint": "Checking each app against Homebrew's cask index. This can take a little while.",
     "scanFailedTitle": "Scan failed",
     "nothingToAdopt": "Nothing to adopt. Everything matched is already Homebrew-managed (or nothing matched a known cask).",
-    "colApp": "App",
-    "colMatchedCask": "Matched cask",
     "colInstalledVersion": "Installed",
     "colHomebrewVersion": "Homebrew",
-    "colMatch": "Match",
-    "colAction": "Action",
     "adoptButton": "Adopt",
     "versionUnknown": "unknown",
     "matchExact": "Match",
@@ -244,7 +240,11 @@
     "downgradeConfirmLabel": "Adopt anyway",
     "possibleMatchWarningTitle": "This is a possible match, not a confirmed one",
     "possibleMatchWarningBody": "mead isn't fully certain {{appName}} corresponds to the cask {{caskToken}}. {{reason}}",
-    "possibleMatchConfirmLabel": "Adopt anyway"
+    "possibleMatchConfirmLabel": "Adopt anyway",
+    "caskLabel": "Cask:",
+    "adoptAndUpdateButton": "Adopt and update",
+    "adoptAndDowngradeButton": "Adopt and downgrade",
+    "appStoreWarning": "Installed from the App Store. It updates through the App Store, not Homebrew, so that's probably the better way to keep it current."
   },
   "appstore": {
     "title": "App Store",

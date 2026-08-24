@@ -1,6 +1,8 @@
 package brew
 
 import (
+	"os"
+	"path/filepath"
 	"reflect"
 	"testing"
 )
@@ -208,6 +210,40 @@ func TestBuildMatchConfidence(t *testing.T) {
 			}
 			if gotReason != tt.wantReason {
 				t.Errorf("reason = %q, want %q", gotReason, tt.wantReason)
+			}
+		})
+	}
+}
+
+func TestIsAppStoreApp(t *testing.T) {
+	masApp := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(masApp, "Contents", "_MASReceipt"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(masApp, "Contents", "_MASReceipt", "receipt"), []byte("receipt"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	directApp := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(directApp, "Contents"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	missingApp := filepath.Join(t.TempDir(), "DoesNotExist.app")
+
+	tests := []struct {
+		name    string
+		appPath string
+		want    bool
+	}{
+		{"has MAS receipt", masApp, true},
+		{"no MAS receipt", directApp, false},
+		{"app path doesn't exist", missingApp, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := isAppStoreApp(tt.appPath); got != tt.want {
+				t.Errorf("isAppStoreApp(%q) = %v, want %v", tt.appPath, got, tt.want)
 			}
 		})
 	}

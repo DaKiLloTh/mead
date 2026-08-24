@@ -228,6 +228,16 @@ func buildMatchConfidence(tokenExact bool, appDirName string, info BrewPackage) 
 	return "possible", strings.Join(reasons, "; ")
 }
 
+// isAppStoreApp reports whether the app bundle at appPath was installed
+// from the Mac App Store, detected via the receipt every MAS-distributed
+// app carries at Contents/_MASReceipt/receipt. This is the same signal
+// macOS itself uses to tell a Store install apart from a direct download,
+// so it doesn't depend on the `mas` CLI being installed at all.
+func isAppStoreApp(appPath string) bool {
+	_, err := os.Stat(filepath.Join(appPath, "Contents", "_MASReceipt", "receipt"))
+	return err == nil
+}
+
 // batchSlugs partitions slugs into consecutive chunks of at most size,
 // preserving order. size <= 0 is treated as "everything in one batch".
 func batchSlugs(slugs []string, size int) [][]string {
@@ -370,6 +380,7 @@ func ScanAdoptableApps(ctx context.Context) ([]AdoptCandidate, error) {
 			MatchConfidence:   confidence,
 			MatchReason:       reason,
 			PossibleDowngrade: PossibleDowngrade(installedVersion, info.Version),
+			IsAppStoreApp:     isAppStoreApp(c.appPath),
 		})
 	}
 
