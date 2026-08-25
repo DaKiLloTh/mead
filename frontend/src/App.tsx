@@ -67,11 +67,22 @@ function AppShell() {
   const [headerUpdateBusy, setHeaderUpdateBusy] = useState(false)
   const installedPackages = useInstalledPackages()
 
-  // Dashboard's Health tile needs to land on Installed pre-filtered (e.g. to
-  // the deprecated/disabled/pinned subset), while every other caller of
-  // onNavigate (Sidebar, CommandPalette, Dashboard's own other stats) just
-  // wants a plain view switch. Keep setView as the simple path and only give
-  // Dashboard this extra capability.
+  // Dashboard's Health tile and stat tiles need to land on Installed
+  // pre-filtered (e.g. to the deprecated/disabled/pinned subset), while
+  // every other caller of onNavigate (Sidebar, CommandPalette) just wants a
+  // plain view switch. changeView is that plain path, and every one of
+  // those callers goes through it rather than setView directly, so that a
+  // later, unrelated visit to Installed doesn't inherit a stale filter from
+  // some earlier Health-tile click -- installedInitialFilter previously
+  // stuck around in this state forever once set, since nothing ever cleared
+  // it back to undefined (see issue #114): click "Deprecated" on Dashboard,
+  // navigate elsewhere, then open Installed again from the sidebar, and it
+  // would still land pre-filtered to Deprecated instead of showing All.
+  const changeView = (v: ViewKey) => {
+    setInstalledInitialFilter(undefined)
+    setView(v)
+  }
+
   const navigateToInstalled = (filter?: InstalledFilter) => {
     setInstalledInitialFilter(filter)
     setView('installed')
@@ -154,7 +165,7 @@ function AppShell() {
   return (
     <div className="h-full flex flex-col bg-base-100 text-base-content">
       <div className="flex flex-1 min-h-0">
-        <Sidebar view={view} onSelect={setView} outdatedCount={outdatedCount} />
+        <Sidebar view={view} onSelect={changeView} outdatedCount={outdatedCount} />
         <div className="flex-1 min-w-0 flex flex-col">
           <div className="drag-region h-9 shrink-0 flex items-center px-6">
             <span className="text-sm font-medium text-base-content/60">{t(viewTitleKeys[view])}</span>
@@ -180,7 +191,7 @@ function AppShell() {
           </div>
           <div className="flex-1 min-h-0 overflow-y-auto">
             {view === 'dashboard' && (
-              <Dashboard onNavigate={setView} onNavigateInstalled={navigateToInstalled} refreshToken={refreshToken} />
+              <Dashboard onNavigate={changeView} onNavigateInstalled={navigateToInstalled} refreshToken={refreshToken} />
             )}
             {view === 'installed' && (
               <Installed refreshToken={refreshToken} bump={bump} initialFilter={installedInitialFilter} />
@@ -202,7 +213,7 @@ function AppShell() {
       </div>
       <JobConsole />
       <Toasts />
-      <CommandPalette onNavigate={setView} bump={bump} />
+      <CommandPalette onNavigate={changeView} bump={bump} />
     </div>
   )
 }
