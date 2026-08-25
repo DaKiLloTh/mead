@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.8.0](https://github.com/DaKiLloTh/mead/compare/v0.7.0...v0.8.0) (2026-08-24)
+
+
+### Features
+
+* redesign Adopt cards with deterministic actions and App Store detection ([40208e9](https://github.com/DaKiLloTh/mead/commit/40208e9072dacc0b1e06fb2c474c3ea6c4e16e15))
+
+
+### Bug Fixes
+
+* refresh SystemInfo from bump(), clarify Adopt's version columns ([b624b41](https://github.com/DaKiLloTh/mead/commit/b624b41f252e7bc3d991a43a414892505256e3e8))
+* use --force instead of --adopt when adopting a version-mismatched app ([993bd75](https://github.com/DaKiLloTh/mead/commit/993bd75fe4da04f8b458aa262e6047e278095a93))
+
 ## [0.7.0](https://github.com/DaKiLloTh/mead/compare/v0.6.0...v0.7.0) (2026-08-23)
 
 
