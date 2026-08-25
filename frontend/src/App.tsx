@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { JobsProvider, useJobs } from './context/JobsContext'
 import { ConfirmProvider } from './context/ConfirmContext'
-import { UserDataProvider } from './context/UserDataContext'
+import { UserDataProvider, useUserData } from './context/UserDataContext'
 import { InstalledPackagesProvider, useInstalledPackages } from './context/InstalledPackagesContext'
 import { SystemInfoProvider, useSystemInfo } from './context/SystemInfoContext'
 import { RefreshIcon } from './components/Icons'
@@ -60,6 +60,7 @@ function AppShell() {
   const { t } = useTranslation()
   const { runAction } = useJobs()
   const { info: systemInfo, refresh: refreshSystemInfo } = useSystemInfo()
+  const userData = useUserData()
   const [view, setView] = useState<ViewKey>('dashboard')
   const [refreshToken, setRefreshToken] = useState(0)
   const [outdatedCount, setOutdatedCount] = useState(0)
@@ -125,12 +126,17 @@ function AppShell() {
       })
   }
 
+  // Matches Updates.tsx's own "N update(s)" headline, which is
+  // visible.length (snoozed packages excluded), not the raw outdated
+  // count -- otherwise the sidebar badge and the Updates page disagree
+  // any time something's snoozed. See issue #124.
   useEffect(() => {
     api
       .outdated()
-      .then((o) => setOutdatedCount(o.length))
+      .then((o) => setOutdatedCount(o.filter((p) => !userData.snoozedUntil(p.name, p.isCask)).length))
       .catch(() => {})
-  }, [refreshToken])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refreshToken, userData.data])
 
   // Periodically refresh Homebrew's own update index in the background (see
   // issue #88 and BACKGROUND_HOMEBREW_UPDATE_INTERVAL_MS above), for as long
