@@ -79,11 +79,11 @@ export default function Dashboard({ onNavigate, onNavigateInstalled, refreshToke
       {info && (
         <>
           <div className="stats shadow stats-vertical sm:stats-horizontal w-full bg-base-200 mb-6">
-            <div className="stat cursor-pointer" onClick={() => onNavigate('installed')}>
+            <div className="stat cursor-pointer" onClick={() => onNavigateInstalled('formula')}>
               <div className="stat-title">{t('dashboard.statFormulaeInstalled')}</div>
               <div className="stat-value text-primary">{info.installedFormulaCount}</div>
             </div>
-            <div className="stat cursor-pointer" onClick={() => onNavigate('installed')}>
+            <div className="stat cursor-pointer" onClick={() => onNavigateInstalled('cask')}>
               <div className="stat-title">{t('dashboard.statCasksInstalled')}</div>
               <div className="stat-value text-accent">{info.installedCaskCount}</div>
             </div>
