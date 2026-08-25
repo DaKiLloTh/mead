@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.9.0](https://github.com/DaKiLloTh/mead/compare/v0.8.0...v0.9.0) (2026-08-25)
+
+
+### Features
+
+* show real icons for Mac App Store apps ([91e2cbd](https://github.com/DaKiLloTh/mead/commit/91e2cbd5cbcf11806788425da0b6e6607eb8bfe0))
+
+
+### Bug Fixes
+
+* clear stale Installed filter on plain navigation ([907fcee](https://github.com/DaKiLloTh/mead/commit/907fcee6218fe6de29ac40b4679af9b3a4d791a3))
+* dashboard stat tiles filter Installed instead of landing on All ([d281a34](https://github.com/DaKiLloTh/mead/commit/d281a345bc6351021c37643363db487684bb4f97))
+* sync sidebar Updates badge with the page (snooze + shared fetch) ([24a7112](https://github.com/DaKiLloTh/mead/commit/24a711241157a73d335627998e1afaed0d8fdd56))
+
 ## [0.8.0](https://github.com/DaKiLloTh/mead/compare/v0.7.0...v0.8.0) (2026-08-24)
 
 
