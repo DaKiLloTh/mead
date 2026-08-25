@@ -189,6 +189,37 @@ func ResolveCaskAppPath(pkg *brew.BrewPackage) string {
 	return ""
 }
 
+// ResolveMasAppPath resolves a Mac App Store app's display name (as `mas
+// list` reports it, e.g. "Windows App") to its installed .app bundle in
+// /Applications. Unlike a cask, there's no manifest telling us the real
+// filename, but in practice `mas`'s display name and the .app's own
+// filename match exactly for every app checked while building this (mas
+// list vs. ls /Applications: "WhatsApp" -> WhatsApp.app, "Windows App" ->
+// "Windows App.app"), so that's tried first. The case-insensitive
+// directory scan is a fallback for the rare case where they differ only in
+// casing, not a primary strategy -- if neither matches, "" is returned
+// like ResolveCaskAppPath, and the caller treats that as "no icon"
+// rather than an error.
+func ResolveMasAppPath(name string) string {
+	guess := filepath.Join("/Applications", name+".app")
+	if _, err := os.Stat(guess); err == nil {
+		return guess
+	}
+	entries, err := os.ReadDir("/Applications")
+	if err != nil {
+		return ""
+	}
+	for _, e := range entries {
+		if !e.IsDir() || !strings.HasSuffix(e.Name(), ".app") {
+			continue
+		}
+		if strings.EqualFold(strings.TrimSuffix(e.Name(), ".app"), name) {
+			return filepath.Join("/Applications", e.Name())
+		}
+	}
+	return ""
+}
+
 // CreateLocalSnapshot creates an instant local APFS snapshot of the boot
 // volume via `tmutil localsnapshot` -- a lightweight safety net before a
 // destructive operation. It does not require an external Time Machine disk;

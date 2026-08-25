@@ -52,3 +52,14 @@ func TestResolveCaskAppPathUnmanagedFails(t *testing.T) {
 		t.Fatalf("ResolveCaskAppPath() = %q, want empty string for an unresolvable cask", got)
 	}
 }
+
+// TestResolveMasAppPathNotFound mirrors TestResolveCaskAppPathUnmanagedFails:
+// a mas display name with no matching /Applications entry (exact or
+// case-insensitive) resolves to "" rather than an error, same "no icon"
+// signal MasAppIcon relies on.
+func TestResolveMasAppPathNotFound(t *testing.T) {
+	got := ResolveMasAppPath("Definitely Not An Installed App XYZ123")
+	if got != "" {
+		t.Fatalf("ResolveMasAppPath() = %q, want empty string for an app that isn't installed", got)
+	}
+}
