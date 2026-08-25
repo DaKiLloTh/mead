@@ -46,11 +46,11 @@ function withConcurrencyLimit<T>(run: () => Promise<T>): Promise<T> {
   })
 }
 
-function fetchIcon(name: string): Promise<string> {
-  let promise = inflight.get(name)
+function fetchIcon(cacheKey: string, run: () => Promise<string>): Promise<string> {
+  let promise = inflight.get(cacheKey)
   if (!promise) {
-    promise = withConcurrencyLimit(() => api.caskIcon(name)).catch(() => '')
-    inflight.set(name, promise)
+    promise = withConcurrencyLimit(run).catch(() => '')
+    inflight.set(cacheKey, promise)
   }
   return promise
 }
@@ -75,7 +75,7 @@ function fetchIcon(name: string): Promise<string> {
 export function prefetchCaskIcons(names: string[]): void {
   for (const name of names) {
     if (cache.has(name)) continue
-    fetchIcon(name).then((uri) => {
+    fetchIcon(name, () => api.caskIcon(name)).then((uri) => {
       cache.set(name, uri)
     })
   }
@@ -89,14 +89,33 @@ export function prefetchCaskIcons(names: string[]): void {
  * ../components/PackageIcon.tsx) whenever this returns null.
  */
 export function useCaskIcon(name: string | undefined, isCask: boolean): string | null {
-  const [icon, setIcon] = useState<string | null>(() => (name && isCask ? cache.get(name) || null : null))
+  return useIcon(isCask ? name : undefined, name ?? '', () => api.caskIcon(name ?? ''))
+}
+
+/**
+ * Same shape and caching behavior as useCaskIcon, but for a Mac App Store
+ * app's icon (see App.MasAppIcon in internal/app/app.go). `available` gates
+ * the fetch the same way `isCask` gates useCaskIcon -- pass false (or omit
+ * a name) for anything that isn't a mas app, e.g. when a component might
+ * render either a cask or a mas app depending on context.
+ *
+ * Cache key is prefixed the same way the backend's own cache prefixes it,
+ * to keep this namespace separate from useCaskIcon's even though a real
+ * collision between a cask token and a mas display name is unlikely.
+ */
+export function useMasAppIcon(name: string | undefined, available: boolean): string | null {
+  return useIcon(available ? name : undefined, `mas:${name ?? ''}`, () => api.masAppIcon(name ?? ''))
+}
+
+function useIcon(name: string | undefined, cacheKey: string, run: () => Promise<string>): string | null {
+  const [icon, setIcon] = useState<string | null>(() => (name ? cache.get(cacheKey) || null : null))
 
   useEffect(() => {
-    if (!name || !isCask) {
+    if (!name) {
       setIcon(null)
       return
     }
-    const cached = cache.get(name)
+    const cached = cache.get(cacheKey)
     if (cached !== undefined) {
       setIcon(cached || null)
       return
@@ -104,14 +123,15 @@ export function useCaskIcon(name: string | undefined, isCask: boolean): string |
 
     setIcon(null)
     let cancelled = false
-    fetchIcon(name).then((uri) => {
-      cache.set(name, uri)
+    fetchIcon(cacheKey, run).then((uri) => {
+      cache.set(cacheKey, uri)
       if (!cancelled) setIcon(uri || null)
     })
     return () => {
       cancelled = true
     }
-  }, [name, isCask])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [name, cacheKey])
 
   return icon
 }

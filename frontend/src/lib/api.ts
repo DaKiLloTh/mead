@@ -122,6 +122,7 @@ export const api = {
 
   // app icons / launching
   caskIcon: (name: string) => App.CaskIcon(name),
+  masAppIcon: (name: string) => App.MasAppIcon(name),
   openCaskApp: (name: string) => App.OpenCaskApp(name),
 
   // settings

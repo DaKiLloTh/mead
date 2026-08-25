@@ -4,6 +4,7 @@ import { api, MasApp } from '../lib/api'
 import { useJobs } from '../context/JobsContext'
 import { ArrowUpCircleIcon, DownloadIcon, RefreshIcon, StoreIcon } from '../components/Icons'
 import ExternalLink from '../components/ExternalLink'
+import PackageIcon from '../components/PackageIcon'
 
 export default function AppStore() {
   const { t } = useTranslation()
@@ -135,7 +136,12 @@ export default function AppStore() {
               <tbody>
                 {apps.map((app) => (
                   <tr key={app.id} className="hover:bg-base-200">
-                    <td className="font-medium truncate">{app.name}</td>
+                    <td className="font-medium">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <PackageIcon name={app.name} isCask={false} isMas className="size-5" />
+                        <span className="truncate">{app.name}</span>
+                      </div>
+                    </td>
                     <td className="font-mono text-xs wrap-break-word">
                       {app.installedVersion}
                       {outdatedIds.has(app.id) && (

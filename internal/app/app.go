@@ -743,6 +743,39 @@ func (a *App) extractCaskIcon(name string) string {
 	return dataURI
 }
 
+// MasAppIcon returns a Mac App Store app's icon, same shape and caching
+// behavior as CaskIcon (see its doc comment), just resolved via
+// security.ResolveMasAppPath instead of a cask's manifest since a mas app
+// has no Homebrew-side artifacts list to consult. Cache key is prefixed to
+// keep this namespace separate from CaskIcon's, even though a real
+// collision between a cask token and a mas display name is unlikely.
+func (a *App) MasAppIcon(name string) (string, error) {
+	cacheKey := "mas:" + name
+
+	a.iconsMu.Lock()
+	if cached, ok := a.icons[cacheKey]; ok {
+		a.iconsMu.Unlock()
+		return cached, nil
+	}
+	a.iconsMu.Unlock()
+
+	dataURI := ""
+	if appPath := security.ResolveMasAppPath(name); appPath != "" {
+		if d, err := security.ExtractAppIcon(a.ctx, appPath); err == nil {
+			dataURI = d
+		}
+	}
+
+	a.iconsMu.Lock()
+	if a.icons == nil {
+		a.icons = map[string]string{}
+	}
+	a.icons[cacheKey] = dataURI
+	a.iconsMu.Unlock()
+
+	return dataURI, nil
+}
+
 // OpenCaskApp launches an installed cask's .app bundle via `open`, the
 // double-click action in the Applications grid -- distinct from
 // RevealPackage, which only selects the app in Finder without launching it.
