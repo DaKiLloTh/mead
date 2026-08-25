@@ -1,0 +1,49 @@
+// Framework-independent decision logic for OutdatedContext, extracted so the
+// "what happens to the cache when a fetch resolves" behavior can be unit
+// tested without rendering React or mocking timers.
+//
+// Mirrors systemInfoCache.ts/installedPackagesCache.ts: a failure should only
+// ever surface as a user-visible error when there is no previously-good
+// cache to fall back on. Once we have a good outdated list, a later failed
+// fetch (background poll or otherwise) must never wipe it out or replace it
+// with an error, it should be logged by the caller and retried next time,
+// leaving the last-known-good data on screen.
+
+import type { OutdatedPackage } from '../lib/api'
+
+export interface OutdatedState {
+  items: OutdatedPackage[] | null
+  loading: boolean
+  error: string | null
+}
+
+export const initialOutdatedState: OutdatedState = {
+  items: null,
+  loading: true,
+  error: null,
+}
+
+export type FetchOutcome = { ok: true; items: OutdatedPackage[] } | { ok: false; error: string }
+
+/**
+ * Pure reducer: given the current cache state and the outcome of a fetch
+ * (initial load, background poll, or explicit refresh), returns the next
+ * state.
+ *
+ * - success: always replace `items`, clear any error, loading -> false.
+ * - failure while we have no good data yet (`items === null`, i.e. this was
+ *   the initial load): surface the error, loading -> false.
+ * - failure while we already have good data: keep serving it unchanged
+ *   (aside from clearing the initial `loading` flag if still set), the
+ *   failure is not reflected in the returned state at all, so the caller
+ *   should log it separately rather than expect this function to surface it.
+ */
+export function applyFetchOutcome(state: OutdatedState, outcome: FetchOutcome): OutdatedState {
+  if (outcome.ok) {
+    return { items: outcome.items, loading: false, error: null }
+  }
+  if (state.items === null) {
+    return { items: null, loading: false, error: outcome.error }
+  }
+  return state.loading ? { ...state, loading: false } : state
+}

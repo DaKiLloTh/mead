@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { api, OutdatedPackage } from '../lib/api'
 import { useJobs } from '../context/JobsContext'
 import { useUserData } from '../context/UserDataContext'
+import { useOutdated } from '../context/OutdatedContext'
 import PackageDetailModal, { DetailTarget } from '../components/PackageDetailModal'
 import { ArrowUpCircleIcon, ClockIcon, RefreshIcon } from '../components/Icons'
 
@@ -21,26 +22,52 @@ export default function Updates({ refreshToken, bump }: Props) {
   const { t } = useTranslation()
   const { runAction } = useJobs()
   const userData = useUserData()
-  const [items, setItems] = useState<OutdatedPackage[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  // Non-greedy reads from the shared OutdatedContext cache (same source the
+  // sidebar badge uses), rather than this view running its own independent
+  // `api.outdated()` fetch -- two separate fetches racing to resolve is
+  // exactly what made the sidebar badge and this page's own count disagree
+  // for a moment after every refresh, even with nothing snoozed (issue
+  // #124). The greedy toggle below is a genuinely different query
+  // (`--greedy` pulls in a superset Homebrew normally excludes), so it
+  // isn't served by the shared cache and still runs its own fetch, only
+  // while active.
+  const outdated = useOutdated()
+  const [greedyItems, setGreedyItems] = useState<OutdatedPackage[]>([])
+  const [greedyLoading, setGreedyLoading] = useState(false)
+  const [greedyError, setGreedyError] = useState<string | null>(null)
   const [rowBusy, setRowBusy] = useState<string | null>(null)
   const [upgradingAll, setUpgradingAll] = useState(false)
   const [showSnoozed, setShowSnoozed] = useState(false)
   const [greedy, setGreedy] = useState(false)
   const [detail, setDetail] = useState<DetailTarget | null>(null)
 
-  function load() {
-    setLoading(true)
-    setError(null)
+  const items = greedy ? greedyItems : outdated.items ?? []
+  const loading = greedy ? greedyLoading : outdated.loading
+  const error = greedy ? greedyError : outdated.error
+
+  function loadGreedy() {
+    setGreedyLoading(true)
+    setGreedyError(null)
     api
-      .outdated(greedy)
-      .then(setItems)
-      .catch((e) => setError(String(e)))
-      .finally(() => setLoading(false))
+      .outdated(true)
+      .then(setGreedyItems)
+      .catch((e) => setGreedyError(String(e)))
+      .finally(() => setGreedyLoading(false))
   }
 
-  useEffect(load, [refreshToken, greedy])
+  // load() is what the Refresh button and post-mutation call sites reach
+  // for: refresh whichever source is currently active. For the non-greedy
+  // case that's the shared cache's own refresh(), so a manual refresh here
+  // also keeps the sidebar badge in sync, not just this page.
+  function load() {
+    if (greedy) loadGreedy()
+    else outdated.refresh()
+  }
+
+  useEffect(() => {
+    if (greedy) loadGreedy()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [greedy, refreshToken])
 
   const { visible, snoozed } = useMemo(() => {
     const visible: OutdatedPackage[] = []
@@ -56,11 +83,14 @@ export default function Updates({ refreshToken, bump }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items, userData.data])
 
+  // bump() already covers the non-greedy refresh via the shared cache's
+  // refresh(); only the greedy-specific fetch needs an explicit call here,
+  // to avoid firing two outdated fetches back to back in the common case.
   async function upgradeOne(p: OutdatedPackage) {
     setRowBusy(p.name)
     await runAction(() => api.upgrade(p.name, p.isCask))
     setRowBusy(null)
-    load()
+    if (greedy) loadGreedy()
     bump()
   }
 
@@ -68,7 +98,7 @@ export default function Updates({ refreshToken, bump }: Props) {
     setUpgradingAll(true)
     await runAction(() => api.upgradeAll(greedy))
     setUpgradingAll(false)
-    load()
+    if (greedy) loadGreedy()
     bump()
   }
 
@@ -237,7 +267,7 @@ export default function Updates({ refreshToken, bump }: Props) {
         target={detail}
         onClose={() => setDetail(null)}
         onChanged={() => {
-          load()
+          if (greedy) loadGreedy()
           bump()
         }}
       />

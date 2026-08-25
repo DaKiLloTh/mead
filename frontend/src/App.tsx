@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { JobsProvider, useJobs } from './context/JobsContext'
 import { ConfirmProvider } from './context/ConfirmContext'
-import { UserDataProvider } from './context/UserDataContext'
+import { UserDataProvider, useUserData } from './context/UserDataContext'
 import { InstalledPackagesProvider, useInstalledPackages } from './context/InstalledPackagesContext'
 import { SystemInfoProvider, useSystemInfo } from './context/SystemInfoContext'
+import { OutdatedProvider, useOutdated } from './context/OutdatedContext'
 import { RefreshIcon } from './components/Icons'
 import { formatHomebrewLastUpdated } from './lib/formatHomebrewLastUpdated'
 import Sidebar, { type ViewKey } from './components/Sidebar'
@@ -60,9 +61,10 @@ function AppShell() {
   const { t } = useTranslation()
   const { runAction } = useJobs()
   const { info: systemInfo, refresh: refreshSystemInfo } = useSystemInfo()
+  const userData = useUserData()
+  const outdated = useOutdated()
   const [view, setView] = useState<ViewKey>('dashboard')
   const [refreshToken, setRefreshToken] = useState(0)
-  const [outdatedCount, setOutdatedCount] = useState(0)
   const [installedInitialFilter, setInstalledInitialFilter] = useState<InstalledFilter | undefined>(undefined)
   const [headerUpdateBusy, setHeaderUpdateBusy] = useState(false)
   const installedPackages = useInstalledPackages()
@@ -106,6 +108,7 @@ function AppShell() {
     setRefreshToken((t) => t + 1)
     installedPackages.refresh()
     refreshSystemInfo()
+    outdated.refresh()
   }
 
   // Global "Update Homebrew" trigger for the top bar (see issue #89), so the
@@ -125,12 +128,17 @@ function AppShell() {
       })
   }
 
-  useEffect(() => {
-    api
-      .outdated()
-      .then((o) => setOutdatedCount(o.length))
-      .catch(() => {})
-  }, [refreshToken])
+  // Derived from the shared OutdatedContext cache (see OutdatedContext.tsx),
+  // not a separate fetch -- App.tsx and Updates.tsx used to each run their
+  // own independent `api.outdated()` call, which raced on every refresh and
+  // could disagree for a moment even with nothing snoozed (issue #124).
+  // Matches Updates.tsx's own "N update(s)" headline, which is
+  // visible.length (snoozed packages excluded), not the raw outdated count.
+  const outdatedCount = useMemo(
+    () => (outdated.items ?? []).filter((p) => !userData.snoozedUntil(p.name, p.isCask)).length,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [outdated.items, userData.data]
+  )
 
   // Periodically refresh Homebrew's own update index in the background (see
   // issue #88 and BACKGROUND_HOMEBREW_UPDATE_INTERVAL_MS above), for as long
@@ -225,7 +233,9 @@ export default function App() {
         <UserDataProvider>
           <InstalledPackagesProvider>
             <SystemInfoProvider>
-              <AppShell />
+              <OutdatedProvider>
+                <AppShell />
+              </OutdatedProvider>
             </SystemInfoProvider>
           </InstalledPackagesProvider>
         </UserDataProvider>
