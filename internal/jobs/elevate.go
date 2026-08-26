@@ -10,30 +10,27 @@ import "strings"
 // prompt otherwise, without mead needing to implement anything
 // Touch-ID-specific itself).
 //
-// This is the whole point of wrapping the entire `brew uninstall ...`
-// invocation rather than trying to isolate just the final privileged step:
-// Homebrew's own cask uninstall shells out to a plain `sudo -E -- rm ...`
-// (see Homebrew/Library/Homebrew/cask/{utils,artifact/moved}.rb) when a
-// Generic Artifact -- e.g. a JDK under /Library/Java/JavaVirtualMachines --
-// lives outside a location the current user can write to. sudo does not
-// require a password to re-authenticate when the process invoking it is
-// already root, which is exactly the situation here once `do shell script
-// ... with administrator privileges` has elevated the whole `brew`
-// invocation: brew's own internal `sudo rm` call is satisfied by that
-// existing root context and returns immediately, without brew itself
-// needing to run privileged for any of its normal (non-removal) work. So one
-// prompt at the top covers the one privileged step Homebrew needs, and brew
-// is never told to run as root for anything else.
+// argv here is deliberately never a `brew` invocation (see
+// runElevatedUninstall in jobs.go, the one caller): `do shell script ...
+// with administrator privileges` runs argv as root, and Homebrew's own
+// brew.sh unconditionally refuses to run as root for anything outside a
+// small allowlist that doesn't include `uninstall` ("Running Homebrew as
+// root is extremely dangerous and no longer supported") -- confirmed by
+// reading brew.sh's check-run-command-as-root directly, not assumed. An
+// earlier version of this wrapped the whole `brew uninstall` call, which
+// hit exactly that check immediately after a successful prompt (issue
+// #101). argv is instead a narrow `/bin/sh -c "rm -rf -- <path> ; ..."`
+// covering only the specific path(s) Homebrew itself said it needed sudo
+// to remove.
 //
 // envPairs are literal "KEY=value" shell-command words, embedded verbatim
-// and unquoted immediately before argv -- this only ever carries mead's own
-// fixed, hardcoded environment overrides (see brew.FixedEnvVars), never
-// caller-supplied data, because quoting a "KEY=value" token as a whole would
-// stop a POSIX shell from recognizing it as an assignment rather than a
-// command name.
+// and unquoted immediately before argv -- never caller-supplied data,
+// because quoting a "KEY=value" token as a whole would stop a POSIX shell
+// from recognizing it as an assignment rather than a command name. The
+// current (and only) caller passes nil, since its argv is a plain rm chain
+// with no need for any env overrides.
 //
-// argv is the command and its arguments (e.g. the resolved brew path
-// followed by ["uninstall", "--cask", name]). Each element is shell-quoted
+// argv is the command and its arguments. Each element is shell-quoted
 // individually -- via shellQuoteArg -- so it can safely contain arbitrary
 // characters (quotes, spaces, shell metacharacters) without being
 // interpreted by the /bin/sh that `do shell script` re-enters, and the

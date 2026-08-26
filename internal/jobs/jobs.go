@@ -10,6 +10,8 @@ import (
 	"errors"
 	"io"
 	"os/exec"
+	"regexp"
+	"strings"
 	"sync"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
@@ -134,11 +136,11 @@ func (jm *Manager) StartMas(title string, args ...string) string {
 	return jm.start(masTarget, title, false, false, nil, nil, args...)
 }
 
-// osascriptTarget runs `osascript` for StartElevatedTracked below. It has no
+// osascriptTarget runs `osascript` for runElevatedRemove below. It has no
 // use for brew's HOMEBREW_* overrides (those are embedded directly in the
-// shell command text StartElevatedTracked builds, since the elevated shell
-// doesn't inherit this process's environment), so, like masTarget, it leaves
-// defaultEnv nil.
+// shell command text BuildElevatedShellScript builds, since the elevated
+// shell doesn't inherit this process's environment), so, like masTarget, it
+// leaves defaultEnv nil.
 var osascriptTarget = binaryTarget{
 	resolve: func() (string, error) {
 		p, err := exec.LookPath("osascript")
@@ -149,33 +151,186 @@ var osascriptTarget = binaryTarget{
 	},
 }
 
-// StartElevatedTracked runs `brew <brewArgs...>` the same way StartTracked
-// does, except the brew invocation is wrapped in
-// `osascript -e 'do shell script "..." with administrator privileges'` so it
-// runs with a native Touch-ID-or-password authorization prompt -- for the
-// one case mead needs that: a cask uninstall whose Generic Artifact removal
-// step needs `sudo` to delete files outside Homebrew's own prefix, which
-// fails outright when brew runs as a plain background subprocess with no
-// attached terminal for sudo to prompt on. See BuildElevatedShellScript for
-// the escaping/wrapping approach and why wrapping the whole `brew uninstall`
-// call (rather than just its internal sudo step) is safe here.
+// sudoOwnershipPathRe matches the literal line Homebrew's cask uninstall
+// prints when a removal step needs root to take ownership of a path outside
+// Homebrew's own prefix -- Cask::Utils.gain_permissions in
+// Library/Homebrew/cask/utils.rb: `ohai "Using sudo to gain ownership of
+// path '#{path}'"`. This is how runElevatedUninstall finds out which
+// specific path(s) to elevate, rather than guessing.
+var sudoOwnershipPathRe = regexp.MustCompile(`Using sudo to gain ownership of path '([^']+)'`)
+
+// StartElevatedUninstall runs a cask/formula uninstall that needs root to
+// remove one or more paths outside Homebrew's own prefix (e.g. a JDK's
+// Generic Artifact under /Library/Java/JavaVirtualMachines) -- offered by
+// the frontend only as an explicit retry after a plain uninstall has
+// already failed with sudo's "a terminal is required"/"a password is
+// required" errors.
 //
-// This trades away real-time output streaming. Start/StartTracked stream
-// job:output events line-by-line as brew runs; here, `do shell script`
-// buffers the whole command's combined stdout/stderr internally and only
-// hands it back once the privileged command has completely finished, so an
-// elevated job's job:output events all arrive in one burst immediately
-// before its job:done rather than progressively. That's an accepted
-// tradeoff for this one path, not a regression to fix -- there's no way to
-// stream through `do shell script`.
-func (jm *Manager) StartElevatedTracked(title string, onDone func(success bool), brewArgs ...string) string {
+// This does NOT wrap the whole `brew uninstall` invocation in `do shell
+// script ... with administrator privileges` the way this used to (see
+// issue #101) -- that runs brew itself as root, and Homebrew's own brew.sh
+// unconditionally refuses to run any command outside a small allowlist
+// (`as-console-user`, `setup-sandbox`, `services`, `--prefix`) as root:
+// "Running Homebrew as root is extremely dangerous and no longer
+// supported." `uninstall` isn't on that list, so the old approach failed
+// that check immediately after a successful Touch-ID/password prompt --
+// exactly the "prompt succeeds, retry still fails" symptom #101 reported.
+// Confirmed by reading Homebrew's own brew.sh (check-run-command-as-root)
+// and cask/utils.rb (gain_permissions*) rather than guessing.
+//
+// Instead: run the uninstall normally first (never running brew itself as
+// root); if it fails, scan its output for the specific path(s) Homebrew
+// says it needs sudo to remove; elevate only removing those paths
+// directly, via one `do shell script ... with administrator privileges`
+// prompt covering all of them; then re-run the uninstall normally once
+// more, which should now succeed since whatever was blocking it is gone.
+// If the first failure isn't this specific "needs sudo for an out-of-prefix
+// path" shape, there's nothing more this can safely try, so the real error
+// is reported rather than looping.
+func (jm *Manager) StartElevatedUninstall(title string, onDone func(success bool), uninstallArgs []string) string {
+	id := newJobID()
+	runtime.EventsEmit(jm.ctx, eventJobStart, StartEvent{ID: id, Title: title})
+	go jm.runElevatedUninstall(id, onDone, uninstallArgs)
+	return id
+}
+
+func (jm *Manager) runElevatedUninstall(id string, onDone func(success bool), uninstallArgs []string) {
 	brewPath, err := brew.ResolveBrewPath()
 	if err != nil {
-		return jm.Fail(title, err.Error())
+		jm.failDone(id, onDone, err.Error())
+		return
 	}
-	argv := append([]string{brewPath}, brewArgs...)
-	script := BuildElevatedShellScript(brew.FixedEnvVars(), argv)
-	return jm.start(osascriptTarget, title, false, false, nil, onDone, "-e", script)
+
+	out, runErr := jm.runPhase(id, brewPath, brew.Env(), uninstallArgs...)
+	if runErr == nil {
+		jm.succeedDone(id, onDone)
+		return
+	}
+
+	paths := sudoOwnershipPaths(out)
+	if len(paths) == 0 {
+		// Not the failure shape this path exists to handle -- report the
+		// real error instead of pretending there's a fix to retry.
+		jm.failDone(id, onDone, runErr.Error())
+		return
+	}
+
+	if err := jm.runElevatedRemove(id, paths); err != nil {
+		jm.failDone(id, onDone, err.Error())
+		return
+	}
+
+	if _, retryErr := jm.runPhase(id, brewPath, brew.Env(), uninstallArgs...); retryErr != nil {
+		jm.failDone(id, onDone, retryErr.Error())
+		return
+	}
+	jm.succeedDone(id, onDone)
+}
+
+// sudoOwnershipPaths returns the deduplicated, order-preserved set of paths
+// sudoOwnershipPathRe finds across every line of a job phase's output.
+func sudoOwnershipPaths(output string) []string {
+	matches := sudoOwnershipPathRe.FindAllStringSubmatch(output, -1)
+	seen := map[string]bool{}
+	var paths []string
+	for _, m := range matches {
+		if p := m[1]; !seen[p] {
+			seen[p] = true
+			paths = append(paths, p)
+		}
+	}
+	return paths
+}
+
+// runElevatedRemove removes every path in paths as root, via a single
+// `do shell script ... with administrator privileges` prompt -- one
+// Touch-ID/password prompt covering all of them, rather than one per path.
+// Each path is `rm -rf`'d independently (joined with ";", not "&&") so one
+// failing removal doesn't stop the rest from being attempted; a failure in
+// the elevated script itself (e.g. the user cancels the prompt) is what
+// runElevatedUninstall treats as fatal, not an individual rm's exit code.
+func (jm *Manager) runElevatedRemove(id string, paths []string) error {
+	osaPath, err := osascriptTarget.resolve()
+	if err != nil {
+		return err
+	}
+	_, err = jm.runPhase(id, osaPath, nil, "-e", buildElevatedRemoveScript(paths))
+	return err
+}
+
+// buildElevatedRemoveScript is the pure, directly-testable half of
+// runElevatedRemove: given the paths Homebrew said it needs sudo to
+// remove, builds the `do shell script ... with administrator privileges`
+// source that removes all of them under one prompt.
+func buildElevatedRemoveScript(paths []string) string {
+	return BuildElevatedShellScript(nil, []string{"/bin/sh", "-c", removeCommand(paths)})
+}
+
+// removeCommand builds the `rm -rf -- <path>` shell command for each path,
+// joined with ";" (not "&&") so one failing removal doesn't stop the rest
+// from being attempted, and shell-quotes each path individually so it can
+// safely contain spaces or other shell metacharacters (e.g. a real path
+// like "/Library/Application Support/SomeApp"). Split out from
+// buildElevatedRemoveScript so this half -- the actual command text -- is
+// testable without also having to reason about BuildElevatedShellScript's
+// own quoting of it as a nested `sh -c` argument.
+func removeCommand(paths []string) string {
+	rmCmds := make([]string, len(paths))
+	for i, p := range paths {
+		rmCmds[i] = "rm -rf -- " + shellQuoteArg(p)
+	}
+	return strings.Join(rmCmds, " ; ")
+}
+
+// runPhase runs one command to completion as part of a job already in
+// progress (see runElevatedUninstall), streaming its output as job:output
+// events under the given (already-started) job id same as start() does,
+// and additionally returning the combined captured output so the caller
+// can inspect it (see sudoOwnershipPaths). Registers/unregisters in jm.cmd
+// around the run so Cancel(id) still works mid-phase.
+func (jm *Manager) runPhase(id, path string, env []string, args ...string) (string, error) {
+	cmd := exec.Command(path, args...)
+	if env != nil {
+		cmd.Env = env
+	}
+	cmd.Stdin = nil
+
+	stdout, err1 := cmd.StdoutPipe()
+	stderr, err2 := cmd.StderrPipe()
+	if err1 != nil || err2 != nil {
+		return "", errors.New("failed to create output pipes")
+	}
+	if err := cmd.Start(); err != nil {
+		return "", err
+	}
+
+	jm.mu.Lock()
+	jm.cmd[id] = cmd
+	jm.mu.Unlock()
+
+	capture := &lineCapture{}
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go jm.pipeCapturing(&wg, id, "stdout", stdout, capture)
+	go jm.pipeCapturing(&wg, id, "stderr", stderr, capture)
+	wg.Wait()
+	err := cmd.Wait()
+
+	jm.mu.Lock()
+	delete(jm.cmd, id)
+	jm.mu.Unlock()
+
+	return capture.String(), err
+}
+
+// succeedDone emits a job's success DoneEvent and invokes onDone(true) --
+// the multi-phase counterpart to failDone, used once runElevatedUninstall
+// knows the whole sequence finished cleanly.
+func (jm *Manager) succeedDone(id string, onDone func(success bool)) {
+	runtime.EventsEmit(jm.ctx, eventJobDone, DoneEvent{ID: id, Success: true, ExitCode: 0})
+	if onDone != nil {
+		onDone(true)
+	}
 }
 
 func (jm *Manager) start(target binaryTarget, title string, lenient bool, quiet bool, env []string, onDone func(success bool), args ...string) string {
@@ -258,6 +413,37 @@ func scanLines(data []byte, atEOF bool) (advance int, token []byte, err error) {
 }
 
 func (jm *Manager) pipe(wg *sync.WaitGroup, id, stream string, r io.Reader) {
+	jm.pipeCapturing(wg, id, stream, r, nil)
+}
+
+// lineCapture accumulates every line pipeCapturing sees, guarded by its own
+// mutex since stdout and stderr are each read by a separate goroutine.
+// Used by runElevatedUninstall (see StartElevatedUninstall) to scan a
+// phase's combined output for the specific paths Homebrew says it needs
+// root to remove, after that phase's lines have already been streamed to
+// the frontend as normal job:output events.
+type lineCapture struct {
+	mu  sync.Mutex
+	buf strings.Builder
+}
+
+func (c *lineCapture) add(line string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.buf.WriteString(line)
+	c.buf.WriteByte('\n')
+}
+
+func (c *lineCapture) String() string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.buf.String()
+}
+
+// pipeCapturing is pipe, plus optionally appending every line to capture
+// (nil for the normal single-phase job path, where nothing downstream needs
+// to inspect the output afterward).
+func (jm *Manager) pipeCapturing(wg *sync.WaitGroup, id, stream string, r io.Reader, capture *lineCapture) {
 	defer wg.Done()
 	scanner := bufio.NewScanner(r)
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
@@ -266,6 +452,9 @@ func (jm *Manager) pipe(wg *sync.WaitGroup, id, stream string, r io.Reader) {
 		line := scanner.Text()
 		if line == "" {
 			continue
+		}
+		if capture != nil {
+			capture.add(line)
 		}
 		runtime.EventsEmit(jm.ctx, eventJobOutput, OutputEvent{ID: id, Line: line, Stream: stream})
 	}
