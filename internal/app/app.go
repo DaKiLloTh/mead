@@ -289,23 +289,22 @@ func (a *App) Uninstall(name string, isCask bool, zap bool, force bool) string {
 	return a.jobs.StartTracked(title, a.record("uninstall", name, isCask), args...)
 }
 
-// UninstallElevated runs the exact same uninstall as Uninstall, but through
-// jobs.Manager.StartElevatedTracked, so the underlying `brew uninstall ...`
-// runs with a native Touch-ID-or-password authorization prompt instead of as
-// a plain subprocess. It's offered by the frontend only as an explicit,
-// user-initiated retry after a plain Uninstall has already failed with
-// sudo's "a terminal is required"/"a password is required" errors -- e.g.
-// uninstalling a JDK cask whose files live outside Homebrew's own prefix
-// under /Library/Java/JavaVirtualMachines. mead never elevates automatically;
-// see StartElevatedTracked for why wrapping the whole uninstall (rather than
-// just Homebrew's internal sudo step) is safe, and for the output-streaming
-// tradeoff this path makes.
+// UninstallElevated retries an uninstall that needs root to remove a path
+// outside Homebrew's own prefix (e.g. a JDK cask whose files live under
+// /Library/Java/JavaVirtualMachines), via jobs.Manager.StartElevatedUninstall
+// -- see its doc comment for why this runs the uninstall normally and
+// elevates only the specific blocking path(s), rather than running `brew`
+// itself as root (which Homebrew unconditionally refuses to do). It's
+// offered by the frontend only as an explicit, user-initiated retry after a
+// plain Uninstall has already failed with sudo's "a terminal is
+// required"/"a password is required" errors; mead never elevates
+// automatically.
 func (a *App) UninstallElevated(name string, isCask bool, zap bool, force bool) string {
 	if err := brew.ValidName(name); err != nil {
 		return a.jobs.Fail(fmt.Sprintf("Uninstall %s", name), err.Error())
 	}
 	args, title := buildUninstallArgsAndTitle(name, isCask, zap, force, true)
-	return a.jobs.StartElevatedTracked(title, a.record("uninstall", name, isCask), args...)
+	return a.jobs.StartElevatedUninstall(title, a.record("uninstall", name, isCask), args)
 }
 
 func (a *App) Reinstall(name string, isCask bool) string {
