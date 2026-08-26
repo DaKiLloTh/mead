@@ -71,27 +71,29 @@ export default function Search({ refreshToken, bump }: Props) {
       <h1 className="text-2xl font-bold mb-1">{t('search.title')}</h1>
       <p className="text-base-content/60 text-sm mb-4">{t('search.subtitle')}</p>
 
-      <label className="input w-full max-w-lg mb-4">
-        <SearchIcon className="size-4 opacity-50" />
-        <input
-          type="text"
-          placeholder={t('search.placeholder')}
-          value={query}
-          autoFocus
-          onChange={(e) => setQuery(e.target.value)}
-        />
-        {loading && <span className="loading loading-spinner loading-xs" />}
-      </label>
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mb-4">
+        <label className="input w-full max-w-lg">
+          <SearchIcon className="size-4 opacity-50" />
+          <input
+            type="text"
+            placeholder={t('search.placeholder')}
+            value={query}
+            autoFocus
+            onChange={(e) => setQuery(e.target.value)}
+          />
+          {loading && <span className="loading loading-spinner loading-xs" />}
+        </label>
 
-      <label className="label cursor-pointer gap-2 text-sm w-fit mb-4">
-        <input
-          type="checkbox"
-          className="checkbox checkbox-sm"
-          checked={searchDesc}
-          onChange={(e) => setSearchDesc(e.target.checked)}
-        />
-        <span className="label-text">{t('search.searchDescLabel')}</span>
-      </label>
+        <label className="label cursor-pointer gap-2 text-sm w-fit">
+          <input
+            type="checkbox"
+            className="checkbox checkbox-sm"
+            checked={searchDesc}
+            onChange={(e) => setSearchDesc(e.target.checked)}
+          />
+          <span className="label-text">{t('search.searchDescLabel')}</span>
+        </label>
+      </div>
 
       {results && (
         <div role="tablist" className="tabs tabs-box tabs-sm w-fit mb-4">
