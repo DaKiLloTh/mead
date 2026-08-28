@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { filterNavItems, filterPackages } from '../lib/paletteFilter'
-import { useInstalledPackages } from '../context/InstalledPackagesContext'
+import { useInstalledPackages } from '../context/InstalledPackagesSignal'
 import { navItems, type ViewKey } from './Sidebar'
 import PackageDetailModal, { type DetailTarget } from './PackageDetailModal'
 import { PackageIcon, SearchIcon } from './Icons'

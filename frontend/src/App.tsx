@@ -3,9 +3,9 @@ import { useTranslation } from 'react-i18next'
 import { JobsProvider, useJobs } from './context/JobsContext'
 import { ConfirmProvider } from './context/ConfirmContext'
 import { UserDataProvider, useUserData } from './context/UserDataContext'
-import { InstalledPackagesProvider, useInstalledPackages } from './context/InstalledPackagesContext'
-import { SystemInfoProvider, useSystemInfo } from './context/SystemInfoContext'
-import { OutdatedProvider, useOutdated } from './context/OutdatedContext'
+import { useInstalledPackages, startInstalledPackagesPolling } from './context/InstalledPackagesSignal'
+import { useSystemInfo, startSystemInfoPolling } from './context/SystemInfoSignal'
+import { useOutdated, startOutdatedPolling } from './context/OutdatedSignal'
 import { RefreshIcon } from './components/Icons'
 import { formatHomebrewLastUpdated } from './lib/formatHomebrewLastUpdated'
 import Sidebar, { type ViewKey } from './components/Sidebar'
@@ -68,6 +68,18 @@ function AppShell() {
   const [installedInitialFilter, setInstalledInitialFilter] = useState<InstalledFilter | undefined>(undefined)
   const [headerUpdateBusy, setHeaderUpdateBusy] = useState(false)
   const installedPackages = useInstalledPackages()
+
+  // Starts the three signal-backed caches exactly once, for the life of the
+  // app. There's no Provider mount position for this to hook into anymore
+  // (see InstalledPackagesSignal.ts), so it's kicked off explicitly here
+  // instead. startOutdatedPolling() internally defers its first fetch until
+  // InstalledPackages' first fetch resolves -- callers don't need to know or
+  // care about that ordering.
+  useEffect(() => {
+    startInstalledPackagesPolling()
+    startSystemInfoPolling()
+    startOutdatedPolling()
+  }, [])
 
   // Dashboard's Health tile and stat tiles need to land on Installed
   // pre-filtered (e.g. to the deprecated/disabled/pinned subset), while
@@ -225,18 +237,17 @@ function AppShell() {
   )
 }
 
+// InstalledPackages/SystemInfo/Outdated no longer need Provider positions --
+// their state lives in module-level signals (see *Signal.ts) that are
+// reachable from anywhere. JobsProvider/ConfirmProvider/UserDataProvider stay
+// as ordinary Context; see each context file for why converting it to a
+// signal wouldn't be a real improvement.
 export default function App() {
   return (
     <JobsProvider>
       <ConfirmProvider>
         <UserDataProvider>
-          <InstalledPackagesProvider>
-            <SystemInfoProvider>
-              <OutdatedProvider>
-                <AppShell />
-              </OutdatedProvider>
-            </SystemInfoProvider>
-          </InstalledPackagesProvider>
+          <AppShell />
         </UserDataProvider>
       </ConfirmProvider>
     </JobsProvider>

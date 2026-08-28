@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { api, OutdatedPackage } from '../lib/api'
 import { useJobs } from '../context/JobsContext'
 import { useUserData } from '../context/UserDataContext'
-import { useOutdated } from '../context/OutdatedContext'
+import { useOutdated } from '../context/OutdatedSignal'
 import PackageDetailModal, { DetailTarget } from '../components/PackageDetailModal'
 import { ArrowUpCircleIcon, ClockIcon } from '../components/Icons'
 

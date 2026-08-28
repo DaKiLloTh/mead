@@ -4,7 +4,7 @@ import { api, BrewPackage } from '../lib/api'
 import { useJobs } from '../context/JobsContext'
 import { useConfirm } from '../context/ConfirmContext'
 import { useUserData } from '../context/UserDataContext'
-import { useInstalledPackages } from '../context/InstalledPackagesContext'
+import { useInstalledPackages } from '../context/InstalledPackagesSignal'
 import PackageDetailModal, { DetailTarget } from '../components/PackageDetailModal'
 import PackageIcon from '../components/PackageIcon'
 import {

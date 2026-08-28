@@ -16,6 +16,12 @@ interface UserDataContextValue {
   allTags: string[]
 }
 
+// Left as Context, not converted to a signal: unlike InstalledPackages/
+// SystemInfo/Outdated, there's no cross-context boot-sequencing problem here
+// for a signal to remove, and turning six mutating methods (toggleFavorite,
+// setTags, setNote, snooze, unsnooze, plus their read-side lookups) into
+// free functions over a mutable module global would just relocate the
+// complexity, not reduce it.
 const UserDataContext = createContext<UserDataContextValue | null>(null)
 
 export function useUserData(): UserDataContextValue {

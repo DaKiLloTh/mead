@@ -24,6 +24,11 @@ interface PendingConfirm extends ConfirmOptions {
   resolve: (result: ConfirmResult) => void
 }
 
+// Left as Context, not converted to a signal: this is an imperative
+// one-shot dialog trigger (a single pending confirmation at a time, resolved
+// by the user's click), not a cache read from many places across the tree,
+// so there's no Provider-tree duplication or cross-context sequencing for a
+// signal to remove.
 const ConfirmContext = createContext<((opts: ConfirmOptions) => Promise<ConfirmResult>) | null>(null)
 
 export function useConfirm() {

@@ -26,6 +26,12 @@ interface JobsContextValue {
   clearFinishedJobs: () => void
 }
 
+// Left as Context, not converted to a signal: the job list's authoritative
+// source of truth already lives outside React state, in JobTracker (see
+// jobTracker.ts), specifically to avoid a synchronization race against the
+// live event bus. Converting the React-facing mirror (`jobs` state below) to
+// a signal would just move where that mirror lives, not remove the tracker,
+// so it isn't a real simplification.
 const JobsContext = createContext<JobsContextValue | null>(null)
 
 export function useJobs(): JobsContextValue {
