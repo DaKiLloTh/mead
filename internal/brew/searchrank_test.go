@@ -79,23 +79,54 @@ func TestRankResultsPreservesRelativeOrderWithinATier(t *testing.T) {
 	}
 }
 
-func TestSearchMatchConfidence(t *testing.T) {
-	tests := []struct {
-		name  string
-		input string
-		query string
-		want  string
-	}{
-		{"exact match is exact confidence", "blender", "blender", "exact"},
-		{"prefix match is exact confidence", "blender-benchmark", "blender", "exact"},
-		{"substring match is exact confidence", "the-blender-app", "blender", "exact"},
-		{"fuzzy leftover is possible confidence", "bender", "blender", "possible"},
+// TestAddToInfoIndexThirdPartyTap is a real-world regression case: a cask
+// installed from a third-party tap (this repo's own mead cask, from
+// dakilloth/mead). `brew search` returns the tap-qualified name
+// ("dakilloth/mead/mead") for anything outside the default tap, but
+// `brew info`'s own token/name field is always the short, unqualified one
+// ("mead") regardless of which tap it came from. addToInfoIndex must index
+// under both forms, or a lookup keyed by the tap-qualified search result
+// name misses entirely -- exactly what happened before this was caught
+// live: the mead cask's own search card silently showed no description,
+// version, or tap badge.
+func TestAddToInfoIndexThirdPartyTap(t *testing.T) {
+	pkg := BrewPackage{
+		Name:     "mead",
+		FullName: "mead", // caskToPackage overwrites this with the pretty display name, see its own test
+		IsCask:   true,
+		Tap:      "dakilloth/mead",
+		Desc:     "Native Homebrew GUI for macOS",
+		Version:  "0.9.0",
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := searchMatchConfidence(tt.input, tt.query); got != tt.want {
-				t.Errorf("searchMatchConfidence(%q, %q) = %q, want %q", tt.input, tt.query, got, tt.want)
-			}
-		})
+
+	index := map[string]BrewPackage{}
+	addToInfoIndex(index, []BrewPackage{pkg})
+
+	got, ok := index[searchKey("dakilloth/mead/mead", true)]
+	if !ok {
+		t.Fatal("addToInfoIndex() did not index the tap-qualified form \"dakilloth/mead/mead\", the exact name brew search returns for this cask")
+	}
+	if got.Desc != pkg.Desc || got.Version != pkg.Version {
+		t.Errorf("addToInfoIndex()[tap-qualified key] = %+v, want the same package data as the short-token lookup", got)
+	}
+
+	// The short form must still work too, for every default-tap result.
+	if _, ok := index[searchKey("mead", true)]; !ok {
+		t.Error("addToInfoIndex() did not also index the short token \"mead\"")
+	}
+}
+
+func TestAddToInfoIndexDefaultTapHasNoQualifiedDuplicateNeeded(t *testing.T) {
+	// A homebrew/cask result's search-result name is already the short
+	// form, so it only ever needs the short-token key -- confirms the
+	// tap-qualified key doesn't clobber or confuse the common case.
+	pkg := BrewPackage{Name: "meld", IsCask: true, Tap: "homebrew/cask", Desc: "Visual diff and merge tool"}
+
+	index := map[string]BrewPackage{}
+	addToInfoIndex(index, []BrewPackage{pkg})
+
+	got, ok := index[searchKey("meld", true)]
+	if !ok || got.Desc != pkg.Desc {
+		t.Errorf("addToInfoIndex() short-token lookup for a default-tap cask = %+v, ok=%v, want the package data", got, ok)
 	}
 }

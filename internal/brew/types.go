@@ -35,20 +35,18 @@ type BrewPackage struct {
 type SearchResult struct {
 	Name   string `json:"name"`
 	IsCask bool   `json:"isCask"`
-	// Desc, Version, Deprecated, Disabled, AutoUpdates come from a single
-	// batched `brew info` call covering every result (mirrors adopt.go's
-	// batching), not a lookup per row. Desc/Version are "" and the bools
-	// are false if the batch lookup failed for any reason -- best-effort,
-	// never blocks Search from returning the name/type match itself.
+	// Desc, Version, Homepage, Tap, Deprecated, Disabled, AutoUpdates come
+	// from a single batched `brew info` call covering every result (mirrors
+	// adopt.go's batching), not a lookup per row. These are "" / false if
+	// the batch lookup failed for any reason -- best-effort, never blocks
+	// Search from returning the name/type match itself.
 	Desc        string `json:"desc"`
 	Version     string `json:"version"`
+	Homepage    string `json:"homepage"`
+	Tap         string `json:"tap"`
 	Deprecated  bool   `json:"deprecated"`
 	Disabled    bool   `json:"disabled"`
 	AutoUpdates bool   `json:"autoUpdates"`
-	// MatchConfidence is "exact" (exact/prefix/substring name match) or
-	// "possible" (Homebrew's own fuzzy leftovers) -- same vocabulary as
-	// AdoptCandidate.MatchConfidence, see searchMatchConfidence.
-	MatchConfidence string `json:"matchConfidence"`
 }
 
 // OutdatedPackage represents an entry from `brew outdated --json=v2`.
