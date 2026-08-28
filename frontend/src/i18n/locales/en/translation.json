@@ -26,6 +26,7 @@
     "badgeAutoUpdates": "auto-updates",
     "badgeInstalled": "installed",
     "badgeDeprecated": "deprecated",
+    "badgeDisabled": "disabled",
     "badgeKegOnly": "keg-only",
     "updateHomebrew": "Update Homebrew",
     "lastUpdatedLabel": "Last updated",
@@ -146,7 +147,8 @@
     "tabFormulae": "Formulae ({{count}})",
     "tabCasks": "Casks ({{count}})",
     "emptyPrompt": "Start typing to search Homebrew.",
-    "noResults": "No results."
+    "noResults": "No results.",
+    "possibleMatch": "Possible match"
   },
   "collections": {
     "title": "Collections",
