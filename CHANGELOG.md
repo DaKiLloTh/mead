@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.10.1](https://github.com/DaKiLloTh/mead/compare/v0.10.0...v0.10.1) (2026-08-28)
+
+
+### Bug Fixes
+
+* don't let a transient mas failure blank the App Store view ([#143](https://github.com/DaKiLloTh/mead/issues/143)) ([c5be296](https://github.com/DaKiLloTh/mead/commit/c5be2962f8049f4e571c84ee9300abc9e3e5bb87))
+
 ## [0.10.0](https://github.com/DaKiLloTh/mead/compare/v0.9.0...v0.10.0) (2026-08-28)
 
 
