@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { api, SearchResult } from '../lib/api'
 import { useJobs } from '../context/JobsContext'
 import PackageDetailModal, { DetailTarget } from '../components/PackageDetailModal'
-import { BadgeInstalledIcon, DownloadIcon, SearchIcon } from '../components/Icons'
+import { AlertIcon, BadgeBrokenIcon, BadgeInstalledIcon, CheckIcon, DownloadIcon, SearchIcon } from '../components/Icons'
 
 type Filter = 'all' | 'formula' | 'cask'
 
@@ -118,23 +118,50 @@ export default function Search({ refreshToken, bump }: Props) {
       )}
 
       {results && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+        <div className="flex flex-col gap-3">
           {filtered.map((r) => {
             const key = `${r.isCask ? 'c' : 'f'}:${r.name}`
             const isInstalled = installedKeys.has(key)
             return (
               <div
                 key={key}
-                className="card bg-base-200 hover:bg-base-300/60 transition-colors cursor-pointer"
+                className="rounded-box border border-base-300 p-4 flex flex-col gap-2 hover:bg-base-200/60 transition-colors cursor-pointer"
                 onClick={() => setDetail({ name: r.name, isCask: r.isCask })}
               >
-                <div className="card-body py-3 px-4 flex-row items-center justify-between gap-2">
+                <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <div className="font-medium truncate">{r.name}</div>
-                    <span className={`badge badge-xs badge-outline ${r.isCask ? 'badge-accent' : 'badge-primary'}`}>
-                      {r.isCask ? t('common.cask') : t('common.formula')}
-                    </span>
+                    <div className="font-medium wrap-break-word">{r.name}</div>
+                    {r.desc && <div className="text-xs text-base-content/50 wrap-break-word">{r.desc}</div>}
                   </div>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {r.matchConfidence === 'possible' ? (
+                      <AlertIcon className="size-4 text-warning" />
+                    ) : (
+                      <CheckIcon className="size-4 text-success" />
+                    )}
+                    {r.matchConfidence === 'possible' ? (
+                      <span className="badge badge-warning badge-soft badge-sm">{t('search.possibleMatch')}</span>
+                    ) : (
+                      <span className={`badge badge-sm badge-outline ${r.isCask ? 'badge-accent' : 'badge-primary'}`}>
+                        {r.isCask ? t('common.cask') : t('common.formula')}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="border-t border-base-300/50 pt-2 flex items-center justify-between gap-3 flex-wrap">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {r.version && <span className="font-mono text-xs text-base-content/60">{r.version}</span>}
+                    {r.deprecated && (
+                      <span className="badge badge-sm badge-error badge-outline gap-1">
+                        <BadgeBrokenIcon className="size-3" />
+                        {t('common.badgeDeprecated')}
+                      </span>
+                    )}
+                    {r.disabled && <span className="badge badge-sm badge-error gap-1">{t('common.badgeDisabled')}</span>}
+                    {r.isCask && r.autoUpdates && <span className="badge badge-sm badge-ghost">{t('common.badgeAutoUpdates')}</span>}
+                  </div>
+
                   {isInstalled ? (
                     <span className="badge badge-success badge-outline shrink-0 gap-1">
                       <BadgeInstalledIcon className="size-3" />
@@ -162,7 +189,7 @@ export default function Search({ refreshToken, bump }: Props) {
             )
           })}
           {filtered.length === 0 && !loading && (
-            <div className="text-base-content/50 text-sm py-8 text-center col-span-full">{t('search.noResults')}</div>
+            <div className="text-base-content/50 text-sm py-8 text-center">{t('search.noResults')}</div>
           )}
         </div>
       )}

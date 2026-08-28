@@ -335,6 +335,12 @@ func Search(ctx context.Context, query string, desc bool) ([]SearchResult, error
 		add(lines, true)
 	}
 
+	rankResults(results, q)
+	for i := range results {
+		results[i].MatchConfidence = searchMatchConfidence(results[i].Name, q)
+	}
+	enrichSearchResults(ctx, results)
+
 	return results, nil
 }
 
