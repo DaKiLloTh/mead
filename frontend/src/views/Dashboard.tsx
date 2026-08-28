@@ -65,7 +65,7 @@ export default function Dashboard({ onNavigate, onNavigateInstalled, refreshToke
   }
 
   return (
-    <div className="p-6 max-w-4xl">
+    <div className="p-6 max-w-2xl">
       <h1 className="text-2xl font-bold mb-1">{t('dashboard.title')}</h1>
       <p className="text-base-content/60 mb-6">{t('dashboard.subtitle')}</p>
 
