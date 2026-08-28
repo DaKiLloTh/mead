@@ -1,6 +1,33 @@
 package brew
 
-import "testing"
+import (
+	"slices"
+	"strings"
+	"testing"
+)
+
+// Regression test for mead reporting mas as "not installed" when it
+// genuinely is: mas is a regular Homebrew formula, so it lives at the same
+// prefix as `brew` itself, not necessarily anywhere a GUI app's restricted
+// default PATH (Finder/Dock/LaunchServices launches don't inherit the
+// user's shell PATH) would find it via a bare PATH lookup.
+func TestMasPathCandidatesCheckHomebrewPrefixesBeforePath(t *testing.T) {
+	candidates := masPathCandidates()
+
+	if len(candidates) == 0 {
+		t.Fatal("masPathCandidates() returned no candidates")
+	}
+	for _, want := range []string{"/opt/homebrew/bin/mas", "/usr/local/bin/mas"} {
+		if !slices.Contains(candidates, want) {
+			t.Errorf("masPathCandidates() = %v, want it to contain %q", candidates, want)
+		}
+	}
+	for _, c := range candidates {
+		if !strings.HasSuffix(c, "/mas") {
+			t.Errorf("candidate %q doesn't point at a `mas` binary", c)
+		}
+	}
+}
 
 func TestValidName(t *testing.T) {
 	tests := []struct {

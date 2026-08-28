@@ -1,6 +1,6 @@
 import { signal } from '@preact/signals'
 import { api } from '../lib/api'
-import { applyFetchOutcome, initialAppStoreState, type AppStoreState } from './appStoreCache'
+import { applyFetchOutcome, initialAppStoreState, needsLoad, type AppStoreState } from './appStoreCache'
 
 export type { AppStoreState }
 
@@ -46,14 +46,13 @@ export function loadAppStore() {
 }
 
 /**
- * The hover-prefetch/mount entry point: idempotent, a no-op once the signal
- * has been touched at all. "Touched" is read directly off the signal
- * (reference equality against the untouched initialAppStoreState object)
- * rather than a separate module boolean -- loadAppStore() always replaces
- * .value with a new object, so every caller (hover, mount) is just reading
- * the one shared signal, not tracking its own "did I already ask" state.
+ * The hover-prefetch/mount entry point: a no-op once we have a real,
+ * already-fetched apps list (available:true), so repeat hovers/mounts don't
+ * keep re-fetching. NOT a no-op merely because the signal has been
+ * "touched" at all -- see needsLoad's doc comment in appStoreCache.ts for
+ * why available:false must keep retrying rather than caching a stale "mas
+ * isn't installed" verdict for the life of the process.
  */
 export function ensureAppStoreLoaded() {
-  if (appStoreSignal.value !== initialAppStoreState) return
-  loadAppStore()
+  if (needsLoad(appStoreSignal.value)) loadAppStore()
 }

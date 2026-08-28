@@ -1,53 +1,39 @@
 package jobs
 
 import (
-	"os"
-	"path/filepath"
-	"strings"
+	"reflect"
 	"testing"
+
+	"mead/internal/brew"
 )
 
-// TestMasTargetResolvesMasBinary guards against the regression where Mac App
-// Store upgrade jobs actually ran through brew's binary resolution: start()
-// used to unconditionally call brew.ResolveBrewPath() and exec `brew`
-// regardless of which job it was launching, so clicking "Upgrade" on an App
-// Store app ran `brew upgrade <numeric-id>` (which always fails) and
+// TestMasTargetResolvesViaMasNotBrew guards against the regression where Mac
+// App Store upgrade jobs actually ran through brew's binary resolution:
+// start() used to unconditionally call brew.ResolveBrewPath() and exec
+// `brew` regardless of which job it was launching, so clicking "Upgrade" on
+// an App Store app ran `brew upgrade <numeric-id>` (which always fails) and
 // "Upgrade all App Store apps" ran bare `brew upgrade` (which silently
-// upgraded every outdated Homebrew formula/cask on the system). masTarget
-// must resolve strictly by looking up `mas` on PATH, independent of whatever
-// brew binary happens to be installed.
-func TestMasTargetResolvesMasBinary(t *testing.T) {
-	dir := t.TempDir()
-	masPath := filepath.Join(dir, "mas")
-	if err := os.WriteFile(masPath, []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
-		t.Fatalf("writing fake mas binary: %v", err)
-	}
+// upgraded every outdated Homebrew formula/cask on the system).
+//
+// Compares the resolved function by pointer rather than exercising it
+// against a faked PATH: ResolveMasPath checks Homebrew's own well-known bin
+// directories before falling back to PATH (see exec.go's masPathCandidates
+// -- mas is itself a Homebrew formula, and a bare PATH lookup alone can miss
+// it for a GUI-launched, non-terminal process), so a test that only
+// controls PATH can no longer force a specific resolved path or a lookup
+// failure on a machine that genuinely has mas installed. Checking the
+// wiring directly is what this test actually cares about, and is exact
+// regardless of what's installed on the machine running it.
+func TestMasTargetResolvesViaMasNotBrew(t *testing.T) {
+	got := reflect.ValueOf(masTarget.resolve).Pointer()
+	wantMas := reflect.ValueOf(brew.ResolveMasPath).Pointer()
+	dontWantBrew := reflect.ValueOf(brew.ResolveBrewPath).Pointer()
 
-	t.Setenv("PATH", dir)
-
-	got, err := masTarget.resolve()
-	if err != nil {
-		t.Fatalf("masTarget.resolve() error = %v, want nil", err)
+	if got != wantMas {
+		t.Error("masTarget.resolve is not brew.ResolveMasPath -- mas jobs would resolve through the wrong function")
 	}
-	if got != masPath {
-		t.Errorf("masTarget.resolve() = %q, want %q", got, masPath)
-	}
-}
-
-// TestMasTargetResolveErrorMentionsMas checks that the "not found" error
-// actually names mas, not brew -- exactly the kind of misdirection the
-// original bug produced (a `brew upgrade` failure for what's supposed to be
-// an App Store action).
-func TestMasTargetResolveErrorMentionsMas(t *testing.T) {
-	dir := t.TempDir() // empty: nothing on PATH
-	t.Setenv("PATH", dir)
-
-	_, err := masTarget.resolve()
-	if err == nil {
-		t.Fatal("masTarget.resolve() error = nil, want an error since mas isn't on PATH")
-	}
-	if !strings.Contains(err.Error(), "mas") {
-		t.Errorf("masTarget.resolve() error = %q, want it to mention mas", err.Error())
+	if got == dontWantBrew {
+		t.Error("masTarget.resolve is brew.ResolveBrewPath -- the original regression this test guards against")
 	}
 }
 
