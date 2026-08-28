@@ -150,7 +150,7 @@
     "noResults": "No results.",
     "homepageLink": "Homepage",
     "formulaeBrewShLink": "View on formulae.brew.sh",
-    "nonStandardTapTooltip": "From a third-party tap, not one of Homebrew's own homebrew/core or homebrew/cask"
+    "nonStandardTapTooltip": "From a third-party tap, outside Homebrew's official homebrew/core and homebrew/cask"
   },
   "collections": {
     "title": "Collections",
@@ -228,7 +228,7 @@
   },
   "adopt": {
     "title": "Adopt Existing Apps",
-    "subtitle": "Apps already in <path>/Applications</path> that match an installable cask, so future updates can run through Homebrew instead of each app's own updater.",
+    "subtitle": "Apps already in <path>/Applications</path> that match an installable cask, so Homebrew can manage their future updates.",
     "scanButton": "Scan /Applications",
     "scanningHint": "Checking each app against Homebrew's cask index. This can take a little while.",
     "scanFailedTitle": "Scan failed",
@@ -240,16 +240,16 @@
     "matchExact": "Match",
     "matchPossible": "Possible match",
     "downgradeWarningTitle": "Installed version is newer than the cask",
-    "downgradeWarningBody": "{{appName}} is installed at version {{installed}}, but the cask {{caskToken}} is only at {{cask}}. Adopting it will replace the installed app with the cask's older build right away, not just on a later upgrade.",
+    "downgradeWarningBody": "{{appName}} is installed at version {{installed}}, but the cask {{caskToken}} is only at {{cask}}. Adopting it replaces the installed app with the cask's older build immediately.",
     "downgradeConfirmLabel": "Adopt anyway",
-    "possibleMatchWarningTitle": "This is a possible match, not a confirmed one",
+    "possibleMatchWarningTitle": "This match hasn't been confirmed",
     "possibleMatchWarningBody": "mead isn't fully certain {{appName}} corresponds to the cask {{caskToken}}. {{reason}}",
-    "possibleMatchForceWarningExtra": "The installed and cask versions also differ, so if this turns out to be the wrong app, mead will still overwrite it with the cask's download rather than just start tracking it.",
+    "possibleMatchForceWarningExtra": "The installed and cask versions also differ, so if this turns out to be the wrong app, mead will still overwrite it with the cask's download.",
     "possibleMatchConfirmLabel": "Adopt anyway",
     "caskLabel": "Cask:",
     "adoptAndUpdateButton": "Adopt and update",
     "adoptAndDowngradeButton": "Adopt and downgrade",
-    "appStoreWarning": "Installed from the App Store. It updates through the App Store, not Homebrew, so that's probably the better way to keep it current."
+    "appStoreWarning": "Installed from the App Store. It updates through the App Store, so that's probably the better way to keep it current."
   },
   "appstore": {
     "title": "App Store",
@@ -337,7 +337,7 @@
     "confirmRemoveLabel": "Remove",
     "checkboxSnapshot": "Create a local safety snapshot first (Time Machine)",
     "localSnapshotCreated": "Local snapshot created",
-    "leftoversDescription": "Scans well-known locations (Application Support, Caches, Preferences, Logs, and Saved Application State) for files left behind by apps that aren't currently installed via Homebrew -- either uninstalled outside brew, or never brew-managed at all. This is a best-effort guess, not a guarantee: review carefully before removing anything.",
+    "leftoversDescription": "Scans well-known locations (Application Support, Caches, Preferences, Logs, and Saved Application State) for files left behind by apps that aren't currently installed via Homebrew -- either uninstalled outside brew, or never brew-managed at all. This is a best-effort guess: review carefully before removing anything.",
     "scanLeftovers": "Scan for leftovers",
     "leftoversScanning": "Scanning…",
     "noLeftoversFound": "No leftovers found.",
@@ -373,7 +373,7 @@
     "title": "Settings",
     "subtitle": "Preferences for mead and for Homebrew itself.",
     "privacyTitle": "Privacy",
-    "privacyDescription": "mead never sends its own commands' analytics to Homebrew (suppressed automatically), but this controls Homebrew's own global analytics preference, the one that also applies if you use `brew` directly in a terminal.",
+    "privacyDescription": "mead automatically suppresses analytics for its own commands. This setting controls Homebrew's own global analytics preference, which also applies if you use `brew` directly in a terminal.",
     "checking": "Checking…",
     "turnOn": "Turn on",
     "turnOff": "Turn off",
