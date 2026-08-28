@@ -5,7 +5,7 @@ import { useJobs } from '../context/JobsContext'
 import { useUserData } from '../context/UserDataContext'
 import { useOutdated } from '../context/OutdatedContext'
 import PackageDetailModal, { DetailTarget } from '../components/PackageDetailModal'
-import { ArrowUpCircleIcon, ClockIcon, RefreshIcon } from '../components/Icons'
+import { ArrowUpCircleIcon, ClockIcon } from '../components/Icons'
 
 interface Props {
   refreshToken: number
@@ -53,15 +53,6 @@ export default function Updates({ refreshToken, bump }: Props) {
       .then(setGreedyItems)
       .catch((e) => setGreedyError(String(e)))
       .finally(() => setGreedyLoading(false))
-  }
-
-  // load() is what the Refresh button and post-mutation call sites reach
-  // for: refresh whichever source is currently active. For the non-greedy
-  // case that's the shared cache's own refresh(), so a manual refresh here
-  // also keeps the sidebar badge in sync, not just this page.
-  function load() {
-    if (greedy) loadGreedy()
-    else outdated.refresh()
   }
 
   useEffect(() => {
@@ -134,9 +125,6 @@ export default function Updates({ refreshToken, bump }: Props) {
               {showSnoozed ? t('updates.showActive') : t('updates.showSnoozed', { count: snoozed.length })}
             </button>
           )}
-          <button className="btn btn-sm" disabled={loading} onClick={load}>
-            <RefreshIcon className="size-4" /> {t('common.refresh')}
-          </button>
           {!showSnoozed && visible.length > 0 && (
             <button className="btn btn-sm btn-primary" disabled={upgradingAll} onClick={upgradeAll}>
               {upgradingAll ? <span className="loading loading-spinner loading-xs" /> : <ArrowUpCircleIcon className="size-4" />}

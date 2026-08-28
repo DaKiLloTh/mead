@@ -175,21 +175,20 @@ function AppShell() {
       <div className="flex flex-1 min-h-0">
         <Sidebar view={view} onSelect={changeView} outdatedCount={outdatedCount} />
         <div className="flex-1 min-w-0 flex flex-col">
-          <div className="drag-region h-9 shrink-0 flex items-center px-6">
+          <div className="drag-region h-14 shrink-0 flex items-center px-6 border-b border-base-300">
             <span className="text-sm font-medium text-base-content/60">{t(viewTitleKeys[view])}</span>
-            <div className="ml-auto flex items-center gap-3">
-              <button
-                className="btn btn-ghost btn-xs btn-square no-drag"
-                disabled={headerUpdateBusy}
-                onClick={runHeaderUpdate}
-                title={
-                  systemInfo
-                    ? `${systemInfo.brewVersion} · ${t('common.lastUpdatedLabel')} ${formatHomebrewLastUpdated(t, systemInfo.homebrewLastUpdated)}`
-                    : t('common.updateHomebrew')
-                }
-                aria-label={t('common.updateHomebrew')}
-              >
+            <div className="ml-auto flex items-center gap-4">
+              {systemInfo && (
+                <div className="text-xs text-base-content/50 text-right no-drag hidden sm:block leading-tight">
+                  <div className="font-mono">{systemInfo.brewVersion}</div>
+                  <div>
+                    {t('common.lastUpdatedLabel')} {formatHomebrewLastUpdated(t, systemInfo.homebrewLastUpdated)}
+                  </div>
+                </div>
+              )}
+              <button className="btn btn-sm btn-outline no-drag" disabled={headerUpdateBusy} onClick={runHeaderUpdate}>
                 {headerUpdateBusy ? <span className="loading loading-spinner loading-xs" /> : <RefreshIcon className="size-4" />}
+                {t('common.updateHomebrew')}
               </button>
               <span className="flex items-center gap-1 text-base-content/40">
                 <kbd className="kbd kbd-xs">⌘</kbd>
