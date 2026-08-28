@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.10.2](https://github.com/DaKiLloTh/mead/compare/v0.10.1...v0.10.2) (2026-08-28)
+
+
+### Bug Fixes
+
+* mas not detected when mead is launched normally (Finder/Dock) ([#147](https://github.com/DaKiLloTh/mead/issues/147)) ([524321e](https://github.com/DaKiLloTh/mead/commit/524321e9d1a36ae5c73255a6946c76e32211026e))
+
 ## [0.10.1](https://github.com/DaKiLloTh/mead/compare/v0.10.0...v0.10.1) (2026-08-28)
 
 
