@@ -1,4 +1,6 @@
-import React, { createContext, useCallback, useContext, useEffect, useState } from 'react'
+import { createContext } from 'preact'
+import type { ComponentChildren } from 'preact'
+import { useCallback, useContext, useEffect, useState } from 'preact/hooks'
 import { api, pkgKey, UserData } from '../lib/api'
 
 interface UserDataContextValue {
@@ -30,19 +32,19 @@ export function useUserData(): UserDataContextValue {
   return ctx
 }
 
-export function UserDataProvider({ children }: { children: React.ReactNode }) {
+export function UserDataProvider({ children }: { children: ComponentChildren }) {
   const [data, setData] = useState<UserData | null>(null)
 
   const refresh = useCallback(() => {
-    api.getUserData().then(setData).catch(() => {})
+    api
+      .getUserData()
+      .then(setData)
+      .catch(() => {})
   }, [])
 
   useEffect(refresh, [refresh])
 
-  const isFavorite = useCallback(
-    (name: string, isCask: boolean) => !!data?.favorites?.[pkgKey(name, isCask)],
-    [data]
-  )
+  const isFavorite = useCallback((name: string, isCask: boolean) => !!data?.favorites?.[pkgKey(name, isCask)], [data])
 
   const toggleFavorite = useCallback(
     async (name: string, isCask: boolean) => {
@@ -52,10 +54,7 @@ export function UserDataProvider({ children }: { children: React.ReactNode }) {
     [refresh]
   )
 
-  const tagsFor = useCallback(
-    (name: string, isCask: boolean) => data?.tags?.[pkgKey(name, isCask)] ?? [],
-    [data]
-  )
+  const tagsFor = useCallback((name: string, isCask: boolean) => data?.tags?.[pkgKey(name, isCask)] ?? [], [data])
 
   const setTags = useCallback(
     async (name: string, isCask: boolean, tags: string[]) => {
@@ -65,10 +64,7 @@ export function UserDataProvider({ children }: { children: React.ReactNode }) {
     [refresh]
   )
 
-  const noteFor = useCallback(
-    (name: string, isCask: boolean) => data?.notes?.[pkgKey(name, isCask)] ?? '',
-    [data]
-  )
+  const noteFor = useCallback((name: string, isCask: boolean) => data?.notes?.[pkgKey(name, isCask)] ?? '', [data])
 
   const setNote = useCallback(
     async (name: string, isCask: boolean, note: string) => {

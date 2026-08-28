@@ -1,4 +1,4 @@
-import type { ReactElement } from 'react'
+import type { VNode } from 'preact'
 import { useTranslation } from 'react-i18next'
 import {
   AppWindowIcon,
@@ -36,7 +36,7 @@ export type ViewKey =
 export interface NavItem {
   key: ViewKey
   labelKey: string
-  icon: (p: { className?: string }) => ReactElement
+  icon: (p: { className?: string }) => VNode
 }
 
 interface NavGroup {
@@ -83,10 +83,12 @@ export const navItems: NavItem[] = [...groups.flatMap((g) => g.items), settingsI
 interface Props {
   view: ViewKey
   onSelect: (v: ViewKey) => void
+  /** Fired when the pointer enters a nav item, before it's actually clicked -- see App.tsx's handleNavHover. */
+  onHover?: (v: ViewKey) => void
   outdatedCount: number
 }
 
-export default function Sidebar({ view, onSelect, outdatedCount }: Props) {
+export default function Sidebar({ view, onSelect, onHover, outdatedCount }: Props) {
   const { t } = useTranslation()
   return (
     <div className="w-56 shrink-0 bg-base-200/70 backdrop-blur-xl border-r border-base-300/60 flex flex-col">
@@ -105,6 +107,7 @@ export default function Sidebar({ view, onSelect, outdatedCount }: Props) {
                 <li key={item.key}>
                   <a
                     className={view === item.key ? 'menu-active' : ''}
+                    onMouseEnter={() => onHover?.(item.key)}
                     onClick={(e) => {
                       e.preventDefault()
                       onSelect(item.key)

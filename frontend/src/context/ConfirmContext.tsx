@@ -1,4 +1,6 @@
-import React, { createContext, useCallback, useContext, useState } from 'react'
+import { createContext } from 'preact'
+import type { ComponentChildren } from 'preact'
+import { useCallback, useContext, useState } from 'preact/hooks'
 import { useTranslation } from 'react-i18next'
 
 interface ConfirmCheckbox {
@@ -37,7 +39,7 @@ export function useConfirm() {
   return ctx
 }
 
-export function ConfirmProvider({ children }: { children: React.ReactNode }) {
+export function ConfirmProvider({ children }: { children: ComponentChildren }) {
   const { t } = useTranslation()
   const [pending, setPending] = useState<PendingConfirm | null>(null)
   const [checked, setChecked] = useState<boolean[]>([])
@@ -70,7 +72,7 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
                 onChange={(e) =>
                   setChecked((prev) => {
                     const next = [...prev]
-                    next[i] = e.target.checked
+                    next[i] = e.currentTarget.checked
                     return next
                   })
                 }
@@ -82,10 +84,7 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
             <button className="btn" onClick={() => close(false)}>
               {pending?.cancelLabel ?? t('confirmDialog.cancel')}
             </button>
-            <button
-              className={`btn ${pending?.danger ? 'btn-error' : 'btn-primary'}`}
-              onClick={() => close(true)}
-            >
+            <button className={`btn ${pending?.danger ? 'btn-error' : 'btn-primary'}`} onClick={() => close(true)}>
               {pending?.confirmLabel ?? t('confirmDialog.confirm')}
             </button>
           </div>

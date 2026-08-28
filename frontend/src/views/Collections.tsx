@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState } from 'preact/hooks'
 import { useTranslation } from 'react-i18next'
 import { api, Collection } from '../lib/api'
 import { useJobs } from '../context/JobsContext'
@@ -46,11 +46,7 @@ export default function Collections({ bump }: Props) {
                 ))}
               </div>
               <div className="card-actions mt-2">
-                <button
-                  className="btn btn-sm btn-primary"
-                  disabled={installing === c.name}
-                  onClick={() => install(c)}
-                >
+                <button className="btn btn-sm btn-primary" disabled={installing === c.name} onClick={() => install(c)}>
                   {installing === c.name ? (
                     <span className="loading loading-spinner loading-xs" />
                   ) : (

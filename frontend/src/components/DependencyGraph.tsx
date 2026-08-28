@@ -1,7 +1,14 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'preact/hooks'
 import { useTranslation } from 'react-i18next'
 import cytoscape from 'cytoscape'
 import CytoscapeComponent from 'react-cytoscapejs'
+
+// react-cytoscapejs's own types are written against React's ComponentClass,
+// which doesn't structurally match Preact's JSX.Element under our
+// jsxImportSource: 'preact' tsconfig (ComponentChildren vs ReactNode) --
+// the component itself runs fine at runtime via the preact/compat alias in
+// vite.config.ts, this cast only works around the type mismatch.
+const CytoscapeGraph = CytoscapeComponent as unknown as (props: Record<string, unknown>) => import('preact').VNode
 import { api, DependencyGraph as DependencyGraphData, pkgKey } from '../lib/api'
 import { useInstalledPackages } from '../context/InstalledPackagesSignal'
 import { useJobs } from '../context/JobsContext'
@@ -253,10 +260,18 @@ export default function DependencyGraph({ target, onSelectPackage }: Props) {
           </button>
         </div>
         <div className="flex items-center gap-1">
-          <button className="btn btn-xs btn-square" onClick={() => zoomBy(0.8)} aria-label={t('packageDetail.depGraphZoomOut')}>
+          <button
+            className="btn btn-xs btn-square"
+            onClick={() => zoomBy(0.8)}
+            aria-label={t('packageDetail.depGraphZoomOut')}
+          >
             −
           </button>
-          <button className="btn btn-xs btn-square" onClick={() => zoomBy(1.25)} aria-label={t('packageDetail.depGraphZoomIn')}>
+          <button
+            className="btn btn-xs btn-square"
+            onClick={() => zoomBy(1.25)}
+            aria-label={t('packageDetail.depGraphZoomIn')}
+          >
             +
           </button>
           <button
@@ -268,20 +283,30 @@ export default function DependencyGraph({ target, onSelectPackage }: Props) {
             <MaximizeIcon className="size-3.5" />
           </button>
           <button className="btn btn-xs" disabled={exporting || !cy} onClick={() => void exportPng()}>
-            {exporting ? <span className="loading loading-spinner loading-xs" /> : <DownloadIcon className="size-3.5" />}
+            {exporting ? (
+              <span className="loading loading-spinner loading-xs" />
+            ) : (
+              <DownloadIcon className="size-3.5" />
+            )}
             {t('packageDetail.depGraphExportPng')}
           </button>
         </div>
       </div>
 
-      <div ref={containerRef} className="relative rounded-box border border-base-300 bg-base-100" style={{ height: 320 }}>
+      <div
+        ref={containerRef}
+        className="relative rounded-box border border-base-300 bg-base-100"
+        style={{ height: 320 }}
+      >
         {loading && (
           <div className="absolute inset-0 flex items-center gap-2 text-base-content/60 text-sm justify-center">
             <span className="loading loading-spinner loading-xs" /> {t('packageDetail.depGraphLoading')}
           </div>
         )}
         {!loading && error && (
-          <div className="absolute inset-0 flex items-center justify-center text-error text-xs px-4 text-center">{error}</div>
+          <div className="absolute inset-0 flex items-center justify-center text-error text-xs px-4 text-center">
+            {error}
+          </div>
         )}
         {!loading && !error && graph && graph.nodes.length <= 1 && (
           <div className="absolute inset-0 flex items-center justify-center text-base-content/50 text-xs">
@@ -289,7 +314,7 @@ export default function DependencyGraph({ target, onSelectPackage }: Props) {
           </div>
         )}
         {!loading && !error && graph && graph.nodes.length > 1 && (
-          <CytoscapeComponent
+          <CytoscapeGraph
             elements={elements}
             stylesheet={stylesheet}
             layout={{ name: 'preset' }}

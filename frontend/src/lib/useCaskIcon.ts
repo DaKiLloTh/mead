@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState } from 'preact/hooks'
 import { api } from './api'
 
 // Frontend-side mirror of the backend's in-memory icon cache (App.icons in

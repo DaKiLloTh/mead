@@ -69,25 +69,32 @@ let pollingStarted = false
  * dependency array, except inferred from the read itself rather than
  * hand-written, so it can't drift out of sync with what's actually read.
  *
- * `started` is a plain closure flag, not a ref: unlike the old Context
- * version, this doesn't live inside a component's render, so there's no
- * remount that could lose a ref's value, and once installedPackagesSignal's
- * loading flips false the first time, this callback becomes a permanent
- * no-op (installedPackagesCache.ts never sets loading back to true after a
- * poll success). Note this can't self-dispose by calling effect()'s own
- * return value from inside the callback: `const stop = effect(fn)` runs
+ * The "already fired" guard inside the effect is read directly off
+ * outdatedSignal itself (reference equality against the untouched
+ * initialOutdatedState object), not a separate closure boolean: once
+ * refreshOutdated() resolves once, outdatedSignal.value can never again
+ * equal initialOutdatedState (applyFetchOutcome always constructs a new
+ * object), so this callback becomes a permanent no-op on every later
+ * InstalledPackagesSignal poll tick without a second piece of state to keep
+ * in sync with the first. Note this can't self-dispose by calling effect()'s
+ * own return value from inside the callback: `const stop = effect(fn)` runs
  * `fn` synchronously before `effect()` returns, so referencing `stop` from
  * inside `fn` on that first synchronous call is a TDZ crash if the
  * condition is already true the first time this runs. Leaving the guard
  * clause in place permanently is simplest and exactly as cheap.
+ *
+ * pollingStarted (below) is a genuine exception to "derive it from a
+ * signal instead": it's not guarding fetch state, it's guarding against
+ * registering a second effect() subscription if this function itself were
+ * ever called twice -- there's no signal value that means "a subscription
+ * already exists" to check against, so a plain latch is the right tool
+ * here, not a workaround.
  */
 export function startOutdatedPolling() {
   if (pollingStarted) return
   pollingStarted = true
-  let started = false
   effect(() => {
-    if (started || installedPackagesSignal.value.loading) return
-    started = true
+    if (outdatedSignal.value !== initialOutdatedState || installedPackagesSignal.value.loading) return
     refreshOutdated()
     setInterval(refreshOutdated, POLL_INTERVAL_MS)
   })

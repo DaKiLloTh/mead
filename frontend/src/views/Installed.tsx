@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'preact/hooks'
 import { useTranslation } from 'react-i18next'
 import { api, BrewPackage } from '../lib/api'
 import { useJobs } from '../context/JobsContext'
@@ -46,7 +46,6 @@ export default function Installed({ refreshToken, bump, initialFilter }: Props) 
   // changes and the component stays mounted across an initialFilter update.
   useEffect(() => {
     if (initialFilter) setFilter(initialFilter)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialFilter])
   const [query, setQuery] = useState('')
   const [detail, setDetail] = useState<DetailTarget | null>(null)
@@ -83,7 +82,13 @@ export default function Installed({ refreshToken, bump, initialFilter }: Props) 
       if (filter === 'deprecated' && !p.deprecated) return false
       if (filter === 'disabled' && !p.disabled) return false
       if (filter === 'pinned' && !p.pinned) return false
-      if (q && !p.name.toLowerCase().includes(q) && !p.fullName?.toLowerCase().includes(q) && !p.desc?.toLowerCase().includes(q)) return false
+      if (
+        q &&
+        !p.name.toLowerCase().includes(q) &&
+        !p.fullName?.toLowerCase().includes(q) &&
+        !p.desc?.toLowerCase().includes(q)
+      )
+        return false
       return true
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -209,7 +214,7 @@ export default function Installed({ refreshToken, bump, initialFilter }: Props) 
             type="text"
             placeholder={t('installed.filterPlaceholder')}
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => setQuery(e.currentTarget.value)}
           />
         </label>
       </div>
@@ -226,7 +231,11 @@ export default function Installed({ refreshToken, bump, initialFilter }: Props) 
           >
             {t('installed.tabFormulae', { count: formulaCount })}
           </button>
-          <button role="tab" className={`tab ${filter === 'cask' ? 'tab-active' : ''}`} onClick={() => setFilter('cask')}>
+          <button
+            role="tab"
+            className={`tab ${filter === 'cask' ? 'tab-active' : ''}`}
+            onClick={() => setFilter('cask')}
+          >
             {t('installed.tabCasks', { count: caskCount })}
           </button>
           <button
@@ -347,7 +356,9 @@ export default function Installed({ refreshToken, bump, initialFilter }: Props) 
                       {p.desc && <div className="text-xs text-base-content/50 truncate">{p.desc}</div>}
                     </td>
                     <td>
-                      <span className={`badge badge-sm badge-outline ${p.isCask ? 'badge-secondary' : 'badge-primary'}`}>
+                      <span
+                        className={`badge badge-sm badge-outline ${p.isCask ? 'badge-secondary' : 'badge-primary'}`}
+                      >
                         {p.isCask ? t('common.cask') : t('common.formula')}
                       </span>
                     </td>
@@ -363,11 +374,17 @@ export default function Installed({ refreshToken, bump, initialFilter }: Props) 
                           </span>
                         )}
                         {p.pinned && <span className="badge badge-sm badge-ghost">{t('common.badgePinned')}</span>}
-                        {!p.isCask && leaves.has(p.name) && <span className="badge badge-sm badge-ghost">{t('installed.badgeLeaf')}</span>}
-                        {!p.isCask && !p.linked && (
-                          <span className="badge badge-sm badge-warning badge-outline">{t('common.badgeUnlinked')}</span>
+                        {!p.isCask && leaves.has(p.name) && (
+                          <span className="badge badge-sm badge-ghost">{t('installed.badgeLeaf')}</span>
                         )}
-                        {p.isCask && p.autoUpdates && <span className="badge badge-sm badge-ghost">{t('common.badgeAutoUpdates')}</span>}
+                        {!p.isCask && !p.linked && (
+                          <span className="badge badge-sm badge-warning badge-outline">
+                            {t('common.badgeUnlinked')}
+                          </span>
+                        )}
+                        {p.isCask && p.autoUpdates && (
+                          <span className="badge badge-sm badge-ghost">{t('common.badgeAutoUpdates')}</span>
+                        )}
                       </div>
                     </td>
                     <td>

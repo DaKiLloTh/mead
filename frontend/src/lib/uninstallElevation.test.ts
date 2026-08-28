@@ -9,7 +9,10 @@ describe('isSudoTerminalRequiredFailure', () => {
   it('matches the "a terminal is required" sudo diagnostic', () => {
     expect(
       isSudoTerminalRequiredFailure(
-        lines('==> Purging files for version 21.0.12,7 of Cask graalvm-jdk@21', 'sudo: a terminal is required to read the password')
+        lines(
+          '==> Purging files for version 21.0.12,7 of Cask graalvm-jdk@21',
+          'sudo: a terminal is required to read the password'
+        )
       )
     ).toBe(true)
   })
@@ -35,7 +38,9 @@ describe('isSudoTerminalRequiredFailure', () => {
   })
 
   it('does not match a generic permission-denied error that never mentions sudo', () => {
-    expect(isSudoTerminalRequiredFailure(lines('rm: /Library/Java/JavaVirtualMachines/graalvm-21.jdk: Permission denied'))).toBe(false)
+    expect(
+      isSudoTerminalRequiredFailure(lines('rm: /Library/Java/JavaVirtualMachines/graalvm-21.jdk: Permission denied'))
+    ).toBe(false)
   })
 
   it('does not match another sudo message that is not the terminal/password one', () => {

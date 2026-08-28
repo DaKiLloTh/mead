@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'preact/hooks'
 import { useTranslation } from 'react-i18next'
 import { useJobs } from '../context/JobsContext'
 import { duration } from '../lib/format'
@@ -82,18 +82,21 @@ export default function JobConsole() {
   }
 
   return (
-    <div className="border-t border-base-300 bg-base-100 flex flex-col shrink-0" style={{ height: consoleOpen ? 280 : 40 }}>
+    <div
+      className="border-t border-base-300 bg-base-100 flex flex-col shrink-0"
+      style={{ height: consoleOpen ? 280 : 40 }}
+    >
       <div className="flex items-center gap-2 px-3 h-10 shrink-0 text-sm">
         <button
           className="flex items-center gap-2 flex-1 min-w-0 h-full hover:bg-base-200 transition-colors -mx-3 px-3"
           onClick={() => setConsoleOpen(!consoleOpen)}
         >
           <span className="font-medium">{t('jobConsole.activity')}</span>
-          {activeCount > 0 && <span className="badge badge-primary badge-sm">{t('jobConsole.running', { count: activeCount })}</span>}
-          <span className="flex-1" />
-          {selected && (
-            <span className="text-base-content/60 truncate max-w-xs">{selected.title}</span>
+          {activeCount > 0 && (
+            <span className="badge badge-primary badge-sm">{t('jobConsole.running', { count: activeCount })}</span>
           )}
+          <span className="flex-1" />
+          {selected && <span className="text-base-content/60 truncate max-w-xs">{selected.title}</span>}
           <span className="text-base-content/50">{consoleOpen ? '▾' : '▴'}</span>
         </button>
         {activeCount === 0 && (
@@ -112,10 +115,7 @@ export default function JobConsole() {
           <ul className="menu menu-sm w-56 shrink-0 border-r border-base-300 flex-nowrap overflow-y-auto flex-col">
             {[...jobs].reverse().map((j) => (
               <li key={j.id}>
-                <button
-                  className={j.id === selected?.id ? 'menu-active' : ''}
-                  onClick={() => setSelectedJobId(j.id)}
-                >
+                <button className={j.id === selected?.id ? 'menu-active' : ''} onClick={() => setSelectedJobId(j.id)}>
                   <StatusIcon status={j.status} />
                   <span className="truncate">{j.title}</span>
                 </button>
@@ -131,7 +131,14 @@ export default function JobConsole() {
                   {selected.status === 'running'
                     ? t('jobConsole.runningStatus')
                     : selected.status === 'success'
-                      ? t('jobConsole.finishedIn', { duration: duration(selected.startedAt, selected.endedAt ?? Date.now()) })
+                      ? t('jobConsole.finishedIn', {
+                          // endedAt is always set alongside status:'success' by jobTracker's
+                          // handleDone -- the fallback to startedAt (0 duration) only matters
+                          // for TS's benefit, since endedAt is typed optional independently of
+                          // status. Falls back to startedAt rather than Date.now() to keep this
+                          // pure: an impure call here would make render output nondeterministic.
+                          duration: duration(selected.startedAt, selected.endedAt ?? selected.startedAt),
+                        })
                       : t('jobConsole.failedExitCode', { code: selected.exitCode ?? '?' })}
                 </span>
                 <span className="flex-1" />

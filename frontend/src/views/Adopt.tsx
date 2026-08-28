@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState } from 'preact/hooks'
 import { Trans, useTranslation } from 'react-i18next'
 import { api, AdoptCandidate } from '../lib/api'
 import { useJobs } from '../context/JobsContext'
@@ -85,7 +85,7 @@ export default function Adopt({ bump }: Props) {
     <div className="p-6">
       <h1 className="text-2xl font-bold mb-1">{t('adopt.title')}</h1>
       <p className="text-base-content/60 text-sm mb-4">
-        <Trans i18nKey="adopt.subtitle" components={{ path: <span className="font-mono" /> }} />
+        <Trans i18nKey="adopt.subtitle" components={{ path: <span className="font-mono" /> } as any} />
       </p>
 
       <button className="btn btn-sm btn-primary mb-4" disabled={loading} onClick={scan}>

@@ -52,17 +52,19 @@ export function refreshInstalledPackages() {
     })
 }
 
-let pollingStarted = false
-
 /**
  * Starts the initial fetch plus the 60s background poll. Called once from
  * App.tsx at startup. Guarded so a second call (e.g. a remount during dev)
  * is a no-op, since the signal and its interval already live for the life
  * of the process, not tied to any component's mount lifecycle.
+ *
+ * "Already started" is read directly off the signal (reference equality
+ * against the untouched initialInstalledPackagesState object) rather than a
+ * separate `let pollingStarted` module boolean -- one source of truth,
+ * consistent with ServicesSignal.ts/AppStoreSignal.ts's ensureXLoaded().
  */
 export function startInstalledPackagesPolling() {
-  if (pollingStarted) return
-  pollingStarted = true
+  if (installedPackagesSignal.value !== initialInstalledPackagesState) return
   refreshInstalledPackages()
   setInterval(refreshInstalledPackages, POLL_INTERVAL_MS)
 }

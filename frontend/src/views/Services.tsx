@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'preact/hooks'
 import { useTranslation } from 'react-i18next'
-import { api, Service } from '../lib/api'
+import { api } from '../lib/api'
 import { useJobs } from '../context/JobsContext'
+import { servicesSignal, ensureServicesLoaded, loadServices } from '../context/ServicesSignal'
 import { PlayIcon, RefreshIcon, SquareIcon } from '../components/Icons'
 
 interface Props {
@@ -20,29 +21,34 @@ function statusBadge(status: string) {
 export default function Services({ refreshToken, bump }: Props) {
   const { t } = useTranslation()
   const { runAction } = useJobs()
-  const [services, setServices] = useState<Service[]>([])
-  const [loading, setLoading] = useState(true)
+  const { services, loading, error } = servicesSignal.value
   const [rowBusy, setRowBusy] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
   const [cleaningUp, setCleaningUp] = useState(false)
 
-  function load() {
-    setLoading(true)
-    setError(null)
-    api
-      .services()
-      .then(setServices)
-      .catch((e) => setError(String(e)))
-      .finally(() => setLoading(false))
-  }
+  // ensureServicesLoaded() is idempotent: if Sidebar's onMouseEnter already
+  // kicked off a fetch before this view even mounted, this is a no-op and
+  // the data that comes back is whatever that fetch returns. loadServices()
+  // below is the separate, always-real-fetch path for refreshToken changes
+  // after the initial mount, since those mean something else in the app
+  // changed and this view genuinely needs fresh data, not whatever's cached.
+  useEffect(() => {
+    ensureServicesLoaded()
+  }, [])
 
-  useEffect(load, [refreshToken])
+  const skipFirstRefreshRef = useRef(true)
+  useEffect(() => {
+    if (skipFirstRefreshRef.current) {
+      skipFirstRefreshRef.current = false
+      return
+    }
+    loadServices()
+  }, [refreshToken])
 
   async function act(name: string, action: () => Promise<string>) {
     setRowBusy(name)
     await runAction(action)
     setRowBusy(null)
-    load()
+    loadServices()
     bump()
   }
 
@@ -50,7 +56,7 @@ export default function Services({ refreshToken, bump }: Props) {
     setCleaningUp(true)
     await runAction(() => api.servicesCleanup())
     setCleaningUp(false)
-    load()
+    loadServices()
   }
 
   return (
@@ -64,7 +70,7 @@ export default function Services({ refreshToken, bump }: Props) {
           <button className="btn btn-sm" disabled={cleaningUp} onClick={cleanup}>
             {cleaningUp && <span className="loading loading-spinner loading-xs" />} {t('services.cleanUpUnused')}
           </button>
-          <button className="btn btn-sm" disabled={loading} onClick={load}>
+          <button className="btn btn-sm" disabled={loading} onClick={loadServices}>
             <RefreshIcon className="size-4" /> {t('common.refresh')}
           </button>
         </div>

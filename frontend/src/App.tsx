@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'preact/hooks'
 import { useTranslation } from 'react-i18next'
 import { JobsProvider, useJobs } from './context/JobsContext'
 import { ConfirmProvider } from './context/ConfirmContext'
@@ -6,6 +6,8 @@ import { UserDataProvider, useUserData } from './context/UserDataContext'
 import { useInstalledPackages, startInstalledPackagesPolling } from './context/InstalledPackagesSignal'
 import { useSystemInfo, startSystemInfoPolling } from './context/SystemInfoSignal'
 import { useOutdated, startOutdatedPolling } from './context/OutdatedSignal'
+import { ensureServicesLoaded } from './context/ServicesSignal'
+import { ensureAppStoreLoaded } from './context/AppStoreSignal'
 import { RefreshIcon } from './components/Icons'
 import { formatHomebrewLastUpdated } from './lib/formatHomebrewLastUpdated'
 import Sidebar, { type ViewKey } from './components/Sidebar'
@@ -102,6 +104,19 @@ function AppShell() {
     setView('installed')
   }
 
+  // Fired on hover, before the click that would actually mount the view --
+  // starts Services'/App Store's fetch early so the data's often already
+  // back by the time the click lands, instead of only starting once the
+  // view mounts. Both entry points are idempotent (see *Signal.ts), so this
+  // never causes a second, redundant fetch once the view actually mounts.
+  // Scoped to just these two: they're the app's slowest per-view fetches
+  // (mas especially) and, unlike most views, have nothing else gating
+  // whether it's safe to start the fetch speculatively.
+  const handleNavHover = (v: ViewKey) => {
+    if (v === 'services') ensureServicesLoaded()
+    else if (v === 'appstore') ensureAppStoreLoaded()
+  }
+
   // The single "something changed, refresh now" signal for the whole app.
   // Views still on the per-view fetch-on-refreshToken pattern pick this up
   // via the `refreshToken` prop; the shared installed-packages and
@@ -185,7 +200,7 @@ function AppShell() {
   return (
     <div className="h-full flex flex-col bg-base-100 text-base-content">
       <div className="flex flex-1 min-h-0">
-        <Sidebar view={view} onSelect={changeView} outdatedCount={outdatedCount} />
+        <Sidebar view={view} onSelect={changeView} onHover={handleNavHover} outdatedCount={outdatedCount} />
         <div className="flex-1 min-w-0 flex flex-col">
           <div className="drag-region h-14 shrink-0 flex items-center px-6 border-b border-base-300">
             <span className="text-sm font-medium text-base-content/60">{t(viewTitleKeys[view])}</span>
@@ -199,7 +214,11 @@ function AppShell() {
                 </div>
               )}
               <button className="btn btn-sm btn-outline no-drag" disabled={headerUpdateBusy} onClick={runHeaderUpdate}>
-                {headerUpdateBusy ? <span className="loading loading-spinner loading-xs" /> : <RefreshIcon className="size-4" />}
+                {headerUpdateBusy ? (
+                  <span className="loading loading-spinner loading-xs" />
+                ) : (
+                  <RefreshIcon className="size-4" />
+                )}
                 {t('common.updateHomebrew')}
               </button>
               <span className="flex items-center gap-1 text-base-content/40">
@@ -210,7 +229,11 @@ function AppShell() {
           </div>
           <div className="flex-1 min-h-0 overflow-y-auto">
             {view === 'dashboard' && (
-              <Dashboard onNavigate={changeView} onNavigateInstalled={navigateToInstalled} refreshToken={refreshToken} />
+              <Dashboard
+                onNavigate={changeView}
+                onNavigateInstalled={navigateToInstalled}
+                refreshToken={refreshToken}
+              />
             )}
             {view === 'installed' && (
               <Installed refreshToken={refreshToken} bump={bump} initialFilter={installedInitialFilter} />

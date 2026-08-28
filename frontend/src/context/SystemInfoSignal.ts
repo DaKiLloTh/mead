@@ -40,12 +40,15 @@ export function refreshSystemInfo() {
     })
 }
 
-let pollingStarted = false
-
-/** Starts the initial fetch plus the 60s background poll. Called once from App.tsx at startup. */
+/**
+ * Starts the initial fetch plus the 60s background poll. Called once from
+ * App.tsx at startup. "Already started" is read directly off the signal
+ * (reference equality against the untouched initialSystemInfoState object)
+ * rather than a separate `let pollingStarted` module boolean -- see
+ * InstalledPackagesSignal.ts's startInstalledPackagesPolling for why.
+ */
 export function startSystemInfoPolling() {
-  if (pollingStarted) return
-  pollingStarted = true
+  if (systemInfoSignal.value !== initialSystemInfoState) return
   refreshSystemInfo()
   setInterval(refreshSystemInfo, POLL_INTERVAL_MS)
 }

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'preact/hooks'
 import { useTranslation } from 'react-i18next'
 import { api, OutdatedPackage } from '../lib/api'
 import { useJobs } from '../context/JobsContext'
@@ -41,7 +41,7 @@ export default function Updates({ refreshToken, bump }: Props) {
   const [greedy, setGreedy] = useState(false)
   const [detail, setDetail] = useState<DetailTarget | null>(null)
 
-  const items = greedy ? greedyItems : outdated.items ?? []
+  const items = greedy ? greedyItems : (outdated.items ?? [])
   const loading = greedy ? greedyLoading : outdated.loading
   const error = greedy ? greedyError : outdated.error
 
@@ -57,7 +57,6 @@ export default function Updates({ refreshToken, bump }: Props) {
 
   useEffect(() => {
     if (greedy) loadGreedy()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [greedy, refreshToken])
 
   const { visible, snoozed } = useMemo(() => {
@@ -104,8 +103,8 @@ export default function Updates({ refreshToken, bump }: Props) {
             {error
               ? t('updates.subtitleError')
               : visible.length === 0
-              ? t('updates.subtitleUpToDate')
-              : t('updates.subtitleCanUpgrade', { count: visible.length })}
+                ? t('updates.subtitleUpToDate')
+                : t('updates.subtitleCanUpgrade', { count: visible.length })}
             {!error && snoozed.length > 0 && t('updates.subtitleSnoozedSuffix', { count: snoozed.length })}
           </p>
         </div>
@@ -115,7 +114,7 @@ export default function Updates({ refreshToken, bump }: Props) {
               type="checkbox"
               className="checkbox checkbox-sm"
               checked={greedy}
-              onChange={(e) => setGreedy(e.target.checked)}
+              onChange={(e) => setGreedy(e.currentTarget.checked)}
             />
             <span className="label-text">{t('updates.includeAutoUpdatingCasks')}</span>
           </label>
@@ -127,7 +126,11 @@ export default function Updates({ refreshToken, bump }: Props) {
           )}
           {!showSnoozed && visible.length > 0 && (
             <button className="btn btn-sm btn-primary" disabled={upgradingAll} onClick={upgradeAll}>
-              {upgradingAll ? <span className="loading loading-spinner loading-xs" /> : <ArrowUpCircleIcon className="size-4" />}
+              {upgradingAll ? (
+                <span className="loading loading-spinner loading-xs" />
+              ) : (
+                <ArrowUpCircleIcon className="size-4" />
+              )}
               {t('common.upgradeAll')}
             </button>
           )}
@@ -215,7 +218,10 @@ export default function Updates({ refreshToken, bump }: Props) {
                             >
                               <ClockIcon className="size-3.5" />
                             </div>
-                            <ul tabIndex={0} className="dropdown-content menu menu-sm bg-base-100 rounded-box z-10 w-32 p-1 shadow border border-base-300">
+                            <ul
+                              tabIndex={0}
+                              className="dropdown-content menu menu-sm bg-base-100 rounded-box z-10 w-32 p-1 shadow border border-base-300"
+                            >
                               {SNOOZE_OPTIONS.map((o) => (
                                 <li key={o.days}>
                                   <a
@@ -238,7 +244,11 @@ export default function Updates({ refreshToken, bump }: Props) {
                               upgradeOne(p)
                             }}
                           >
-                            {rowBusy === p.name ? <span className="loading loading-spinner loading-xs" /> : t('common.upgrade')}
+                            {rowBusy === p.name ? (
+                              <span className="loading loading-spinner loading-xs" />
+                            ) : (
+                              t('common.upgrade')
+                            )}
                           </button>
                         </>
                       )}

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState } from 'preact/hooks'
 import { Trans, useTranslation } from 'react-i18next'
 import { api } from '../lib/api'
 import { useJobs } from '../context/JobsContext'
@@ -163,10 +163,12 @@ export default function Settings() {
               {analyticsBusy === 'on' && <span className="loading loading-spinner loading-xs" />} {t('settings.turnOn')}
             </button>
             <button className="btn btn-sm" disabled={analyticsBusy !== null} onClick={() => analyticsToggle(false)}>
-              {analyticsBusy === 'off' && <span className="loading loading-spinner loading-xs" />} {t('settings.turnOff')}
+              {analyticsBusy === 'off' && <span className="loading loading-spinner loading-xs" />}{' '}
+              {t('settings.turnOff')}
             </button>
             <button className="btn btn-sm btn-ghost" disabled={analyticsBusy !== null} onClick={analyticsRegenerate}>
-              {analyticsBusy === 'regen' && <span className="loading loading-spinner loading-xs" />} {t('settings.regenerateId')}
+              {analyticsBusy === 'regen' && <span className="loading loading-spinner loading-xs" />}{' '}
+              {t('settings.regenerateId')}
             </button>
           </div>
         </div>
@@ -176,7 +178,7 @@ export default function Settings() {
         <div className="card-body">
           <h2 className="card-title text-base">{t('settings.casksTitle')}</h2>
           <p className="text-sm text-base-content/70">
-            <Trans i18nKey="settings.casksDescription" components={{ path: <span className="font-mono" /> }} />
+            <Trans i18nKey="settings.casksDescription" components={{ path: <span className="font-mono" /> } as any} />
           </p>
           <div className="flex gap-2">
             <input
@@ -184,7 +186,7 @@ export default function Settings() {
               className="input input-sm flex-1"
               placeholder={t('settings.appDirPlaceholder')}
               value={appDir}
-              onChange={(e) => setAppDir(e.target.value)}
+              onChange={(e) => setAppDir(e.currentTarget.value)}
             />
             <button className="btn btn-sm btn-primary" onClick={saveAppDir}>
               {appDirSaved ? t('common.saved') : t('common.save')}
@@ -201,7 +203,7 @@ export default function Settings() {
             className="select select-sm w-fit"
             value={i18n.language}
             disabled={supportedLngs.length <= 1}
-            onChange={(e) => void i18n.changeLanguage(e.target.value)}
+            onChange={(e) => void i18n.changeLanguage(e.currentTarget.value)}
           >
             {supportedLngs.map((lng) => (
               <option key={lng} value={lng}>
@@ -237,18 +239,26 @@ export default function Settings() {
         <div className="card-body">
           <h2 className="card-title text-base">{t('settings.dataTitle')}</h2>
           <p className="text-sm text-base-content/70">
-            <Trans i18nKey="settings.dataDescription" components={{ path: <span className="font-mono" /> }} />
+            <Trans i18nKey="settings.dataDescription" components={{ path: <span className="font-mono" /> } as any} />
           </p>
           <div className="flex flex-wrap gap-2">
             <button className="btn btn-sm" onClick={() => api.revealLocalDataFile()}>
               {t('settings.revealInFinder')}
             </button>
             <button className="btn btn-sm" disabled={exportingData} onClick={exportData}>
-              {exportingData ? <span className="loading loading-spinner loading-xs" /> : <DownloadIcon className="size-4" />}
+              {exportingData ? (
+                <span className="loading loading-spinner loading-xs" />
+              ) : (
+                <DownloadIcon className="size-4" />
+              )}
               {t('settings.exportData')}
             </button>
             <button className="btn btn-sm" disabled={importingData} onClick={importData}>
-              {importingData ? <span className="loading loading-spinner loading-xs" /> : <ImportIcon className="size-4" />}
+              {importingData ? (
+                <span className="loading loading-spinner loading-xs" />
+              ) : (
+                <ImportIcon className="size-4" />
+              )}
               {t('settings.importData')}
             </button>
             <button className="btn btn-sm btn-error btn-outline" onClick={clearAllData}>

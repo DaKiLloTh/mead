@@ -1,10 +1,17 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'preact/hooks'
 import { useTranslation } from 'react-i18next'
 import { api, SearchResult } from '../lib/api'
 import { useJobs } from '../context/JobsContext'
 import PackageDetailModal, { DetailTarget } from '../components/PackageDetailModal'
 import ExternalLink from '../components/ExternalLink'
-import { BadgeBrokenIcon, BadgeInstalledIcon, DownloadIcon, ExternalLinkIcon, SearchIcon, TapIcon } from '../components/Icons'
+import {
+  BadgeBrokenIcon,
+  BadgeInstalledIcon,
+  DownloadIcon,
+  ExternalLinkIcon,
+  SearchIcon,
+  TapIcon,
+} from '../components/Icons'
 
 type Filter = 'all' | 'formula' | 'cask'
 
@@ -91,7 +98,7 @@ export default function Search({ refreshToken, bump }: Props) {
             placeholder={t('search.placeholder')}
             value={query}
             autoFocus
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => setQuery(e.currentTarget.value)}
           />
           {loading && <span className="loading loading-spinner loading-xs" />}
         </label>
@@ -101,7 +108,7 @@ export default function Search({ refreshToken, bump }: Props) {
             type="checkbox"
             className="checkbox checkbox-sm"
             checked={searchDesc}
-            onChange={(e) => setSearchDesc(e.target.checked)}
+            onChange={(e) => setSearchDesc(e.currentTarget.checked)}
           />
           <span className="label-text">{t('search.searchDescLabel')}</span>
         </label>
@@ -119,7 +126,11 @@ export default function Search({ refreshToken, bump }: Props) {
           >
             {t('search.tabFormulae', { count: results.filter((r) => !r.isCask).length })}
           </button>
-          <button role="tab" className={`tab ${filter === 'cask' ? 'tab-active' : ''}`} onClick={() => setFilter('cask')}>
+          <button
+            role="tab"
+            className={`tab ${filter === 'cask' ? 'tab-active' : ''}`}
+            onClick={() => setFilter('cask')}
+          >
             {t('search.tabCasks', { count: results.filter((r) => r.isCask).length })}
           </button>
         </div>
@@ -147,7 +158,11 @@ export default function Search({ refreshToken, bump }: Props) {
                   </div>
                   <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
                     {r.homepage && (
-                      <ExternalLink href={r.homepage} className="btn btn-ghost btn-xs btn-square" title={t('search.homepageLink')}>
+                      <ExternalLink
+                        href={r.homepage}
+                        className="btn btn-ghost btn-xs btn-square"
+                        title={t('search.homepageLink')}
+                      >
                         <ExternalLinkIcon className="size-3.5" />
                       </ExternalLink>
                     )}
@@ -168,7 +183,10 @@ export default function Search({ refreshToken, bump }: Props) {
                   <div className="flex items-center gap-2 flex-wrap">
                     {r.version && <span className="font-mono text-xs text-base-content/60">{r.version}</span>}
                     {r.tap && !OFFICIAL_TAPS.has(r.tap.toLowerCase()) && (
-                      <span className="badge badge-sm badge-warning badge-outline gap-1" title={t('search.nonStandardTapTooltip')}>
+                      <span
+                        className="badge badge-sm badge-warning badge-outline gap-1"
+                        title={t('search.nonStandardTapTooltip')}
+                      >
                         <TapIcon className="size-3" />
                         {r.tap}
                       </span>
@@ -179,8 +197,12 @@ export default function Search({ refreshToken, bump }: Props) {
                         {t('common.badgeDeprecated')}
                       </span>
                     )}
-                    {r.disabled && <span className="badge badge-sm badge-error gap-1">{t('common.badgeDisabled')}</span>}
-                    {r.isCask && r.autoUpdates && <span className="badge badge-sm badge-ghost">{t('common.badgeAutoUpdates')}</span>}
+                    {r.disabled && (
+                      <span className="badge badge-sm badge-error gap-1">{t('common.badgeDisabled')}</span>
+                    )}
+                    {r.isCask && r.autoUpdates && (
+                      <span className="badge badge-sm badge-ghost">{t('common.badgeAutoUpdates')}</span>
+                    )}
                   </div>
 
                   {isInstalled ? (
