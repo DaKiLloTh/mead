@@ -77,10 +77,28 @@ func ResolveBrewPath() (string, error) {
 	return brewPath, brewPathErr
 }
 
-// ResolveMasPath locates the `mas` executable. Unlike brew, mas has no
-// well-known install locations to search first -- Homebrew always installs
-// it as a regular formula, so a plain PATH lookup is sufficient.
+// masPathCandidates returns the well-known locations to check for `mas`
+// before falling back to a bare PATH lookup, in priority order. Pure and
+// separately testable from the actual filesystem check below.
+func masPathCandidates() []string {
+	return []string{"/opt/homebrew/bin/mas", "/usr/local/bin/mas"}
+}
+
+// ResolveMasPath locates the `mas` executable, checking Homebrew's own
+// well-known bin directories first -- mas is itself a regular Homebrew
+// formula, so it lives at the same prefix as `brew` (see ResolveBrewPath
+// above), which a bare PATH lookup alone can miss. This matters because
+// mead, launched normally (Finder/Dock/LaunchServices rather than a
+// terminal), doesn't inherit the user's shell PATH -- it gets a minimal
+// system default that doesn't include Homebrew's bin directory, even
+// though `mas` is genuinely installed. Falls back to a plain PATH lookup
+// for anyone with mas installed somewhere else entirely.
 func ResolveMasPath() (string, error) {
+	for _, c := range masPathCandidates() {
+		if p, err := exec.LookPath(c); err == nil {
+			return p, nil
+		}
+	}
 	p, err := exec.LookPath("mas")
 	if err != nil {
 		return "", errors.New("could not find the `mas` executable on this system; install it with `brew install mas`")

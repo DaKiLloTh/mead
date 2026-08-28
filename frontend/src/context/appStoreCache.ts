@@ -69,3 +69,25 @@ export function applyFetchOutcome(state: AppStoreState, outcome: FetchOutcome): 
   }
   return state.loading ? { ...state, loading: false } : state
 }
+
+/**
+ * Whether ensureAppStoreLoaded() should trigger a fresh fetch given the
+ * current cached state: whenever availability is unknown (never checked,
+ * or the initial check errored) or was last found unavailable.
+ *
+ * available:false is deliberately NOT treated as settled the way
+ * available:true is. mas becoming available is something that can happen
+ * entirely outside mead (the user runs `brew install mas` themselves in a
+ * terminal, or mead's own earlier `ResolveMasPath` PATH-resolution bug is
+ * what produced a false "not found" for this process even though mas was
+ * genuinely installed the whole time) -- so a cached available:false must
+ * not be permanently sticky for the life of the running process the way a
+ * real, already-fetched apps list is. masAvailable() itself is a cheap
+ * well-known-path/PATH check, not a real `mas` subprocess call like
+ * masList/masOutdated, so re-checking it on every mount/hover doesn't
+ * reintroduce the slow-refetch-on-every-visit problem this idempotent
+ * loader pattern exists to avoid in the first place.
+ */
+export function needsLoad(state: AppStoreState): boolean {
+  return state.available !== true
+}
