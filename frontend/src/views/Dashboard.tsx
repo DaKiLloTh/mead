@@ -5,7 +5,6 @@ import { useJobs } from '../context/JobsContext'
 import { useSystemInfo } from '../context/SystemInfoContext'
 import { ArrowUpCircleIcon, ExternalLinkIcon, RefreshIcon, WrenchIcon } from '../components/Icons'
 import ExternalLink from '../components/ExternalLink'
-import { formatHomebrewLastUpdated } from '../lib/formatHomebrewLastUpdated'
 import type { ViewKey } from '../components/Sidebar'
 import type { Filter as InstalledFilter } from './Installed'
 
@@ -96,14 +95,7 @@ export default function Dashboard({ onNavigate, onNavigateInstalled, refreshToke
 
           <div className="card bg-base-200 mb-6">
             <div className="card-body">
-              <div className="flex items-center justify-between flex-wrap gap-x-4 gap-y-1">
-                <h2 className="card-title text-base">{t('dashboard.quickActionsTitle')}</h2>
-                <div className="text-xs font-mono text-base-content/60">
-                  {info.brewVersion}
-                  <span className="mx-1.5 text-base-content/30">·</span>
-                  {t('common.lastUpdatedLabel')}: {formatHomebrewLastUpdated(t, info.homebrewLastUpdated)}
-                </div>
-              </div>
+              <h2 className="card-title text-base">{t('dashboard.quickActionsTitle')}</h2>
               <div className="flex flex-wrap gap-2 mt-1">
                 <button
                   className="btn btn-sm btn-warning"
@@ -169,8 +161,7 @@ export default function Dashboard({ onNavigate, onNavigateInstalled, refreshToke
             <div className="card bg-base-200">
               <div className="card-body py-4">
                 <h3 className="font-medium text-xs uppercase text-base-content/50">{t('dashboard.homebrewSectionTitle')}</h3>
-                <div className="font-mono text-xs mt-1 break-all">{info.brewVersion}</div>
-                <div className="font-mono text-xs text-base-content/50 break-all">{info.brewPath}</div>
+                <div className="font-mono text-xs mt-1 break-all">{info.brewPath}</div>
               </div>
             </div>
             <div className="card bg-base-200">
