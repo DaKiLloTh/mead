@@ -44,20 +44,7 @@ func rankResults(results []SearchResult, query string) {
 	})
 }
 
-// searchMatchConfidence maps a name's match tier down to the same
-// "exact"/"possible" vocabulary AdoptCandidate.MatchConfidence already uses
-// elsewhere in this codebase (see adopt.go's buildMatchConfidence), so the
-// frontend doesn't need a second vocabulary to interpret: tiers 0-2 (exact,
-// prefix, substring) are all confident enough to call "exact" -- only tier
-// 3, Homebrew's own fuzzy leftovers, gets flagged as a "possible" match.
-func searchMatchConfidence(name, query string) string {
-	if matchTier(name, query) <= 2 {
-		return "exact"
-	}
-	return "possible"
-}
-
-// enrichSearchResults fills in Desc/Version/Deprecated/Disabled/AutoUpdates
+// enrichSearchResults fills in Desc/Version/Homepage/Tap/Deprecated/Disabled/AutoUpdates
 // for every result via batched `brew info` calls -- one batch per type
 // (formula tokens and cask tokens need separate invocations, since --cask
 // is a hard mode switch on `brew info`, not a per-token flag), reusing
@@ -96,9 +83,7 @@ func enrichSearchResults(ctx context.Context, results []SearchResult) {
 			if err != nil {
 				continue
 			}
-			for _, p := range pkgs {
-				infoByKey[searchKey(p.Name, p.IsCask)] = p
-			}
+			addToInfoIndex(infoByKey, pkgs)
 		}
 	}
 	fetch(formulaTokens, false)
@@ -111,8 +96,34 @@ func enrichSearchResults(ctx context.Context, results []SearchResult) {
 		}
 		results[i].Desc = p.Desc
 		results[i].Version = p.Version
+		results[i].Homepage = p.Homepage
+		results[i].Tap = p.Tap
 		results[i].Deprecated = p.Deprecated
 		results[i].Disabled = p.Disabled
 		results[i].AutoUpdates = p.AutoUpdates
+	}
+}
+
+// addToInfoIndex indexes each package under both its short token (p.Name)
+// and, when it has a tap, the tap-qualified form ("tap/name") -- `brew
+// search` prints the qualified form for anything outside the default tap
+// (e.g. "dakilloth/mead/mead"), the exact case this enrichment most needs
+// to work for, since that's also when the tap badge on the card actually
+// has something to show.
+//
+// p.FullName is deliberately not used for this, even though the name
+// suggests it should be: caskToPackage overwrites it with the cask's
+// pretty display name (e.g. "Meld for macOS", see TestCaskToPackage_FullName),
+// an already-established meaning elsewhere in this codebase, not
+// Homebrew's own tap-qualified full_token. Reaching for it here silently
+// broke enrichment for every third-party-tap result -- caught live against
+// this repo's own tap-installed mead cask, not by a test, which is why this
+// is now split out into something a test can hit directly.
+func addToInfoIndex(index map[string]BrewPackage, pkgs []BrewPackage) {
+	for _, p := range pkgs {
+		index[searchKey(p.Name, p.IsCask)] = p
+		if p.Tap != "" {
+			index[searchKey(p.Tap+"/"+p.Name, p.IsCask)] = p
+		}
 	}
 }

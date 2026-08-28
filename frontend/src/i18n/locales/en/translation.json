@@ -148,7 +148,9 @@
     "tabCasks": "Casks ({{count}})",
     "emptyPrompt": "Start typing to search Homebrew.",
     "noResults": "No results.",
-    "possibleMatch": "Possible match"
+    "homepageLink": "Homepage",
+    "formulaeBrewShLink": "View on formulae.brew.sh",
+    "nonStandardTapTooltip": "From a third-party tap, not one of Homebrew's own homebrew/core or homebrew/cask"
   },
   "collections": {
     "title": "Collections",

@@ -3,9 +3,21 @@ import { useTranslation } from 'react-i18next'
 import { api, SearchResult } from '../lib/api'
 import { useJobs } from '../context/JobsContext'
 import PackageDetailModal, { DetailTarget } from '../components/PackageDetailModal'
-import { AlertIcon, BadgeBrokenIcon, BadgeInstalledIcon, CheckIcon, DownloadIcon, SearchIcon } from '../components/Icons'
+import ExternalLink from '../components/ExternalLink'
+import { BadgeBrokenIcon, BadgeInstalledIcon, DownloadIcon, ExternalLinkIcon, SearchIcon, TapIcon } from '../components/Icons'
 
 type Filter = 'all' | 'formula' | 'cask'
+
+// The two official taps every formula/cask not from a third party belongs
+// to. Anything else means the result comes from a tap Homebrew itself
+// doesn't vet -- worth flagging on a search result specifically, since
+// that's the one place in the app someone might install something they've
+// never heard of before.
+const OFFICIAL_TAPS = new Set(['homebrew/core', 'homebrew/cask'])
+
+function formulaeBrewShUrl(r: SearchResult): string {
+  return `https://formulae.brew.sh/${r.isCask ? 'cask' : 'formula'}/${encodeURIComponent(r.name)}`
+}
 
 interface Props {
   refreshToken: number
@@ -133,25 +145,34 @@ export default function Search({ refreshToken, bump }: Props) {
                     <div className="font-medium wrap-break-word">{r.name}</div>
                     {r.desc && <div className="text-xs text-base-content/50 wrap-break-word">{r.desc}</div>}
                   </div>
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    {r.matchConfidence === 'possible' ? (
-                      <AlertIcon className="size-4 text-warning" />
-                    ) : (
-                      <CheckIcon className="size-4 text-success" />
+                  <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+                    {r.homepage && (
+                      <ExternalLink href={r.homepage} className="btn btn-ghost btn-xs btn-square" title={t('search.homepageLink')}>
+                        <ExternalLinkIcon className="size-3.5" />
+                      </ExternalLink>
                     )}
-                    {r.matchConfidence === 'possible' ? (
-                      <span className="badge badge-warning badge-soft badge-sm">{t('search.possibleMatch')}</span>
-                    ) : (
-                      <span className={`badge badge-sm badge-outline ${r.isCask ? 'badge-accent' : 'badge-primary'}`}>
-                        {r.isCask ? t('common.cask') : t('common.formula')}
-                      </span>
-                    )}
+                    <ExternalLink
+                      href={formulaeBrewShUrl(r)}
+                      className="btn btn-ghost btn-xs btn-square"
+                      title={t('search.formulaeBrewShLink')}
+                    >
+                      <TapIcon className="size-3.5" />
+                    </ExternalLink>
+                    <span className={`badge badge-sm badge-outline ${r.isCask ? 'badge-accent' : 'badge-primary'}`}>
+                      {r.isCask ? t('common.cask') : t('common.formula')}
+                    </span>
                   </div>
                 </div>
 
                 <div className="border-t border-base-300/50 pt-2 flex items-center justify-between gap-3 flex-wrap">
                   <div className="flex items-center gap-2 flex-wrap">
                     {r.version && <span className="font-mono text-xs text-base-content/60">{r.version}</span>}
+                    {r.tap && !OFFICIAL_TAPS.has(r.tap.toLowerCase()) && (
+                      <span className="badge badge-sm badge-warning badge-outline gap-1" title={t('search.nonStandardTapTooltip')}>
+                        <TapIcon className="size-3" />
+                        {r.tap}
+                      </span>
+                    )}
                     {r.deprecated && (
                       <span className="badge badge-sm badge-error badge-outline gap-1">
                         <BadgeBrokenIcon className="size-3" />
