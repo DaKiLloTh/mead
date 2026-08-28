@@ -1,6 +1,7 @@
-import React, { createContext, useCallback, useContext, useEffect, useState } from 'react'
+import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { api } from '../lib/api'
 import { applyFetchOutcome, initialOutdatedState, type OutdatedState } from './outdatedCache'
+import { useInstalledPackages } from './InstalledPackagesContext'
 
 // Matches InstalledPackagesContext/SystemInfoContext's poll interval for the
 // same reasoning: infrequent enough not to spam brew, frequent enough that
@@ -42,9 +43,22 @@ export function useOutdated(): OutdatedContextValue {
  * A failed background poll never clears or masks previously-good data, see
  * outdatedCache.ts for the decision logic and why. Only the initial load
  * surfaces a real `error`.
+ *
+ * The very first fetch is deliberately deferred until InstalledPackagesContext's
+ * own first fetch has resolved, rather than firing in the same tick at app
+ * boot: `brew info --json=v2 --installed` (InstalledPackagesContext's call)
+ * is comfortably the heaviest of the app's boot-time brew calls, and racing
+ * it against this one for CPU/subprocess resources made Installed
+ * noticeably slower to load right after launch, exactly when a user is
+ * most likely to click straight into it. Gating on installedPackages.loading
+ * turning false is a real readiness signal, not an arbitrary delay -- once
+ * it's false the heaviest call is out of the way, whether it succeeded or
+ * not, and this one can run without competing with it.
  */
 export function OutdatedProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<OutdatedState>(initialOutdatedState)
+  const installedPackages = useInstalledPackages()
+  const hasFetchedInitially = useRef(false)
 
   const fetchAndApply = useCallback(() => {
     api
@@ -57,7 +71,12 @@ export function OutdatedProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   useEffect(() => {
+    if (installedPackages.loading || hasFetchedInitially.current) return
+    hasFetchedInitially.current = true
     fetchAndApply()
+  }, [installedPackages.loading, fetchAndApply])
+
+  useEffect(() => {
     const interval = setInterval(fetchAndApply, POLL_INTERVAL_MS)
     return () => clearInterval(interval)
   }, [fetchAndApply])
