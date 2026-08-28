@@ -1,9 +1,9 @@
-// Deterministic "pick a color for this package name" logic behind the
-// colored monogram fallback tile -- shown for formulae (which never have an
+// Deterministic "pick a colour for this package name" logic behind the
+// coloured monogram fallback tile -- shown for formulae (which never have an
 // .app/icon at all) and for any cask whose real icon extraction failed for
 // any reason. Pure and framework-independent so it's unit-testable without
 // rendering anything (see monogram.test.ts): the same name always produces
-// the same tile, so a package's color doesn't flicker across renders,
+// the same tile, so a package's colour doesn't flicker across renders,
 // views, or app restarts.
 
 // A small fixed palette of hex background/foreground pairs, rather than a
