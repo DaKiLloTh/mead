@@ -55,6 +55,16 @@ var (
 	brewPathErr  error
 )
 
+// lookPath is exec.LookPath by default, overridden in tests so
+// ResolveBrewPath/ResolveMasPath's actual priority-order/fallback logic can
+// be exercised against a controlled, fake filesystem instead of only the
+// pure candidate list -- this is deliberately named to be testable at this
+// exact seam, since "checks the well-known paths before PATH" being
+// correct in *execution*, not just in the candidate list's contents, is
+// precisely the property that broke silently for months (mas's candidate
+// list didn't exist at all; see ResolveMasPath's doc comment).
+var lookPath = exec.LookPath
+
 // ResolveBrewPath locates the `brew` executable, preferring the well-known
 // Apple Silicon / Intel / Linuxbrew install locations before falling back to
 // PATH lookup.
@@ -62,12 +72,12 @@ func ResolveBrewPath() (string, error) {
 	brewPathOnce.Do(func() {
 		candidates := []string{"/opt/homebrew/bin/brew", "/usr/local/bin/brew", "/home/linuxbrew/.linuxbrew/bin/brew"}
 		for _, c := range candidates {
-			if p, err := exec.LookPath(c); err == nil {
+			if p, err := lookPath(c); err == nil {
 				brewPath = p
 				return
 			}
 		}
-		p, err := exec.LookPath("brew")
+		p, err := lookPath("brew")
 		if err != nil {
 			brewPathErr = errors.New("could not find the `brew` executable on this system; is Homebrew installed")
 			return
@@ -95,11 +105,11 @@ func masPathCandidates() []string {
 // for anyone with mas installed somewhere else entirely.
 func ResolveMasPath() (string, error) {
 	for _, c := range masPathCandidates() {
-		if p, err := exec.LookPath(c); err == nil {
+		if p, err := lookPath(c); err == nil {
 			return p, nil
 		}
 	}
-	p, err := exec.LookPath("mas")
+	p, err := lookPath("mas")
 	if err != nil {
 		return "", errors.New("could not find the `mas` executable on this system; install it with `brew install mas`")
 	}
