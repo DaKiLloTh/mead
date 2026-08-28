@@ -179,7 +179,7 @@ export default function Updates({ refreshToken, bump }: Props) {
                     {p.name}
                   </td>
                   <td>
-                    <span className={`badge badge-sm badge-outline ${p.isCask ? 'badge-accent' : 'badge-primary'}`}>
+                    <span className={`badge badge-sm badge-outline ${p.isCask ? 'badge-secondary' : 'badge-primary'}`}>
                       {p.isCask ? t('common.cask') : t('common.formula')}
                     </span>
                   </td>

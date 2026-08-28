@@ -293,7 +293,7 @@ export default function PackageDetailModal({ target, onClose, onChanged }: Props
               <div>
                 <h3 className="font-bold text-xl">{pkg.fullName || pkg.name}</h3>
                 <div className="flex flex-wrap gap-1.5 mt-1.5">
-                  <span className={`badge badge-sm ${pkg.isCask ? 'badge-accent' : 'badge-primary'} badge-outline`}>
+                  <span className={`badge badge-sm ${pkg.isCask ? 'badge-secondary' : 'badge-primary'} badge-outline`}>
                     {pkg.isCask ? t('common.cask') : t('common.formula')}
                   </span>
                   {pkg.installed && (

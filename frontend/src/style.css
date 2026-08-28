@@ -13,11 +13,20 @@
  *     primary-content set to the theme's own dark text color rather than
  *     white -- white-on-amber falls short of readable contrast, dark
  *     text clears it comfortably.
- *   - secondary: accent dark #8B6224 (aged wood/bronze), content cream.
+ *   - secondary: glass teal #4FB6C6 (the handoff's fourth pillar,
+ *     "glass", not otherwise represented in this palette), content dark.
+ *     Deliberately matched to primary's lightness/saturation rather than
+ *     just "a darker wood tone" -- an earlier version used the wood/
+ *     bronze family here (#8B6224, then the even-darker #6B4B1B), and at
+ *     that brightness the cask badge read as disabled/muted next to
+ *     primary's bright amber formula badge rather than as a distinct but
+ *     equally-weighted color. Currently used for the cask side of the
+ *     cask/formula badge pairing (Installed, Updates, Search, etc).
  *   - accent (daisyUI's third slot, distinct from the "accent amber"
- *     token above): accent darker #6B4B1B, a deeper wood tone so it
- *     reads as a different color from primary rather than a lighter/
- *     darker copy of the same amber.
+ *     token above): accent dark #6B4B1B, a deeper wood tone. Currently
+ *     unused for badges (see secondary above for why); kept as a real,
+ *     distinct dark-wood token for anything that wants that specific
+ *     tone deliberately, e.g. lower-emphasis chrome.
  *   - neutral: accent darker #6B4B1B, cream content -- kept identical
  *     across both themes, matching how daisyUI's own built-in themes
  *     keep `neutral` constant between light and dark.
@@ -47,8 +56,8 @@
 
   --color-primary: #D4A24C;
   --color-primary-content: #241C13;
-  --color-secondary: #8B6224;
-  --color-secondary-content: #F6E7CC;
+  --color-secondary: #4FB6C6;
+  --color-secondary-content: #241C13;
   --color-accent: #6B4B1B;
   --color-accent-content: #F6E7CC;
   --color-neutral: #6B4B1B;
@@ -85,8 +94,8 @@
 
   --color-primary: #D4A24C;
   --color-primary-content: #17130F;
-  --color-secondary: #8B6224;
-  --color-secondary-content: #F6E7CC;
+  --color-secondary: #4FB6C6;
+  --color-secondary-content: #17130F;
   --color-accent: #6B4B1B;
   --color-accent-content: #F6E7CC;
   --color-neutral: #6B4B1B;

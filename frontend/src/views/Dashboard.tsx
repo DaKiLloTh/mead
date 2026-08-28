@@ -84,7 +84,7 @@ export default function Dashboard({ onNavigate, onNavigateInstalled, refreshToke
             </div>
             <div className="stat cursor-pointer" onClick={() => onNavigateInstalled('cask')}>
               <div className="stat-title">{t('dashboard.statCasksInstalled')}</div>
-              <div className="stat-value text-accent">{info.installedCaskCount}</div>
+              <div className="stat-value text-secondary">{info.installedCaskCount}</div>
             </div>
             <div className="stat cursor-pointer" onClick={() => onNavigate('updates')}>
               <div className="stat-title">{t('dashboard.statOutdated')}</div>

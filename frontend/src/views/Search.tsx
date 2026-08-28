@@ -158,7 +158,7 @@ export default function Search({ refreshToken, bump }: Props) {
                     >
                       <TapIcon className="size-3.5" />
                     </ExternalLink>
-                    <span className={`badge badge-sm badge-outline ${r.isCask ? 'badge-accent' : 'badge-primary'}`}>
+                    <span className={`badge badge-sm badge-outline ${r.isCask ? 'badge-secondary' : 'badge-primary'}`}>
                       {r.isCask ? t('common.cask') : t('common.formula')}
                     </span>
                   </div>

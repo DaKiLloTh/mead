@@ -376,7 +376,7 @@ export default function Maintenance() {
                       <tr key={`${p.isCask ? 'c' : 'f'}:${p.name}`} className="hover:bg-base-200">
                         <td className="font-medium truncate">{p.name}</td>
                         <td>
-                          <span className={`badge badge-sm badge-outline ${p.isCask ? 'badge-accent' : 'badge-primary'}`}>
+                          <span className={`badge badge-sm badge-outline ${p.isCask ? 'badge-secondary' : 'badge-primary'}`}>
                             {p.isCask ? t('common.cask') : t('common.formula')}
                           </span>
                         </td>
@@ -572,7 +572,7 @@ export default function Maintenance() {
                           {cleanupPreview.map((item) => (
                             <span
                               key={`${item.isCask ? 'c' : 'f'}:${item.name}`}
-                              className={`badge badge-sm badge-outline ${item.isCask ? 'badge-accent' : 'badge-primary'}`}
+                              className={`badge badge-sm badge-outline ${item.isCask ? 'badge-secondary' : 'badge-primary'}`}
                             >
                               {item.name}
                             </span>
