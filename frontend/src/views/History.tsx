@@ -64,7 +64,7 @@ export default function History() {
               </div>
               <div className="timeline-end timeline-box">
                 <span className="capitalize font-medium">{e.action}</span> {e.name}
-                {e.isCask && <span className="badge badge-xs badge-accent badge-outline ml-2">{t('history.caskBadge')}</span>}
+                {e.isCask && <span className="badge badge-xs badge-secondary badge-outline ml-2">{t('history.caskBadge')}</span>}
               </div>
               {i < sorted.length - 1 && <hr />}
             </li>

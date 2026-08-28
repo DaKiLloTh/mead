@@ -347,7 +347,7 @@ export default function Installed({ refreshToken, bump, initialFilter }: Props) 
                       {p.desc && <div className="text-xs text-base-content/50 truncate">{p.desc}</div>}
                     </td>
                     <td>
-                      <span className={`badge badge-sm badge-outline ${p.isCask ? 'badge-accent' : 'badge-primary'}`}>
+                      <span className={`badge badge-sm badge-outline ${p.isCask ? 'badge-secondary' : 'badge-primary'}`}>
                         {p.isCask ? t('common.cask') : t('common.formula')}
                       </span>
                     </td>

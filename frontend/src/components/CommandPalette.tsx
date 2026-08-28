@@ -158,7 +158,7 @@ export default function CommandPalette({ onNavigate, bump }: Props) {
                   {row.kind === 'package' && (
                     <span
                       className={`badge badge-xs badge-outline ml-auto shrink-0 ${
-                        row.isCask ? 'badge-accent' : 'badge-primary'
+                        row.isCask ? 'badge-secondary' : 'badge-primary'
                       }`}
                     >
                       {row.sublabel}
