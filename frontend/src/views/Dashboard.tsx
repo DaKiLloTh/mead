@@ -106,14 +106,6 @@ export default function Dashboard({ onNavigate, onNavigateInstalled, refreshToke
               </div>
               <div className="flex flex-wrap gap-2 mt-1">
                 <button
-                  className="btn btn-sm btn-primary"
-                  disabled={busy !== null}
-                  onClick={() => run('update', () => api.update())}
-                >
-                  {busy === 'update' ? <span className="loading loading-spinner loading-xs" /> : <RefreshIcon className="size-4" />}
-                  {t('common.updateHomebrew')}
-                </button>
-                <button
                   className="btn btn-sm btn-warning"
                   disabled={busy !== null || info.outdatedCount === 0}
                   onClick={() => run('upgrade', () => api.upgradeAll())}
