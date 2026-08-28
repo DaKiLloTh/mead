@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.10.0](https://github.com/DaKiLloTh/mead/compare/v0.9.0...v0.10.0) (2026-08-28)
+
+
+### Features
+
+* migrate frontend from React to Preact, add signals for shared caches ([#142](https://github.com/DaKiLloTh/mead/issues/142)) ([1c3c367](https://github.com/DaKiLloTh/mead/commit/1c3c36744eb5b852bb4571a43d0de1dd3c6207fc))
+* rank search results by relevance, redesign as detail cards ([2f337d0](https://github.com/DaKiLloTh/mead/commit/2f337d0d775dea1111f5af30f8a95d6abf70080c))
+
+
+### Bug Fixes
+
+* cask badges read as disabled next to formula's bright amber ([62c7a11](https://github.com/DaKiLloTh/mead/commit/62c7a11af06915983427a1713659ae781645f15d))
+* one Update Homebrew action, made properly visible ([5b03c3b](https://github.com/DaKiLloTh/mead/commit/5b03c3b27f316e21ee74ba90afb9c973ab163c63))
+* real gap between search box and search-descriptions checkbox ([0b55484](https://github.com/DaKiLloTh/mead/commit/0b55484cd931d106a09334709e58a22b63ffc63c))
+* reduce Dashboard's max width by 25% ([070e084](https://github.com/DaKiLloTh/mead/commit/070e084438918990d2237795f933de7075e00d4e))
+* remove possible-match badge, add homepage/tap links to search cards ([2c456f2](https://github.com/DaKiLloTh/mead/commit/2c456f2581dcfd7e3386dc026df0d1ecfca87f1c))
+* stop Installed loading slowly on first launch after this session's changes ([8210ad7](https://github.com/DaKiLloTh/mead/commit/8210ad7f0d5035855324a48a4782758dff8140f1))
+* stop showing Homebrew's version/last-updated three times on Dashboard ([918a4fc](https://github.com/DaKiLloTh/mead/commit/918a4fc2b01904f49e68c620561e142c21d62d9b))
+
 ## [0.9.0](https://github.com/DaKiLloTh/mead/compare/v0.8.0...v0.9.0) (2026-08-25)
 
 
