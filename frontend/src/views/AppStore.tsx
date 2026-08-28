@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState } from 'preact/hooks'
 import { Trans, useTranslation } from 'react-i18next'
-import { api, MasApp } from '../lib/api'
+import { api } from '../lib/api'
 import { useJobs } from '../context/JobsContext'
+import { appStoreSignal, ensureAppStoreLoaded, loadAppStore } from '../context/AppStoreSignal'
 import { ArrowUpCircleIcon, DownloadIcon, RefreshIcon, StoreIcon } from '../components/Icons'
 import ExternalLink from '../components/ExternalLink'
 import PackageIcon from '../components/PackageIcon'
@@ -9,44 +10,29 @@ import PackageIcon from '../components/PackageIcon'
 export default function AppStore() {
   const { t } = useTranslation()
   const { runAction } = useJobs()
-  const [available, setAvailable] = useState<boolean | null>(null)
-  const [apps, setApps] = useState<MasApp[]>([])
-  const [outdated, setOutdated] = useState<MasApp[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const { available, apps, outdated, loading, error } = appStoreSignal.value
   const [rowBusy, setRowBusy] = useState<string | null>(null)
   const [installingMas, setInstallingMas] = useState(false)
 
-  function load() {
-    setLoading(true)
-    setError(null)
-    api
-      .masAvailable()
-      .then(async (ok) => {
-        setAvailable(ok)
-        if (!ok) return
-        const [list, out] = await Promise.all([api.masList(), api.masOutdated()])
-        setApps(list)
-        setOutdated(out)
-      })
-      .catch((e) => setError(String(e)))
-      .finally(() => setLoading(false))
-  }
-
-  useEffect(load, [])
+  // Idempotent: a no-op if Sidebar's onMouseEnter already started this
+  // fetch before the view mounted. mas is the slowest CLI this app shells
+  // out to, so the hover head-start matters more here than most views.
+  useEffect(() => {
+    ensureAppStoreLoaded()
+  }, [])
 
   async function installMas() {
     setInstallingMas(true)
     await runAction(() => api.install('mas', false))
     setInstallingMas(false)
-    load()
+    loadAppStore()
   }
 
   async function upgrade(id: string) {
     setRowBusy(id)
     await runAction(() => api.masUpgrade(id))
     setRowBusy(null)
-    load()
+    loadAppStore()
   }
 
   const outdatedIds = new Set(outdated.map((o) => o.id))
@@ -55,13 +41,13 @@ export default function AppStore() {
     <div className="p-6 max-w-3xl">
       <h1 className="text-2xl font-bold mb-1">{t('appstore.title')}</h1>
       <p className="text-base-content/60 text-sm mb-4">
-        <Trans i18nKey="appstore.subtitle" components={{ cli: <span className="font-mono" /> }} />
+        <Trans i18nKey="appstore.subtitle" components={{ cli: <span className="font-mono" /> } as any} />
       </p>
 
       {loading && (
         <div className="flex items-center gap-2 text-base-content/60">
           <span className="loading loading-spinner loading-sm" />{' '}
-          <Trans i18nKey="appstore.checkingForMas" components={{ cli: <span className="font-mono" /> }} />
+          <Trans i18nKey="appstore.checkingForMas" components={{ cli: <span className="font-mono" /> } as any} />
         </div>
       )}
 
@@ -71,7 +57,7 @@ export default function AppStore() {
             <div className="font-medium">{t('appstore.errorTitle')}</div>
             <p className="text-sm mt-1">{error}</p>
           </div>
-          <button className="btn btn-sm" onClick={load}>
+          <button className="btn btn-sm" onClick={loadAppStore}>
             <RefreshIcon className="size-4" /> {t('common.tryAgain')}
           </button>
         </div>
@@ -82,17 +68,29 @@ export default function AppStore() {
           <div className="card-body">
             <h2 className="card-title text-base">
               <StoreIcon className="size-5" />{' '}
-              <Trans i18nKey="appstore.installMasTitle" components={{ cli: <span className="font-mono" /> }} />
+              <Trans i18nKey="appstore.installMasTitle" components={{ cli: <span className="font-mono" /> } as any} />
             </h2>
             <p className="text-sm text-base-content/70">
               <Trans
                 i18nKey="appstore.installMasDescription"
-                components={{ link: <ExternalLink className="link" href="https://github.com/mas-cli/mas">mas</ExternalLink> }}
+                components={
+                  {
+                    link: (
+                      <ExternalLink className="link" href="https://github.com/mas-cli/mas">
+                        mas
+                      </ExternalLink>
+                    ),
+                  } as any
+                }
               />
             </p>
             <div className="card-actions mt-2">
               <button className="btn btn-sm btn-primary" disabled={installingMas} onClick={installMas}>
-                {installingMas ? <span className="loading loading-spinner loading-xs" /> : <DownloadIcon className="size-4" />}
+                {installingMas ? (
+                  <span className="loading loading-spinner loading-xs" />
+                ) : (
+                  <DownloadIcon className="size-4" />
+                )}
                 {t('appstore.installMasButton')}
               </button>
             </div>
@@ -111,7 +109,7 @@ export default function AppStore() {
                 className="btn btn-sm btn-primary"
                 onClick={async () => {
                   await runAction(() => api.masUpgradeAll())
-                  load()
+                  loadAppStore()
                 }}
               >
                 <ArrowUpCircleIcon className="size-4" /> {t('common.upgradeAll')}
@@ -153,8 +151,16 @@ export default function AppStore() {
                     </td>
                     <td className="text-right">
                       {outdatedIds.has(app.id) && (
-                        <button className="btn btn-xs btn-primary" disabled={rowBusy === app.id} onClick={() => upgrade(app.id)}>
-                          {rowBusy === app.id ? <span className="loading loading-spinner loading-xs" /> : t('common.upgrade')}
+                        <button
+                          className="btn btn-xs btn-primary"
+                          disabled={rowBusy === app.id}
+                          onClick={() => upgrade(app.id)}
+                        >
+                          {rowBusy === app.id ? (
+                            <span className="loading loading-spinner loading-xs" />
+                          ) : (
+                            t('common.upgrade')
+                          )}
                         </button>
                       )}
                     </td>

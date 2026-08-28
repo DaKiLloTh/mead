@@ -1,4 +1,5 @@
-import { useEffect, useState, type SyntheticEvent } from 'react'
+import { useEffect, useState } from 'preact/hooks'
+import type { TargetedSubmitEvent } from 'preact'
 import { useTranslation } from 'react-i18next'
 import { api, TapDetail } from '../lib/api'
 import { useJobs } from '../context/JobsContext'
@@ -38,7 +39,7 @@ export default function Taps({ refreshToken, bump }: Props) {
 
   useEffect(load, [refreshToken])
 
-  async function addTap(e: SyntheticEvent<HTMLFormElement>) {
+  async function addTap(e: TargetedSubmitEvent<HTMLFormElement>) {
     e.preventDefault()
     const name = newTap.trim()
     if (!name) return
@@ -67,7 +68,11 @@ export default function Taps({ refreshToken, bump }: Props) {
   }
 
   async function removeTap(name: string) {
-    const { ok } = await confirm({ title: t('taps.confirmRemoveTitle', { name }), danger: true, confirmLabel: t('taps.confirmRemoveLabel') })
+    const { ok } = await confirm({
+      title: t('taps.confirmRemoveTitle', { name }),
+      danger: true,
+      confirmLabel: t('taps.confirmRemoveLabel'),
+    })
     if (!ok) return
     setRowBusy(name)
     setRemoveError((prev) => ({ ...prev, [name]: '' }))
@@ -109,7 +114,7 @@ export default function Taps({ refreshToken, bump }: Props) {
             type="text"
             placeholder={t('taps.addPlaceholder')}
             value={newTap}
-            onChange={(e) => setNewTap(e.target.value)}
+            onChange={(e) => setNewTap(e.currentTarget.value)}
           />
         </label>
         <button className="btn btn-sm btn-primary" type="submit" disabled={adding || !newTap.trim()}>
@@ -138,7 +143,9 @@ export default function Taps({ refreshToken, bump }: Props) {
               <div className="flex flex-col items-stretch p-0!">
                 <div className="flex items-center justify-between px-3 py-2">
                   <button className="flex items-center gap-1.5 font-mono text-sm" onClick={() => toggleExpand(tapName)}>
-                    <ChevronDownIcon className={`size-3.5 transition-transform ${expanded === tapName ? '' : '-rotate-90'}`} />
+                    <ChevronDownIcon
+                      className={`size-3.5 transition-transform ${expanded === tapName ? '' : '-rotate-90'}`}
+                    />
                     {tapName}
                   </button>
                   <button
@@ -166,7 +173,10 @@ export default function Taps({ refreshToken, bump }: Props) {
                           </div>
                         )}
                         <div>
-                          {t('taps.formulaCaskCounts', { formulaCount: detail.formulaCount, caskCount: detail.caskCount })}
+                          {t('taps.formulaCaskCounts', {
+                            formulaCount: detail.formulaCount,
+                            caskCount: detail.caskCount,
+                          })}
                           {detail.official && t('taps.officialSuffix')}
                         </div>
                         {detail.lastCommit && <div>{t('taps.lastCommit', { commit: detail.lastCommit })}</div>}

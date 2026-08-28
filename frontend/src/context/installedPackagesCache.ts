@@ -43,10 +43,7 @@ export type FetchOutcome = { ok: true; packages: BrewPackage[] } | { ok: false; 
  *   failure is not reflected in the returned state at all, so the caller
  *   should log it separately rather than expect this function to surface it.
  */
-export function applyFetchOutcome(
-  state: InstalledPackagesState,
-  outcome: FetchOutcome
-): InstalledPackagesState {
+export function applyFetchOutcome(state: InstalledPackagesState, outcome: FetchOutcome): InstalledPackagesState {
   if (outcome.ok) {
     return { packages: outcome.packages, loading: false, error: null }
   }

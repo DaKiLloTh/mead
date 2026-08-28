@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState } from 'preact/hooks'
 import { Trans, useTranslation } from 'react-i18next'
 import { api, DuplicateApp, VulnResult } from '../lib/api'
 import { AlertIcon, CopyIcon, ExternalLinkIcon, ShieldIcon, WrenchIcon } from '../components/Icons'
@@ -78,7 +78,15 @@ export default function Security() {
           <p className="text-sm text-base-content/70">
             <Trans
               i18nKey="security.vulnsDescription"
-              components={{ link: <ExternalLink className="link" href="https://osv.dev">OSV.dev</ExternalLink> }}
+              components={
+                {
+                  link: (
+                    <ExternalLink className="link" href="https://osv.dev">
+                      OSV.dev
+                    </ExternalLink>
+                  ),
+                } as any
+              }
             />
           </p>
           <button className="btn btn-sm btn-primary" disabled={vulnsLoading} onClick={scanVulns}>
@@ -171,7 +179,8 @@ export default function Security() {
                       {dupes.map((d) => (
                         <tr key={d.name} className="hover:bg-base-200">
                           <td className="font-medium flex items-center gap-1.5 min-w-0">
-                            <AlertIcon className="size-4 text-warning shrink-0" /> <span className="truncate">{d.name}</span>
+                            <AlertIcon className="size-4 text-warning shrink-0" />{' '}
+                            <span className="truncate">{d.name}</span>
                           </td>
                           <td className="font-mono text-xs truncate" title={d.formulaVersion}>
                             {d.formulaVersion}
@@ -194,7 +203,11 @@ export default function Security() {
         <div className="space-y-3">
           <p className="text-sm text-base-content/70">{t('security.missingDescription')}</p>
           <button className="btn btn-sm btn-primary" disabled={missingLoading} onClick={scanMissing}>
-            {missingLoading ? <span className="loading loading-spinner loading-xs" /> : <WrenchIcon className="size-4" />}
+            {missingLoading ? (
+              <span className="loading loading-spinner loading-xs" />
+            ) : (
+              <WrenchIcon className="size-4" />
+            )}
             {t('security.checkMissing')}
           </button>
 

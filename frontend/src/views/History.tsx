@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState } from 'preact/hooks'
 import { useTranslation } from 'react-i18next'
 import { api, HistoryEntry } from '../lib/api'
 import { useConfirm } from '../context/ConfirmContext'
@@ -16,7 +16,11 @@ export default function History() {
   useEffect(load, [])
 
   async function clear() {
-    const { ok } = await confirm({ title: t('history.confirmClearTitle'), confirmLabel: t('history.confirmClearLabel'), danger: true })
+    const { ok } = await confirm({
+      title: t('history.confirmClearTitle'),
+      confirmLabel: t('history.confirmClearLabel'),
+      danger: true,
+    })
     if (!ok) return
     await api.clearHistory()
     load()
@@ -56,15 +60,13 @@ export default function History() {
                 {new Date(e.time).toLocaleString()}
               </div>
               <div className="timeline-middle">
-                {e.success ? (
-                  <CheckIcon className="size-4 text-success" />
-                ) : (
-                  <XIcon className="size-4 text-error" />
-                )}
+                {e.success ? <CheckIcon className="size-4 text-success" /> : <XIcon className="size-4 text-error" />}
               </div>
               <div className="timeline-end timeline-box">
                 <span className="capitalize font-medium">{e.action}</span> {e.name}
-                {e.isCask && <span className="badge badge-xs badge-secondary badge-outline ml-2">{t('history.caskBadge')}</span>}
+                {e.isCask && (
+                  <span className="badge badge-xs badge-secondary badge-outline ml-2">{t('history.caskBadge')}</span>
+                )}
               </div>
               {i < sorted.length - 1 && <hr />}
             </li>

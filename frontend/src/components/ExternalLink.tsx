@@ -1,9 +1,9 @@
-import type { AnchorHTMLAttributes, MouseEvent, ReactNode } from 'react'
+import type { AnchorHTMLAttributes, ComponentChildren, TargetedMouseEvent } from 'preact'
 import { BrowserOpenURL } from '../../wailsjs/runtime'
 
 interface ExternalLinkProps extends Omit<AnchorHTMLAttributes<HTMLAnchorElement>, 'target' | 'rel' | 'onClick'> {
   href: string
-  children: ReactNode
+  children: ComponentChildren
 }
 
 /**
@@ -15,7 +15,7 @@ interface ExternalLinkProps extends Omit<AnchorHTMLAttributes<HTMLAnchorElement>
  * site can keep its existing visual styling.
  */
 export default function ExternalLink({ href, children, ...rest }: ExternalLinkProps) {
-  function handleClick(e: MouseEvent<HTMLAnchorElement>) {
+  function handleClick(e: TargetedMouseEvent<HTMLAnchorElement>) {
     e.preventDefault()
     BrowserOpenURL(href)
   }

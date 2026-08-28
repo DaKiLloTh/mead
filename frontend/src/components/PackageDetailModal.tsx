@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState } from 'preact/hooks'
 import { useTranslation } from 'react-i18next'
 import { api, BrewPackage, SecurityInfo } from '../lib/api'
 import { useJobs } from '../context/JobsContext'
@@ -101,7 +101,10 @@ export default function PackageDetailModal({ target, onClose, onChanged }: Props
 
   function refresh() {
     if (!viewTarget) return
-    api.getInfo(viewTarget.name, viewTarget.isCask).then(setPkg).catch(() => {})
+    api
+      .getInfo(viewTarget.name, viewTarget.isCask)
+      .then(setPkg)
+      .catch(() => {})
     onChanged?.()
   }
 
@@ -255,7 +258,11 @@ export default function PackageDetailModal({ target, onClose, onChanged }: Props
 
   function removeTag(t: string) {
     if (!viewTarget) return
-    void userData.setTags(viewTarget.name, viewTarget.isCask, tags.filter((x) => x !== t))
+    void userData.setTags(
+      viewTarget.name,
+      viewTarget.isCask,
+      tags.filter((x) => x !== t)
+    )
   }
 
   const changelogLink = pkg ? deriveChangelogUrl(pkg) : null
@@ -277,7 +284,9 @@ export default function PackageDetailModal({ target, onClose, onChanged }: Props
           </div>
         )}
 
-        {!loading && !pkg && <div className="py-8 text-center text-base-content/60">{t('packageDetail.notLoaded')}</div>}
+        {!loading && !pkg && (
+          <div className="py-8 text-center text-base-content/60">{t('packageDetail.notLoaded')}</div>
+        )}
 
         {!loading && pkg && (
           <>
@@ -319,11 +328,16 @@ export default function PackageDetailModal({ target, onClose, onChanged }: Props
                     </span>
                   )}
                   {pkg.kegOnly && <span className="badge badge-sm badge-ghost">{t('common.badgeKegOnly')}</span>}
-                  {pkg.isCask && pkg.autoUpdates && <span className="badge badge-sm badge-ghost">{t('common.badgeAutoUpdates')}</span>}
+                  {pkg.isCask && pkg.autoUpdates && (
+                    <span className="badge badge-sm badge-ghost">{t('common.badgeAutoUpdates')}</span>
+                  )}
                   {tags.map((tag) => (
                     <span key={tag} className="badge badge-sm badge-neutral gap-1">
                       {tag}
-                      <button onClick={() => removeTag(tag)} aria-label={t('packageDetail.removeTagAriaLabel', { tag })}>
+                      <button
+                        onClick={() => removeTag(tag)}
+                        aria-label={t('packageDetail.removeTagAriaLabel', { tag })}
+                      >
                         <XIcon className="size-2.5" />
                       </button>
                     </span>
@@ -366,7 +380,7 @@ export default function PackageDetailModal({ target, onClose, onChanged }: Props
                 type="text"
                 placeholder={t('packageDetail.tagPlaceholder')}
                 value={tagInput}
-                onChange={(e) => setTagInput(e.target.value)}
+                onChange={(e) => setTagInput(e.currentTarget.value)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
                     e.preventDefault()
@@ -434,7 +448,9 @@ export default function PackageDetailModal({ target, onClose, onChanged }: Props
                 )}
                 {!pkg.isCask && (
                   <div>
-                    <div className="font-medium text-xs uppercase text-base-content/50 mb-1">{t('packageDetail.usedBy')}</div>
+                    <div className="font-medium text-xs uppercase text-base-content/50 mb-1">
+                      {t('packageDetail.usedBy')}
+                    </div>
                     {uses === null ? (
                       <span className="text-base-content/50 text-xs">{t('common.loading')}</span>
                     ) : uses.length === 0 ? (
@@ -452,7 +468,9 @@ export default function PackageDetailModal({ target, onClose, onChanged }: Props
                 )}
                 {(pkg.dependencies?.length ?? 0) > 0 && (
                   <div>
-                    <div className="font-medium text-xs uppercase text-base-content/50 mb-1">{t('packageDetail.dependsOn')}</div>
+                    <div className="font-medium text-xs uppercase text-base-content/50 mb-1">
+                      {t('packageDetail.dependsOn')}
+                    </div>
                     <div className="flex flex-wrap gap-1">
                       {pkg.dependencies.map((d) => (
                         <span key={d} className="badge badge-ghost badge-sm">
@@ -464,7 +482,9 @@ export default function PackageDetailModal({ target, onClose, onChanged }: Props
                 )}
                 {(pkg.conflictsWith?.length ?? 0) > 0 && (
                   <div>
-                    <div className="font-medium text-xs uppercase text-base-content/50 mb-1">{t('packageDetail.conflictsWith')}</div>
+                    <div className="font-medium text-xs uppercase text-base-content/50 mb-1">
+                      {t('packageDetail.conflictsWith')}
+                    </div>
                     <div className="flex flex-wrap gap-1">
                       {pkg.conflictsWith.map((d) => (
                         <span key={d} className="badge badge-error badge-outline badge-sm">
@@ -475,13 +495,15 @@ export default function PackageDetailModal({ target, onClose, onChanged }: Props
                   </div>
                 )}
                 <div>
-                  <div className="font-medium text-xs uppercase text-base-content/50 mb-1">{t('packageDetail.noteLabel')}</div>
+                  <div className="font-medium text-xs uppercase text-base-content/50 mb-1">
+                    {t('packageDetail.noteLabel')}
+                  </div>
                   <textarea
                     className="textarea textarea-sm w-full"
                     rows={2}
                     placeholder={t('packageDetail.notePlaceholder')}
                     value={note}
-                    onChange={(e) => setNote(e.target.value)}
+                    onChange={(e) => setNote(e.currentTarget.value)}
                     onBlur={() => void userData.setNote(viewTarget.name, viewTarget.isCask, note)}
                   />
                 </div>
@@ -502,9 +524,7 @@ export default function PackageDetailModal({ target, onClose, onChanged }: Props
               </div>
             )}
 
-            {tab === 'graph' && (
-              <DependencyGraph target={viewTarget} onSelectPackage={(t) => setViewTarget(t)} />
-            )}
+            {tab === 'graph' && <DependencyGraph target={viewTarget} onSelectPackage={(t) => setViewTarget(t)} />}
 
             {tab === 'security' && (
               <div className="mt-3 text-sm">
@@ -522,15 +542,25 @@ export default function PackageDetailModal({ target, onClose, onChanged }: Props
                       ) : (
                         <ShieldIcon className="size-4 text-error" />
                       )}
-                      <span>{security.gatekeeperOk ? t('packageDetail.gatekeeperPass') : t('packageDetail.gatekeeperFail')}</span>
+                      <span>
+                        {security.gatekeeperOk ? t('packageDetail.gatekeeperPass') : t('packageDetail.gatekeeperFail')}
+                      </span>
                     </div>
                     <div className="text-xs text-base-content/60 space-y-1">
-                      <div>{t('packageDetail.signed', { value: security.signed ? t('packageDetail.yes') : t('packageDetail.no') })}</div>
-                      {security.authority && <div>{t('packageDetail.authority', { authority: security.authority })}</div>}
+                      <div>
+                        {t('packageDetail.signed', {
+                          value: security.signed ? t('packageDetail.yes') : t('packageDetail.no'),
+                        })}
+                      </div>
+                      {security.authority && (
+                        <div>{t('packageDetail.authority', { authority: security.authority })}</div>
+                      )}
                       {security.teamId && <div>{t('packageDetail.teamId', { teamId: security.teamId })}</div>}
                       <div>
                         {t('packageDetail.quarantineFlag', {
-                          value: security.quarantined ? t('packageDetail.quarantinePresent') : t('packageDetail.quarantineCleared'),
+                          value: security.quarantined
+                            ? t('packageDetail.quarantinePresent')
+                            : t('packageDetail.quarantineCleared'),
                         })}
                       </div>
                     </div>

@@ -1,6 +1,6 @@
-import type { SVGProps } from 'react'
+import type { SVGAttributes } from 'preact'
 
-type IconProps = SVGProps<SVGSVGElement>
+type IconProps = SVGAttributes<SVGSVGElement>
 
 const base = {
   fill: 'none',
@@ -404,7 +404,14 @@ export function BadgeInstalledIcon(p: IconProps) {
   return (
     <svg viewBox="0 0 24 24" {...p}>
       <circle cx="12" cy="12" r="12" fill="#4E9B6E" />
-      <path d="M6 12.5 L10 16.5 L18 8" stroke="white" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" fill="none" />
+      <path
+        d="M6 12.5 L10 16.5 L18 8"
+        stroke="white"
+        strokeWidth={2.4}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+      />
     </svg>
   )
 }
@@ -414,7 +421,14 @@ export function BadgeOutdatedIcon(p: IconProps) {
     <svg viewBox="0 0 24 24" {...p}>
       <circle cx="12" cy="12" r="12" fill="#D4A24C" />
       <path d="M12 17 V7" stroke="white" strokeWidth={2.4} strokeLinecap="round" />
-      <path d="M7 12 L12 7 L17 12" stroke="white" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" fill="none" />
+      <path
+        d="M7 12 L12 7 L17 12"
+        stroke="white"
+        strokeWidth={2.4}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+      />
     </svg>
   )
 }

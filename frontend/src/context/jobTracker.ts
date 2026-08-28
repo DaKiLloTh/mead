@@ -1,5 +1,5 @@
 // Framework-independent job-tracking core, extracted from JobsContext so the
-// resolver/race logic can be unit tested without rendering React.
+// resolver/race logic can be unit tested without rendering a component.
 //
 // Why this exists: `runAction()` calls a Wails-bound RPC (`action()`) that
 // kicks off a background job and returns the job's id once the RPC promise

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState } from 'preact/hooks'
 import { useTranslation } from 'react-i18next'
 import { api, BundleCleanupItem, CacheInfo, LeftoverItem, LeftoverKind, PackageSize } from '../lib/api'
 import { useJobs } from '../context/JobsContext'
@@ -37,7 +37,9 @@ export default function Maintenance() {
   const [largest, setLargest] = useState<PackageSize[] | null>(null)
   const [largestLoading, setLargestLoading] = useState(false)
   const [cleanupOutput, setCleanupOutput] = useState<string[] | null>(null)
-  const [cleanupRunning, setCleanupRunning] = useState<'preview' | 'real' | 'autoremove' | 'autoremove-preview' | null>(null)
+  const [cleanupRunning, setCleanupRunning] = useState<'preview' | 'real' | 'autoremove' | 'autoremove-preview' | null>(
+    null
+  )
   const [clearingCache, setClearingCache] = useState(false)
 
   const [leftovers, setLeftovers] = useState<LeftoverItem[] | null>(null)
@@ -62,7 +64,10 @@ export default function Maintenance() {
   const [cleanupRunningReal, setCleanupRunningReal] = useState(false)
 
   useEffect(() => {
-    api.cacheInfo().then(setCache).catch(() => {})
+    api
+      .cacheInfo()
+      .then(setCache)
+      .catch(() => {})
     loadLargest()
   }, [])
 
@@ -183,7 +188,10 @@ export default function Maintenance() {
     const job = await runAction(() => api.cleanup(dryRun))
     setCleanupOutput(job.lines.map((l) => l.text))
     setCleanupRunning(null)
-    api.cacheInfo().then(setCache).catch(() => {})
+    api
+      .cacheInfo()
+      .then(setCache)
+      .catch(() => {})
   }
 
   async function runClearCache() {
@@ -192,7 +200,10 @@ export default function Maintenance() {
     const job = await runAction(() => api.clearCache())
     setCleanupOutput(job.lines.map((l) => l.text))
     setClearingCache(false)
-    api.cacheInfo().then(setCache).catch(() => {})
+    api
+      .cacheInfo()
+      .then(setCache)
+      .catch(() => {})
   }
 
   async function loadConfig() {
@@ -276,7 +287,11 @@ export default function Maintenance() {
         >
           <AppWindowIcon className="size-3.5 mr-1" /> {t('maintenance.tabLeftovers')}
         </button>
-        <button role="tab" className={`tab ${tab === 'brewfile' ? 'tab-active' : ''}`} onClick={() => setTab('brewfile')}>
+        <button
+          role="tab"
+          className={`tab ${tab === 'brewfile' ? 'tab-active' : ''}`}
+          onClick={() => setTab('brewfile')}
+        >
           <ImportIcon className="size-3.5 mr-1" /> {t('maintenance.tabBrewfile')}
         </button>
         <button
@@ -295,7 +310,11 @@ export default function Maintenance() {
         <div className="space-y-3">
           <p className="text-sm text-base-content/70">{t('maintenance.doctorDescription')}</p>
           <button className="btn btn-sm btn-primary" disabled={doctorRunning} onClick={runDoctor}>
-            {doctorRunning ? <span className="loading loading-spinner loading-xs" /> : <WrenchIcon className="size-4" />}
+            {doctorRunning ? (
+              <span className="loading loading-spinner loading-xs" />
+            ) : (
+              <WrenchIcon className="size-4" />
+            )}
             {t('maintenance.runDoctor')}
           </button>
           {doctorOutput && (
@@ -315,8 +334,16 @@ export default function Maintenance() {
                 <div className="stat-value text-lg">{cache.sizeHuman}</div>
                 <div className="stat-desc font-mono truncate max-w-xs">{cache.path}</div>
                 <div className="stat-actions">
-                  <button className="btn btn-xs" disabled={clearingCache || cleanupRunning !== null} onClick={runClearCache}>
-                    {clearingCache ? <span className="loading loading-spinner loading-xs" /> : <TrashIcon className="size-3.5" />}
+                  <button
+                    className="btn btn-xs"
+                    disabled={clearingCache || cleanupRunning !== null}
+                    onClick={runClearCache}
+                  >
+                    {clearingCache ? (
+                      <span className="loading loading-spinner loading-xs" />
+                    ) : (
+                      <TrashIcon className="size-3.5" />
+                    )}
                     {t('maintenance.clearCacheButton')}
                   </button>
                 </div>
@@ -327,12 +354,24 @@ export default function Maintenance() {
 
           <p className="text-sm text-base-content/70">{t('maintenance.cleanupDescription')}</p>
           <div className="flex gap-2">
-            <button className="btn btn-sm" disabled={cleanupRunning !== null || clearingCache} onClick={() => runCleanup(true)}>
+            <button
+              className="btn btn-sm"
+              disabled={cleanupRunning !== null || clearingCache}
+              onClick={() => runCleanup(true)}
+            >
               {cleanupRunning === 'preview' ? <span className="loading loading-spinner loading-xs" /> : null}
               {t('maintenance.previewDryRun')}
             </button>
-            <button className="btn btn-sm btn-error" disabled={cleanupRunning !== null || clearingCache} onClick={() => runCleanup(false)}>
-              {cleanupRunning === 'real' ? <span className="loading loading-spinner loading-xs" /> : <TrashIcon className="size-4" />}
+            <button
+              className="btn btn-sm btn-error"
+              disabled={cleanupRunning !== null || clearingCache}
+              onClick={() => runCleanup(false)}
+            >
+              {cleanupRunning === 'real' ? (
+                <span className="loading loading-spinner loading-xs" />
+              ) : (
+                <TrashIcon className="size-4" />
+              )}
               {t('maintenance.cleanUpNow')}
             </button>
           </div>
@@ -376,7 +415,9 @@ export default function Maintenance() {
                       <tr key={`${p.isCask ? 'c' : 'f'}:${p.name}`} className="hover:bg-base-200">
                         <td className="font-medium truncate">{p.name}</td>
                         <td>
-                          <span className={`badge badge-sm badge-outline ${p.isCask ? 'badge-secondary' : 'badge-primary'}`}>
+                          <span
+                            className={`badge badge-sm badge-outline ${p.isCask ? 'badge-secondary' : 'badge-primary'}`}
+                          >
                             {p.isCask ? t('common.cask') : t('common.formula')}
                           </span>
                         </td>
@@ -396,18 +437,32 @@ export default function Maintenance() {
 
           <p className="text-sm text-base-content/70">{t('maintenance.autoremoveDescription')}</p>
           <div className="flex gap-2">
-            <button className="btn btn-sm" disabled={cleanupRunning !== null || clearingCache} onClick={() => runAutoremove(true)}>
+            <button
+              className="btn btn-sm"
+              disabled={cleanupRunning !== null || clearingCache}
+              onClick={() => runAutoremove(true)}
+            >
               {cleanupRunning === 'autoremove-preview' ? <span className="loading loading-spinner loading-xs" /> : null}
               {t('maintenance.previewOrphans')}
             </button>
-            <button className="btn btn-sm btn-warning" disabled={cleanupRunning !== null || clearingCache} onClick={() => runAutoremove(false)}>
-              {cleanupRunning === 'autoremove' ? <span className="loading loading-spinner loading-xs" /> : <TrashIcon className="size-4" />}
+            <button
+              className="btn btn-sm btn-warning"
+              disabled={cleanupRunning !== null || clearingCache}
+              onClick={() => runAutoremove(false)}
+            >
+              {cleanupRunning === 'autoremove' ? (
+                <span className="loading loading-spinner loading-xs" />
+              ) : (
+                <TrashIcon className="size-4" />
+              )}
               {t('maintenance.removeOrphanedDeps')}
             </button>
           </div>
           {cleanupOutput && (
             <pre className="mockup-code text-xs overflow-x-auto max-h-96">
-              <code className="whitespace-pre px-4">{cleanupOutput.join('\n') || t('maintenance.nothingToCleanUp')}</code>
+              <code className="whitespace-pre px-4">
+                {cleanupOutput.join('\n') || t('maintenance.nothingToCleanUp')}
+              </code>
             </pre>
           )}
         </div>
@@ -418,7 +473,11 @@ export default function Maintenance() {
           <p className="text-sm text-base-content/70">{t('maintenance.leftoversDescription')}</p>
           <div className="flex items-center gap-2">
             <button className="btn btn-sm btn-primary" disabled={leftoversLoading} onClick={scanLeftovers}>
-              {leftoversLoading ? <span className="loading loading-spinner loading-xs" /> : <AppWindowIcon className="size-4" />}
+              {leftoversLoading ? (
+                <span className="loading loading-spinner loading-xs" />
+              ) : (
+                <AppWindowIcon className="size-4" />
+              )}
               {t('maintenance.scanLeftovers')}
             </button>
             {leftovers && leftovers.length > 0 && (
@@ -486,14 +545,20 @@ export default function Maintenance() {
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-xs text-base-content/50">
-                  {selectedLeftovers.size > 0 ? t('maintenance.selectedSummary', { count: selectedLeftovers.size }) : ''}
+                  {selectedLeftovers.size > 0
+                    ? t('maintenance.selectedSummary', { count: selectedLeftovers.size })
+                    : ''}
                 </span>
                 <button
                   className="btn btn-sm btn-error"
                   disabled={selectedLeftovers.size === 0 || deletingLeftovers}
                   onClick={deleteSelectedLeftovers}
                 >
-                  {deletingLeftovers ? <span className="loading loading-spinner loading-xs" /> : <TrashIcon className="size-4" />}
+                  {deletingLeftovers ? (
+                    <span className="loading loading-spinner loading-xs" />
+                  ) : (
+                    <TrashIcon className="size-4" />
+                  )}
                   {t('maintenance.removeSelectedButton', { count: selectedLeftovers.size })}
                 </button>
               </div>
@@ -507,10 +572,16 @@ export default function Maintenance() {
           <div>
             <p className="text-sm text-base-content/70 mb-2">{t('maintenance.exportDescription')}</p>
             <button className="btn btn-sm btn-primary" disabled={exporting} onClick={doExport}>
-              {exporting ? <span className="loading loading-spinner loading-xs" /> : <DownloadIcon className="size-4" />}
+              {exporting ? (
+                <span className="loading loading-spinner loading-xs" />
+              ) : (
+                <DownloadIcon className="size-4" />
+              )}
               {t('maintenance.exportButton')}
             </button>
-            {exportedPath && <p className="text-xs text-success mt-2">{t('maintenance.savedTo', { path: exportedPath })}</p>}
+            {exportedPath && (
+              <p className="text-xs text-success mt-2">{t('maintenance.savedTo', { path: exportedPath })}</p>
+            )}
           </div>
           <div className="divider my-1" />
           <div>
@@ -536,13 +607,16 @@ export default function Maintenance() {
               <div className="space-y-3">
                 <div className="flex flex-wrap gap-2">
                   <button className="btn btn-xs" disabled={bundleCheckLoading} onClick={doBundleCheck}>
-                    {bundleCheckLoading && <span className="loading loading-spinner loading-xs" />} {t('maintenance.check')}
+                    {bundleCheckLoading && <span className="loading loading-spinner loading-xs" />}{' '}
+                    {t('maintenance.check')}
                   </button>
                   <button className="btn btn-xs" disabled={bundleListLoading} onClick={doBundleList}>
-                    {bundleListLoading && <span className="loading loading-spinner loading-xs" />} {t('maintenance.listContents')}
+                    {bundleListLoading && <span className="loading loading-spinner loading-xs" />}{' '}
+                    {t('maintenance.listContents')}
                   </button>
                   <button className="btn btn-xs" disabled={cleanupPreviewLoading} onClick={doCleanupPreview}>
-                    {cleanupPreviewLoading && <span className="loading loading-spinner loading-xs" />} {t('maintenance.previewCleanup')}
+                    {cleanupPreviewLoading && <span className="loading loading-spinner loading-xs" />}{' '}
+                    {t('maintenance.previewCleanup')}
                   </button>
                 </div>
 
@@ -564,7 +638,9 @@ export default function Maintenance() {
                 {cleanupPreview && (
                   <div>
                     {cleanupPreview.length === 0 ? (
-                      <div className="alert alert-success alert-soft text-xs">{t('maintenance.cleanupNothingToRemove')}</div>
+                      <div className="alert alert-success alert-soft text-xs">
+                        {t('maintenance.cleanupNothingToRemove')}
+                      </div>
                     ) : (
                       <div className="space-y-2">
                         <div className="text-xs text-base-content/60">{t('maintenance.notInBrewfile')}</div>

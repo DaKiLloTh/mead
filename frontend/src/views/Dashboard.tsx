@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState } from 'preact/hooks'
 import { useTranslation } from 'react-i18next'
 import { api } from '../lib/api'
 import { useJobs } from '../context/JobsContext'
-import { useSystemInfo } from '../context/SystemInfoContext'
+import { useSystemInfo } from '../context/SystemInfoSignal'
 import { ArrowUpCircleIcon, ExternalLinkIcon, RefreshIcon, WrenchIcon } from '../components/Icons'
 import ExternalLink from '../components/ExternalLink'
 import type { ViewKey } from '../components/Sidebar'
@@ -114,7 +114,11 @@ export default function Dashboard({ onNavigate, onNavigateInstalled, refreshToke
                   disabled={busy !== null}
                   onClick={() => run('doctor', () => api.doctor())}
                 >
-                  {busy === 'doctor' ? <span className="loading loading-spinner loading-xs" /> : <WrenchIcon className="size-4" />}
+                  {busy === 'doctor' ? (
+                    <span className="loading loading-spinner loading-xs" />
+                  ) : (
+                    <WrenchIcon className="size-4" />
+                  )}
                   {t('dashboard.runDoctor')}
                 </button>
               </div>
@@ -130,7 +134,9 @@ export default function Dashboard({ onNavigate, onNavigateInstalled, refreshToke
                   onClick={() => onNavigateInstalled('deprecated')}
                   title={t('dashboard.deprecatedTooltip')}
                 >
-                  <span className={`font-mono font-semibold ${info.deprecatedCount > 0 ? 'text-warning' : 'text-base-content/60'}`}>
+                  <span
+                    className={`font-mono font-semibold ${info.deprecatedCount > 0 ? 'text-warning' : 'text-base-content/60'}`}
+                  >
                     {info.deprecatedCount}
                   </span>
                   {t('dashboard.deprecated')}
@@ -140,7 +146,9 @@ export default function Dashboard({ onNavigate, onNavigateInstalled, refreshToke
                   onClick={() => onNavigateInstalled('disabled')}
                   title={t('dashboard.disabledTooltip')}
                 >
-                  <span className={`font-mono font-semibold ${info.disabledCount > 0 ? 'text-error' : 'text-base-content/60'}`}>
+                  <span
+                    className={`font-mono font-semibold ${info.disabledCount > 0 ? 'text-error' : 'text-base-content/60'}`}
+                  >
                     {info.disabledCount}
                   </span>
                   {t('dashboard.disabled')}
@@ -160,13 +168,17 @@ export default function Dashboard({ onNavigate, onNavigateInstalled, refreshToke
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
             <div className="card bg-base-200">
               <div className="card-body py-4">
-                <h3 className="font-medium text-xs uppercase text-base-content/50">{t('dashboard.homebrewSectionTitle')}</h3>
+                <h3 className="font-medium text-xs uppercase text-base-content/50">
+                  {t('dashboard.homebrewSectionTitle')}
+                </h3>
                 <div className="font-mono text-xs mt-1 break-all">{info.brewPath}</div>
               </div>
             </div>
             <div className="card bg-base-200">
               <div className="card-body py-4">
-                <h3 className="font-medium text-xs uppercase text-base-content/50">{t('dashboard.prefixSectionTitle')}</h3>
+                <h3 className="font-medium text-xs uppercase text-base-content/50">
+                  {t('dashboard.prefixSectionTitle')}
+                </h3>
                 <div className="font-mono text-xs mt-1 break-all">{info.prefix}</div>
               </div>
             </div>

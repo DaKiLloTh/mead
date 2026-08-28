@@ -1,4 +1,6 @@
-import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
+import { createContext } from 'preact'
+import type { ComponentChildren } from 'preact'
+import { useCallback, useContext, useEffect, useRef, useState } from 'preact/hooks'
 import { EventsOn } from '../../wailsjs/runtime'
 import { api } from '../lib/api'
 import { JobTracker, type JobState, type JobLine } from './jobTracker'
@@ -26,6 +28,12 @@ interface JobsContextValue {
   clearFinishedJobs: () => void
 }
 
+// Left as Context, not converted to a signal: the job list's authoritative
+// source of truth already lives outside React state, in JobTracker (see
+// jobTracker.ts), specifically to avoid a synchronization race against the
+// live event bus. Converting the React-facing mirror (`jobs` state below) to
+// a signal would just move where that mirror lives, not remove the tracker,
+// so it isn't a real simplification.
 const JobsContext = createContext<JobsContextValue | null>(null)
 
 export function useJobs(): JobsContextValue {
@@ -34,7 +42,7 @@ export function useJobs(): JobsContextValue {
   return ctx
 }
 
-export function JobsProvider({ children }: { children: React.ReactNode }) {
+export function JobsProvider({ children }: { children: ComponentChildren }) {
   const [jobs, setJobs] = useState<JobState[]>([])
   const [toasts, setToasts] = useState<Toast[]>([])
   const [consoleOpen, setConsoleOpen] = useState(false)
@@ -57,6 +65,11 @@ export function JobsProvider({ children }: { children: React.ReactNode }) {
   // React state to avoid the job:done-vs-RPC-promise race). React state
   // (`jobs` above) is just a mirror of it, for rendering.
   const trackerRef = useRef<JobTracker | null>(null)
+  // Lazy ref initialization: reading/writing .current during render is only
+  // unsafe in general because it can produce inconsistent output across
+  // renders, but this specific "create once, guarded by a null check" shape
+  // is the documented exception (https://react.dev/reference/react/useRef).
+  // eslint-disable-next-line react-hooks/refs
   if (!trackerRef.current) {
     trackerRef.current = new JobTracker({
       onJobsChange: (next) => setJobs(next),

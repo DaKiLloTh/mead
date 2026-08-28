@@ -1,7 +1,8 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'preact/hooks'
+import type { VNode, TargetedKeyboardEvent } from 'preact'
 import { useTranslation } from 'react-i18next'
 import { filterNavItems, filterPackages } from '../lib/paletteFilter'
-import { useInstalledPackages } from '../context/InstalledPackagesContext'
+import { useInstalledPackages } from '../context/InstalledPackagesSignal'
 import { navItems, type ViewKey } from './Sidebar'
 import PackageDetailModal, { type DetailTarget } from './PackageDetailModal'
 import { PackageIcon, SearchIcon } from './Icons'
@@ -16,7 +17,7 @@ type ResultRow =
       kind: 'nav'
       rowKey: string
       label: string
-      icon: (p: { className?: string }) => React.ReactElement
+      icon: (p: { className?: string }) => VNode
       view: ViewKey
     }
   | { kind: 'package'; rowKey: string; label: string; sublabel: string; name: string; isCask: boolean }
@@ -67,8 +68,12 @@ export default function CommandPalette({ onNavigate, bump }: Props) {
   }, [open])
 
   // Translated nav labels, recomputed whenever the active language changes.
+  // i18n.language is a real dependency despite the lint warning: react-i18next's
+  // `t` keeps a stable reference across language changes, so without this the
+  // memo would never recompute when the user switches language.
   const translatedNavItems = useMemo(
     () => navItems.map((item) => ({ ...item, label: t(item.labelKey) })),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [t, i18n.language]
   )
 
@@ -104,7 +109,7 @@ export default function CommandPalette({ onNavigate, bump }: Props) {
     setOpen(false)
   }
 
-  function handleInputKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+  function handleInputKeyDown(e: TargetedKeyboardEvent<HTMLInputElement>) {
     if (e.key === 'ArrowDown') {
       e.preventDefault()
       setActiveIndex((i) => Math.min(i + 1, results.length - 1))
@@ -129,7 +134,7 @@ export default function CommandPalette({ onNavigate, bump }: Props) {
               type="text"
               placeholder={t('commandPalette.placeholder')}
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={(e) => setQuery(e.currentTarget.value)}
               onKeyDown={handleInputKeyDown}
             />
           </label>
@@ -174,11 +179,7 @@ export default function CommandPalette({ onNavigate, bump }: Props) {
         </form>
       </dialog>
 
-      <PackageDetailModal
-        target={detail}
-        onClose={() => setDetail(null)}
-        onChanged={() => bump?.()}
-      />
+      <PackageDetailModal target={detail} onClose={() => setDetail(null)} onChanged={() => bump?.()} />
     </>
   )
 }

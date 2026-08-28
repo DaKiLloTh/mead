@@ -1,8 +1,8 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState } from 'preact/hooks'
 import { useTranslation } from 'react-i18next'
 import { api, BrewPackage } from '../lib/api'
 import { useJobs } from '../context/JobsContext'
-import { useInstalledPackages } from '../context/InstalledPackagesContext'
+import { useInstalledPackages } from '../context/InstalledPackagesSignal'
 import PackageDetailModal, { DetailTarget } from '../components/PackageDetailModal'
 import PackageIcon from '../components/PackageIcon'
 import { RefreshIcon, SearchIcon } from '../components/Icons'
@@ -55,7 +55,7 @@ export default function Applications({ bump }: Props) {
             type="text"
             placeholder={t('applications.filterPlaceholder')}
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => setQuery(e.currentTarget.value)}
           />
         </label>
       </div>
@@ -83,7 +83,7 @@ export default function Applications({ bump }: Props) {
               key={p.name}
               className="flex flex-col items-center gap-1.5 rounded-box p-3 border border-transparent hover:bg-base-200 hover:border-base-300 text-center transition-colors"
               onClick={() => setDetail({ name: p.name, isCask: true })}
-              onDoubleClick={() => openApp(p)}
+              onDblClick={() => openApp(p)}
               title={p.desc || p.name}
             >
               <PackageIcon name={p.name} isCask className="size-12" />
