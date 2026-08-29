@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.10.5](https://github.com/DaKiLloTh/mead/compare/v0.10.4...v0.10.5) (2026-08-29)
+
+
+### Bug Fixes
+
+* search should stay responsive, not hard-cancel in-flight requests ([#157](https://github.com/DaKiLloTh/mead/issues/157)) ([43f080c](https://github.com/DaKiLloTh/mead/commit/43f080ce0b25ac388d8abc97e1ca16ee018442b4))
+
 ## [0.10.4](https://github.com/DaKiLloTh/mead/compare/v0.10.3...v0.10.4) (2026-08-29)
 
 
