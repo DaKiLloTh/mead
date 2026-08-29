@@ -21,7 +21,20 @@ var masOutdatedRe = regexp.MustCompile(`^(\d+)\s+(.+?)\s+\(([^)]+)\s*->\s*([^)]+
 
 // MasList returns every Mac App Store app `mas` knows is installed.
 func MasList(ctx context.Context) ([]MasApp, error) {
-	out, err := system.RunCmd(ctx, "mas", "list")
+	masPath, err := ResolveMasPath()
+	if err != nil {
+		return nil, err
+	}
+	// system.RunCmd's own LookPath(name) is a bare, no-well-known-paths
+	// lookup -- fine for the standard macOS system tools it's normally
+	// called with (xattr, spctl, tmutil, ...), always on the default
+	// PATH regardless of launch context, but not for mas, a Homebrew
+	// formula. Passing the already-resolved absolute path here (instead
+	// of the bare "mas" name) makes RunCmd's LookPath a plain existence/
+	// executable-bit check on that literal path rather than a PATH
+	// search, so this doesn't reintroduce the exact bug ResolveMasPath
+	// exists to fix -- see its doc comment.
+	out, err := system.RunCmd(ctx, masPath, "list")
 	if err != nil {
 		return nil, err
 	}
@@ -40,7 +53,11 @@ func MasList(ctx context.Context) ([]MasApp, error) {
 
 // MasOutdated returns Mac App Store apps with an available update.
 func MasOutdated(ctx context.Context) ([]MasApp, error) {
-	out, err := system.RunCmd(ctx, "mas", "outdated")
+	masPath, err := ResolveMasPath()
+	if err != nil {
+		return nil, err
+	}
+	out, err := system.RunCmd(ctx, masPath, "outdated")
 	if err != nil {
 		return nil, err
 	}
