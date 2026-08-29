@@ -54,17 +54,46 @@ export default function Search({ refreshToken, bump }: Props) {
     const q = query.trim()
     if (!q) {
       setResults(null)
+      setLoading(false)
       return
     }
     setLoading(true)
+    // Standard AbortController-guarded debounced search (the same idiom
+    // React's own docs, SWR, and React Query all use for search-as-you-
+    // type): the debounce timer alone only stops a search that hasn't
+    // fired yet, but once api.search() is in flight there's nothing
+    // stopping an earlier, broader query (e.g. "ard", which matches far
+    // more packages than "arduino" and so takes longer to enrich/rank)
+    // from resolving AFTER a later, narrower one and clobbering its more
+    // relevant results -- exactly the "fast relevant results replaced by
+    // a slow irrelevant pile" bug this fixes. Every branch checks
+    // `signal.aborted` before touching state, so only the most recent
+    // effect's response is ever applied.
+    //
+    // Wails-bound calls (api.search -> App.Search over Wails' own RPC
+    // bridge) aren't real fetch()es, so aborting here doesn't cancel the
+    // in-flight backend work the way it would for an actual network
+    // request -- but AbortController/AbortSignal is still the right,
+    // standard vehicle for "is this response still wanted", which is the
+    // actual bug being fixed: which response gets applied client-side.
+    const controller = new AbortController()
     const handle = setTimeout(() => {
       api
         .search(q, searchDesc)
-        .then(setResults)
-        .catch(() => setResults([]))
-        .finally(() => setLoading(false))
+        .then((r) => {
+          if (!controller.signal.aborted) setResults(r)
+        })
+        .catch(() => {
+          if (!controller.signal.aborted) setResults([])
+        })
+        .finally(() => {
+          if (!controller.signal.aborted) setLoading(false)
+        })
     }, 300)
-    return () => clearTimeout(handle)
+    return () => {
+      controller.abort()
+      clearTimeout(handle)
+    }
   }, [query, searchDesc])
 
   const filtered = useMemo(() => {
@@ -141,7 +170,12 @@ export default function Search({ refreshToken, bump }: Props) {
       )}
 
       {results && (
-        <div className="flex flex-col gap-3">
+        // Dimmed rather than cleared while a newer query is in flight --
+        // these results are about to be superseded by whatever's loading
+        // now (see the effect above), so this keeps that visible instead
+        // of letting a stale, possibly-irrelevant list sit there looking
+        // current until the new one lands.
+        <div className={`flex flex-col gap-3 transition-opacity ${loading ? 'opacity-50' : ''}`}>
           {filtered.map((r) => {
             const key = `${r.isCask ? 'c' : 'f'}:${r.name}`
             const isInstalled = installedKeys.has(key)
