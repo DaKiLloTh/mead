@@ -11,6 +11,12 @@ export default defineConfig({
   plugins: [preact(), tailwindcss()],
   test: {
     environment: 'node',
-    include: ['src/**/*.test.ts'],
+    // .tsx here is for component-rendering tests (e.g. Search.test.tsx),
+    // which opt into a DOM environment per-file via a
+    // `// @vitest-environment happy-dom` pragma comment rather than
+    // switching this default -- everything else stays on the fast `node`
+    // environment, since pure-logic tests (the overwhelming majority)
+    // don't need a DOM at all.
+    include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
   },
 })
