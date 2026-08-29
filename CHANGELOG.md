@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.10.4](https://github.com/DaKiLloTh/mead/compare/v0.10.3...v0.10.4) (2026-08-29)
+
+
+### Bug Fixes
+
+* stale, broader search response could overwrite a newer, relevant one ([#155](https://github.com/DaKiLloTh/mead/issues/155)) ([f07aabc](https://github.com/DaKiLloTh/mead/commit/f07aabc45e28c71fef8a179fa522430829f733f5))
+
 ## [0.10.3](https://github.com/DaKiLloTh/mead/compare/v0.10.2...v0.10.3) (2026-08-29)
 
 
