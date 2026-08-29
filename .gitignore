@@ -4,6 +4,7 @@ frontend/dist
 frontend/wailsjs
 frontend/coverage
 frontend/package.json.md5
+frontend/storybook-static
 /mead
 /brewtender
 /cmd/mead-mon/mead-mon

@@ -14,7 +14,9 @@
     "format:check": "prettier --check .",
     "typecheck": "tsc --noEmit",
     "fix": "prettier --write . && eslint . --fix",
-    "check": "prettier --check . && eslint . && tsc --noEmit && vitest run"
+    "check": "prettier --check . && eslint . && tsc --noEmit && vitest run",
+    "storybook": "storybook dev -p 6006",
+    "storybook:build": "storybook build"
   },
   "dependencies": {
     "@preact/signals": "^2.11.1",
@@ -28,6 +30,7 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@preact/preset-vite": "^2.10.6",
+    "@storybook/preact-vite": "^10.5.10",
     "@tailwindcss/vite": "^4.3.3",
     "@testing-library/preact": "^3.2.4",
     "@types/node": "^22.20.1",
@@ -41,6 +44,7 @@
     "globals": "^17.11.0",
     "happy-dom": "^20.11.15",
     "prettier": "^3.9.6",
+    "storybook": "^10.5.10",
     "tailwindcss": "^4.3.3",
     "typescript": "^5.6.3",
     "typescript-eslint": "^8.68.0",
