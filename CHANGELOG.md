@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.10.3](https://github.com/DaKiLloTh/mead/compare/v0.10.2...v0.10.3) (2026-08-29)
+
+
+### Bug Fixes
+
+* MasList/MasOutdated bypassed ResolveMasPath, still broken in v0.10.2 ([#150](https://github.com/DaKiLloTh/mead/issues/150)) ([df38a51](https://github.com/DaKiLloTh/mead/commit/df38a518634bc885c77c22b49b4bef5467d0cd17))
+
 ## [0.10.2](https://github.com/DaKiLloTh/mead/compare/v0.10.1...v0.10.2) (2026-08-28)
 
 
