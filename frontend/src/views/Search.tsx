@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'preact/hooks'
+import { useEffect, useMemo, useRef, useState } from 'preact/hooks'
 import { useTranslation } from 'react-i18next'
 import { api, SearchResult } from '../lib/api'
 import { useJobs } from '../context/JobsContext'
@@ -42,6 +42,18 @@ export default function Search({ refreshToken, bump }: Props) {
   const [installedKeys, setInstalledKeys] = useState<Set<string>>(new Set())
   const [rowBusy, setRowBusy] = useState<string | null>(null)
   const [searchDesc, setSearchDesc] = useState(false)
+  // issuedSeqRef: id of the most recently *fired* search request (assigned
+  // when its debounce elapses, not on every keystroke). appliedSeqRef: id
+  // of the most recently *applied* (rendered) response. Together these let
+  // every request run to completion and update the UI as it lands -- a
+  // response is only refused if something newer has already been applied,
+  // not merely because a newer request has since started. That's what
+  // keeps typing responsive (an early, fast response can render before a
+  // slower later one arrives) while still guaranteeing a slow, broader,
+  // out-of-order response (e.g. "ard" arriving after "arduino" already
+  // rendered) can never clobber a fresher, more relevant one.
+  const issuedSeqRef = useRef(0)
+  const appliedSeqRef = useRef(0)
 
   useEffect(() => {
     api
@@ -58,42 +70,40 @@ export default function Search({ refreshToken, bump }: Props) {
       return
     }
     setLoading(true)
-    // Standard AbortController-guarded debounced search (the same idiom
-    // React's own docs, SWR, and React Query all use for search-as-you-
-    // type): the debounce timer alone only stops a search that hasn't
-    // fired yet, but once api.search() is in flight there's nothing
-    // stopping an earlier, broader query (e.g. "ard", which matches far
-    // more packages than "arduino" and so takes longer to enrich/rank)
-    // from resolving AFTER a later, narrower one and clobbering its more
-    // relevant results -- exactly the "fast relevant results replaced by
-    // a slow irrelevant pile" bug this fixes. Every branch checks
-    // `signal.aborted` before touching state, so only the most recent
-    // effect's response is ever applied.
-    //
-    // Wails-bound calls (api.search -> App.Search over Wails' own RPC
-    // bridge) aren't real fetch()es, so aborting here doesn't cancel the
-    // in-flight backend work the way it would for an actual network
-    // request -- but AbortController/AbortSignal is still the right,
-    // standard vehicle for "is this response still wanted", which is the
-    // actual bug being fixed: which response gets applied client-side.
-    const controller = new AbortController()
+    // Debounced so fast, continuous typing doesn't fire a real search on
+    // every keystroke -- but once a request does fire, it's left to run
+    // and its response is allowed to render (not aborted) purely because
+    // a newer request has since started. Only an out-of-order response --
+    // one that resolves after something issued later has already been
+    // applied -- gets dropped. That's the actual bug: a broader query
+    // (e.g. "ard", which matches far more packages than "arduino" and so
+    // takes longer to enrich/rank) arriving after a narrower one and
+    // clobbering its more relevant results, not merely that two requests
+    // overlapped.
     const handle = setTimeout(() => {
+      const seq = ++issuedSeqRef.current
       api
         .search(q, searchDesc)
         .then((r) => {
-          if (!controller.signal.aborted) setResults(r)
+          if (seq > appliedSeqRef.current) {
+            appliedSeqRef.current = seq
+            setResults(r)
+          }
         })
         .catch(() => {
-          if (!controller.signal.aborted) setResults([])
+          if (seq > appliedSeqRef.current) {
+            appliedSeqRef.current = seq
+            setResults([])
+          }
         })
         .finally(() => {
-          if (!controller.signal.aborted) setLoading(false)
+          // Only the most recently *issued* request controls the spinner
+          // -- an older one settling after a newer one has already started
+          // shouldn't flip loading back off.
+          if (seq === issuedSeqRef.current) setLoading(false)
         })
     }, 300)
-    return () => {
-      controller.abort()
-      clearTimeout(handle)
-    }
+    return () => clearTimeout(handle)
   }, [query, searchDesc])
 
   const filtered = useMemo(() => {
