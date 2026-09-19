@@ -2,6 +2,7 @@ import i18n, { type i18n as I18nInstance } from 'i18next'
 import { initReactI18next } from 'react-i18next'
 import LanguageDetector from 'i18next-browser-languagedetector'
 import en from './locales/en/translation.json'
+import de from './locales/de/translation.json'
 import { fetchSystemLocale } from './systemLocale'
 
 /**
@@ -13,9 +14,30 @@ import { fetchSystemLocale } from './systemLocale'
  */
 export const resources = {
   en: { translation: en },
+  de: { translation: de },
 } as const
 
 export const supportedLngs = Object.keys(resources)
+
+/**
+ * Locales that read right-to-left (Arabic, Yiddish, ...). Kept as its own
+ * set rather than inferred from the language tag, since a handful of
+ * locales genuinely need this and a hardcoded list is unambiguous --
+ * `applyDocumentDirection` below is the only thing that reads it.
+ */
+const rtlLngs = new Set<string>([])
+
+/**
+ * Sets `<html lang dir>` to match the active language, including the
+ * text-flow direction for right-to-left locales. i18next doesn't touch the
+ * DOM itself, so this has to be wired up explicitly; called once after init
+ * and again on every `languageChanged` event so switching languages (e.g.
+ * from Settings) flips direction immediately without a reload.
+ */
+function applyDocumentDirection(lng: string): void {
+  document.documentElement.lang = lng
+  document.documentElement.dir = rtlLngs.has(lng) ? 'rtl' : 'ltr'
+}
 
 let initPromise: Promise<I18nInstance> | null = null
 
@@ -71,6 +93,9 @@ export function initI18n(): Promise<I18nInstance> {
         },
         returnEmptyString: false,
       })
+
+    applyDocumentDirection(i18n.language)
+    i18n.on('languageChanged', applyDocumentDirection)
 
     return i18n
   })()
