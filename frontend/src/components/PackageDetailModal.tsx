@@ -22,6 +22,7 @@ import {
 } from './Icons'
 import ExternalLink from './ExternalLink'
 import PackageIcon from './PackageIcon'
+import TypeBadge from './TypeBadge'
 import DependencyGraph from './DependencyGraph'
 import { deriveChangelogUrl } from '../lib/changelog'
 import { isSudoTerminalRequiredFailure } from '../lib/uninstallElevation'
@@ -302,9 +303,7 @@ export default function PackageDetailModal({ target, onClose, onChanged }: Props
               <div>
                 <h3 className="font-bold text-xl">{pkg.fullName || pkg.name}</h3>
                 <div className="flex flex-wrap gap-1.5 mt-1.5">
-                  <span className={`badge badge-sm ${pkg.isCask ? 'badge-secondary' : 'badge-primary'} badge-outline`}>
-                    {pkg.isCask ? t('common.cask') : t('common.formula')}
-                  </span>
+                  <TypeBadge isCask={pkg.isCask} />
                   {pkg.installed && (
                     <span className="badge badge-sm badge-success badge-outline gap-1">
                       <BadgeInstalledIcon className="size-3" />

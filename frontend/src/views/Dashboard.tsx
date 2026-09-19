@@ -5,6 +5,7 @@ import { useJobs } from '../context/JobsContext'
 import { useSystemInfo } from '../context/SystemInfoSignal'
 import { ArrowUpCircleIcon, ExternalLinkIcon, RefreshIcon, WrenchIcon } from '../components/Icons'
 import ExternalLink from '../components/ExternalLink'
+import LoadingRow from '../components/LoadingRow'
 import type { ViewKey } from '../components/Sidebar'
 import type { Filter as InstalledFilter } from './Installed'
 
@@ -69,11 +70,7 @@ export default function Dashboard({ onNavigate, onNavigateInstalled, refreshToke
       <h1 className="text-2xl font-bold mb-1">{t('dashboard.title')}</h1>
       <p className="text-base-content/60 mb-6">{t('dashboard.subtitle')}</p>
 
-      {loading && !info && (
-        <div className="flex items-center gap-2 text-base-content/60">
-          <span className="loading loading-spinner loading-sm" /> {t('common.loading')}
-        </div>
-      )}
+      {loading && !info && <LoadingRow>{t('common.loading')}</LoadingRow>}
 
       {info && (
         <>

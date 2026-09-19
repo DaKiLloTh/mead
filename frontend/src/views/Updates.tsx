@@ -5,7 +5,11 @@ import { useJobs } from '../context/JobsContext'
 import { useUserData } from '../context/UserDataContext'
 import { useOutdated } from '../context/OutdatedSignal'
 import PackageDetailModal, { DetailTarget } from '../components/PackageDetailModal'
-import { ArrowUpCircleIcon, ClockIcon } from '../components/Icons'
+import TypeBadge from '../components/TypeBadge'
+import TableShell from '../components/TableShell'
+import LoadingRow from '../components/LoadingRow'
+import EmptyState from '../components/EmptyState'
+import { ArrowUpCircleIcon, CheckIcon, ClockIcon } from '../components/Icons'
 
 interface Props {
   refreshToken: number
@@ -145,120 +149,114 @@ export default function Updates({ refreshToken, bump }: Props) {
           </div>
         </div>
       ) : loading && items.length === 0 ? (
-        <div className="flex items-center gap-2 text-base-content/60">
-          <span className="loading loading-spinner loading-sm" /> {t('updates.checking')}
-        </div>
+        <LoadingRow>{t('updates.checking')}</LoadingRow>
       ) : list.length === 0 ? (
-        <div className="text-center text-base-content/50 py-16">
-          <div className="text-4xl mb-2">✓</div>
+        <EmptyState icon={CheckIcon}>
           {showSnoozed ? t('updates.nothingSnoozed') : t('updates.nothingToUpdate')}
-        </div>
+        </EmptyState>
       ) : (
-        <div className="overflow-x-auto rounded-box border border-base-300">
-          <table className="table table-sm table-fixed">
-            <colgroup>
-              <col />
-              <col className="w-24" />
-              <col className="w-40" />
-              <col className="w-28" />
-              <col className="w-40" />
-            </colgroup>
-            <thead>
-              <tr>
-                <th>{t('updates.colName')}</th>
-                <th>{t('updates.colType')}</th>
-                <th>{t('updates.colInstalled')}</th>
-                <th>{t('updates.colLatest')}</th>
-                <th className="text-right">{t('updates.colActions')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {list.map((p) => (
-                <tr key={`${p.isCask ? 'c' : 'f'}:${p.name}`} className="hover:bg-base-200">
-                  <td
-                    className="font-medium truncate cursor-pointer"
-                    onClick={() => setDetail({ name: p.name, isCask: p.isCask })}
-                  >
-                    {p.name}
-                  </td>
-                  <td>
-                    <span className={`badge badge-sm badge-outline ${p.isCask ? 'badge-secondary' : 'badge-primary'}`}>
-                      {p.isCask ? t('common.cask') : t('common.formula')}
-                    </span>
-                  </td>
-                  <td className="font-mono text-xs truncate" title={p.installedVersions.join(', ')}>
-                    {p.installedVersions.join(', ')}
-                  </td>
-                  <td className="font-mono text-xs text-warning truncate" title={p.currentVersion}>
-                    {p.currentVersion}
-                  </td>
-                  <td className="text-right">
-                    <div className="flex justify-end gap-1">
-                      {showSnoozed ? (
+        <TableShell
+          colgroup={[
+            <col />,
+            <col className="w-24" />,
+            <col className="w-40" />,
+            <col className="w-28" />,
+            <col className="w-40" />,
+          ]}
+        >
+          <thead>
+            <tr>
+              <th>{t('updates.colName')}</th>
+              <th>{t('updates.colType')}</th>
+              <th>{t('updates.colInstalled')}</th>
+              <th>{t('updates.colLatest')}</th>
+              <th className="text-right">{t('updates.colActions')}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {list.map((p) => (
+              <tr key={`${p.isCask ? 'c' : 'f'}:${p.name}`} className="hover:bg-base-200">
+                <td
+                  className="font-medium truncate cursor-pointer"
+                  onClick={() => setDetail({ name: p.name, isCask: p.isCask })}
+                >
+                  {p.name}
+                </td>
+                <td>
+                  <TypeBadge isCask={p.isCask} />
+                </td>
+                <td className="font-mono text-xs truncate" title={p.installedVersions.join(', ')}>
+                  {p.installedVersions.join(', ')}
+                </td>
+                <td className="font-mono text-xs text-warning truncate" title={p.currentVersion}>
+                  {p.currentVersion}
+                </td>
+                <td className="text-right">
+                  <div className="flex justify-end gap-1">
+                    {showSnoozed ? (
+                      <button
+                        className="btn btn-xs btn-ghost"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          userData.unsnooze(p.name, p.isCask)
+                        }}
+                      >
+                        {t('updates.unsnooze')}
+                      </button>
+                    ) : p.pinned ? (
+                      <span className="badge badge-ghost badge-sm">{t('common.badgePinned')}</span>
+                    ) : (
+                      <>
+                        <div className="dropdown dropdown-end">
+                          <div
+                            tabIndex={0}
+                            role="button"
+                            className="btn btn-xs btn-ghost"
+                            title={t('updates.snoozeTooltip')}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <ClockIcon className="size-3.5" />
+                          </div>
+                          <ul
+                            tabIndex={0}
+                            className="dropdown-content menu menu-sm bg-base-100 rounded-box z-10 w-32 p-1 shadow border border-base-300"
+                          >
+                            {SNOOZE_OPTIONS.map((o) => (
+                              <li key={o.days}>
+                                <a
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    userData.snooze(p.name, p.isCask, o.days)
+                                  }}
+                                >
+                                  {t(o.labelKey)}
+                                </a>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
                         <button
-                          className="btn btn-xs btn-ghost"
+                          className="btn btn-xs btn-primary"
+                          disabled={rowBusy === p.name}
                           onClick={(e) => {
                             e.stopPropagation()
-                            userData.unsnooze(p.name, p.isCask)
+                            upgradeOne(p)
                           }}
                         >
-                          {t('updates.unsnooze')}
+                          {rowBusy === p.name ? (
+                            <span className="loading loading-spinner loading-xs" />
+                          ) : (
+                            t('common.upgrade')
+                          )}
                         </button>
-                      ) : p.pinned ? (
-                        <span className="badge badge-ghost badge-sm">{t('common.badgePinned')}</span>
-                      ) : (
-                        <>
-                          <div className="dropdown dropdown-end">
-                            <div
-                              tabIndex={0}
-                              role="button"
-                              className="btn btn-xs btn-ghost"
-                              title={t('updates.snoozeTooltip')}
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <ClockIcon className="size-3.5" />
-                            </div>
-                            <ul
-                              tabIndex={0}
-                              className="dropdown-content menu menu-sm bg-base-100 rounded-box z-10 w-32 p-1 shadow border border-base-300"
-                            >
-                              {SNOOZE_OPTIONS.map((o) => (
-                                <li key={o.days}>
-                                  <a
-                                    onClick={(e) => {
-                                      e.stopPropagation()
-                                      userData.snooze(p.name, p.isCask, o.days)
-                                    }}
-                                  >
-                                    {t(o.labelKey)}
-                                  </a>
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                          <button
-                            className="btn btn-xs btn-primary"
-                            disabled={rowBusy === p.name}
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              upgradeOne(p)
-                            }}
-                          >
-                            {rowBusy === p.name ? (
-                              <span className="loading loading-spinner loading-xs" />
-                            ) : (
-                              t('common.upgrade')
-                            )}
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                      </>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </TableShell>
       )}
 
       <PackageDetailModal

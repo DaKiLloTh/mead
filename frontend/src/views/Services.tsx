@@ -4,6 +4,9 @@ import { api } from '../lib/api'
 import { useJobs } from '../context/JobsContext'
 import { servicesSignal, ensureServicesLoaded, loadServices } from '../context/ServicesSignal'
 import { PlayIcon, RefreshIcon, SquareIcon } from '../components/Icons'
+import TableShell from '../components/TableShell'
+import LoadingRow from '../components/LoadingRow'
+import EmptyState from '../components/EmptyState'
 
 interface Props {
   refreshToken: number
@@ -79,77 +82,74 @@ export default function Services({ refreshToken, bump }: Props) {
       {error && <div className="alert alert-error alert-soft text-sm mb-4">{error}</div>}
 
       {loading && services.length === 0 ? (
-        <div className="flex items-center gap-2 text-base-content/60">
-          <span className="loading loading-spinner loading-sm" /> {t('common.loading')}
-        </div>
+        <LoadingRow>{t('common.loading')}</LoadingRow>
       ) : services.length === 0 && !error ? (
-        <div className="text-center text-base-content/50 py-16">{t('services.noServices')}</div>
+        <EmptyState>{t('services.noServices')}</EmptyState>
       ) : (
-        <div className="overflow-x-auto rounded-box border border-base-300">
-          <table className="table table-sm table-fixed">
-            <colgroup>
-              <col />
-              <col className="w-28" />
-              <col className="w-32" />
-              <col className="w-20" />
-              <col className="w-28" />
-            </colgroup>
-            <thead>
-              <tr>
-                <th>{t('services.colName')}</th>
-                <th>{t('services.colStatus')}</th>
-                <th>{t('services.colUser')}</th>
-                <th>{t('services.colPid')}</th>
-                <th className="text-right">{t('services.colActions')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {services.map((s) => (
-                <tr key={s.name} className="hover:bg-base-200">
-                  <td className="font-medium truncate">{s.name}</td>
-                  <td>
-                    <span className={`badge badge-sm ${statusBadge(s.status)}`}>{s.status}</span>
-                  </td>
-                  <td className="text-xs text-base-content/60 truncate" title={s.user}>
-                    {s.user}
-                  </td>
-                  <td className="font-mono text-xs truncate">{s.pid || '-'}</td>
-                  <td>
-                    <div className="flex justify-end gap-1">
-                      {s.running ? (
-                        <button
-                          className="btn btn-xs btn-ghost"
-                          disabled={rowBusy === s.name}
-                          onClick={() => act(s.name, () => api.serviceStop(s.name))}
-                          title={t('services.stopTooltip')}
-                        >
-                          <SquareIcon className="size-4" />
-                        </button>
-                      ) : (
-                        <button
-                          className="btn btn-xs btn-ghost text-success"
-                          disabled={rowBusy === s.name}
-                          onClick={() => act(s.name, () => api.serviceStart(s.name))}
-                          title={t('services.startTooltip')}
-                        >
-                          <PlayIcon className="size-4" />
-                        </button>
-                      )}
+        <TableShell
+          colgroup={[
+            <col />,
+            <col className="w-28" />,
+            <col className="w-32" />,
+            <col className="w-20" />,
+            <col className="w-28" />,
+          ]}
+        >
+          <thead>
+            <tr>
+              <th>{t('services.colName')}</th>
+              <th>{t('services.colStatus')}</th>
+              <th>{t('services.colUser')}</th>
+              <th>{t('services.colPid')}</th>
+              <th className="text-right">{t('services.colActions')}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {services.map((s) => (
+              <tr key={s.name} className="hover:bg-base-200">
+                <td className="font-medium truncate">{s.name}</td>
+                <td>
+                  <span className={`badge badge-sm ${statusBadge(s.status)}`}>{s.status}</span>
+                </td>
+                <td className="text-xs text-base-content/60 truncate" title={s.user}>
+                  {s.user}
+                </td>
+                <td className="font-mono text-xs truncate">{s.pid || '-'}</td>
+                <td>
+                  <div className="flex justify-end gap-1">
+                    {s.running ? (
                       <button
                         className="btn btn-xs btn-ghost"
                         disabled={rowBusy === s.name}
-                        onClick={() => act(s.name, () => api.serviceRestart(s.name))}
-                        title={t('services.restartTooltip')}
+                        onClick={() => act(s.name, () => api.serviceStop(s.name))}
+                        title={t('services.stopTooltip')}
                       >
-                        <RefreshIcon className="size-4" />
+                        <SquareIcon className="size-4" />
                       </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                    ) : (
+                      <button
+                        className="btn btn-xs btn-ghost text-success"
+                        disabled={rowBusy === s.name}
+                        onClick={() => act(s.name, () => api.serviceStart(s.name))}
+                        title={t('services.startTooltip')}
+                      >
+                        <PlayIcon className="size-4" />
+                      </button>
+                    )}
+                    <button
+                      className="btn btn-xs btn-ghost"
+                      disabled={rowBusy === s.name}
+                      onClick={() => act(s.name, () => api.serviceRestart(s.name))}
+                      title={t('services.restartTooltip')}
+                    >
+                      <RefreshIcon className="size-4" />
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </TableShell>
       )}
     </div>
   )

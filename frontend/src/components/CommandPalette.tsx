@@ -5,11 +5,21 @@ import { filterNavItems, filterPackages } from '../lib/paletteFilter'
 import { useInstalledPackages } from '../context/InstalledPackagesSignal'
 import { navItems, type ViewKey } from './Sidebar'
 import PackageDetailModal, { type DetailTarget } from './PackageDetailModal'
+import TypeBadge from './TypeBadge'
 import { PackageIcon, SearchIcon } from './Icons'
 
 interface Props {
   onNavigate: (view: ViewKey) => void
   bump?: () => void
+  /**
+   * Initial value of the internal `open` state. App.tsx never passes this
+   * (real usage is always Cmd+K-driven), so it exists purely so a Storybook
+   * story can render the palette open without simulating a real keydown --
+   * a simulated Cmd+K bubbles to `window`, which Storybook's own manager UI
+   * also listens on globally for its own search shortcut, causing the
+   * sidebar to reset/filter every time that story mounted.
+   */
+  defaultOpen?: boolean
 }
 
 type ResultRow =
@@ -20,7 +30,7 @@ type ResultRow =
       icon: (p: { className?: string }) => VNode
       view: ViewKey
     }
-  | { kind: 'package'; rowKey: string; label: string; sublabel: string; name: string; isCask: boolean }
+  | { kind: 'package'; rowKey: string; label: string; name: string; isCask: boolean }
 
 /**
  * Global Cmd+K command palette. Mounted once near the top of the app
@@ -28,9 +38,9 @@ type ResultRow =
  * own open/query/detail state — it doesn't need to live in a shared context
  * since nothing else in the app needs to read or drive it.
  */
-export default function CommandPalette({ onNavigate, bump }: Props) {
+export default function CommandPalette({ onNavigate, bump, defaultOpen = false }: Props) {
   const { t, i18n } = useTranslation()
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(defaultOpen)
   const [query, setQuery] = useState('')
   const [activeIndex, setActiveIndex] = useState(0)
   // Backed by the shared installed-packages cache (populated at app start
@@ -89,12 +99,11 @@ export default function CommandPalette({ onNavigate, bump }: Props) {
       kind: 'package',
       rowKey: `pkg:${p.isCask ? 'cask' : 'formula'}:${p.name}`,
       label: p.name,
-      sublabel: p.isCask ? t('common.cask') : t('common.formula'),
       name: p.name,
       isCask: p.isCask,
     }))
     return [...navRows, ...pkgRows]
-  }, [query, packages, translatedNavItems, t])
+  }, [query, packages, translatedNavItems])
 
   useEffect(() => {
     setActiveIndex(0)
@@ -160,15 +169,7 @@ export default function CommandPalette({ onNavigate, bump }: Props) {
                     <PackageIcon className="size-4 shrink-0 opacity-70" />
                   )}
                   <span className="truncate">{row.label}</span>
-                  {row.kind === 'package' && (
-                    <span
-                      className={`badge badge-xs badge-outline ml-auto shrink-0 ${
-                        row.isCask ? 'badge-secondary' : 'badge-primary'
-                      }`}
-                    >
-                      {row.sublabel}
-                    </span>
-                  )}
+                  {row.kind === 'package' && <TypeBadge isCask={row.isCask} size="xs" className="ml-auto shrink-0" />}
                 </button>
               </li>
             ))}

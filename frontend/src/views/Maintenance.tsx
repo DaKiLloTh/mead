@@ -13,6 +13,9 @@ import {
   TrashIcon,
   WrenchIcon,
 } from '../components/Icons'
+import TypeBadge from '../components/TypeBadge'
+import TableShell from '../components/TableShell'
+import LoadingRow from '../components/LoadingRow'
 
 type Tab = 'doctor' | 'cleanup' | 'leftovers' | 'brewfile' | 'config'
 
@@ -390,43 +393,28 @@ export default function Maintenance() {
                 {t('common.refresh')}
               </button>
             </div>
-            {largestLoading && largest === null && (
-              <div className="flex items-center gap-2 text-base-content/60">
-                <span className="loading loading-spinner loading-sm" /> {t('maintenance.scanning')}
-              </div>
-            )}
+            {largestLoading && largest === null && <LoadingRow>{t('maintenance.scanning')}</LoadingRow>}
             {largest && largest.length > 0 && (
-              <div className="overflow-x-auto rounded-box border border-base-300">
-                <table className="table table-sm table-fixed">
-                  <colgroup>
-                    <col />
-                    <col className="w-24" />
-                    <col className="w-28" />
-                  </colgroup>
-                  <thead>
-                    <tr>
-                      <th>{t('maintenance.colName')}</th>
-                      <th>{t('maintenance.colType')}</th>
-                      <th className="text-right">{t('maintenance.colSize')}</th>
+              <TableShell colgroup={[<col />, <col className="w-24" />, <col className="w-28" />]}>
+                <thead>
+                  <tr>
+                    <th>{t('maintenance.colName')}</th>
+                    <th>{t('maintenance.colType')}</th>
+                    <th className="text-right">{t('maintenance.colSize')}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {largest.map((p) => (
+                    <tr key={`${p.isCask ? 'c' : 'f'}:${p.name}`} className="hover:bg-base-200">
+                      <td className="font-medium truncate">{p.name}</td>
+                      <td>
+                        <TypeBadge isCask={p.isCask} />
+                      </td>
+                      <td className="text-right font-mono text-xs">{p.sizeHuman}</td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {largest.map((p) => (
-                      <tr key={`${p.isCask ? 'c' : 'f'}:${p.name}`} className="hover:bg-base-200">
-                        <td className="font-medium truncate">{p.name}</td>
-                        <td>
-                          <span
-                            className={`badge badge-sm badge-outline ${p.isCask ? 'badge-secondary' : 'badge-primary'}`}
-                          >
-                            {p.isCask ? t('common.cask') : t('common.formula')}
-                          </span>
-                        </td>
-                        <td className="text-right font-mono text-xs">{p.sizeHuman}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                  ))}
+                </tbody>
+              </TableShell>
             )}
             {largest && largest.length === 0 && (
               <div className="text-xs text-base-content/50">{t('maintenance.noInstalledPackages')}</div>
@@ -487,11 +475,7 @@ export default function Maintenance() {
             )}
           </div>
 
-          {leftoversLoading && leftovers === null && (
-            <div className="flex items-center gap-2 text-base-content/60">
-              <span className="loading loading-spinner loading-sm" /> {t('maintenance.leftoversScanning')}
-            </div>
-          )}
+          {leftoversLoading && leftovers === null && <LoadingRow>{t('maintenance.leftoversScanning')}</LoadingRow>}
 
           {leftovers && leftovers.length === 0 && (
             <div className="alert alert-success alert-soft text-sm">{t('maintenance.noLeftoversFound')}</div>
@@ -499,50 +483,44 @@ export default function Maintenance() {
 
           {leftovers && leftovers.length > 0 && (
             <div className="space-y-2">
-              <div className="overflow-x-auto rounded-box border border-base-300">
-                <table className="table table-sm table-fixed">
-                  <colgroup>
-                    <col className="w-8" />
-                    <col />
-                    <col className="w-40" />
-                    <col className="w-24" />
-                  </colgroup>
-                  <thead>
-                    <tr>
-                      <th />
-                      <th>{t('maintenance.colName')}</th>
-                      <th>{t('maintenance.colLocation')}</th>
-                      <th className="text-right">{t('maintenance.colSize')}</th>
+              <TableShell
+                colgroup={[<col className="w-8" />, <col />, <col className="w-40" />, <col className="w-24" />]}
+              >
+                <thead>
+                  <tr>
+                    <th />
+                    <th>{t('maintenance.colName')}</th>
+                    <th>{t('maintenance.colLocation')}</th>
+                    <th className="text-right">{t('maintenance.colSize')}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {leftovers.map((item) => (
+                    <tr key={item.path} className="hover:bg-base-200">
+                      <td>
+                        <input
+                          type="checkbox"
+                          className="checkbox checkbox-sm"
+                          checked={selectedLeftovers.has(item.path)}
+                          onChange={() => toggleLeftover(item.path)}
+                        />
+                      </td>
+                      <td className="min-w-0">
+                        <div className="font-medium truncate">{item.name}</div>
+                        <div className="font-mono text-xs text-base-content/50 truncate" title={item.path}>
+                          {item.path}
+                        </div>
+                      </td>
+                      <td>
+                        <span className="badge badge-sm badge-outline">
+                          {t(leftoverKindLabelKeys[item.kind as LeftoverKind] ?? item.kind)}
+                        </span>
+                      </td>
+                      <td className="text-right font-mono text-xs">{item.sizeHuman}</td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {leftovers.map((item) => (
-                      <tr key={item.path} className="hover:bg-base-200">
-                        <td>
-                          <input
-                            type="checkbox"
-                            className="checkbox checkbox-sm"
-                            checked={selectedLeftovers.has(item.path)}
-                            onChange={() => toggleLeftover(item.path)}
-                          />
-                        </td>
-                        <td className="min-w-0">
-                          <div className="font-medium truncate">{item.name}</div>
-                          <div className="font-mono text-xs text-base-content/50 truncate" title={item.path}>
-                            {item.path}
-                          </div>
-                        </td>
-                        <td>
-                          <span className="badge badge-sm badge-outline">
-                            {t(leftoverKindLabelKeys[item.kind as LeftoverKind] ?? item.kind)}
-                          </span>
-                        </td>
-                        <td className="text-right font-mono text-xs">{item.sizeHuman}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                  ))}
+                </tbody>
+              </TableShell>
               <div className="flex items-center justify-between">
                 <span className="text-xs text-base-content/50">
                   {selectedLeftovers.size > 0
@@ -674,11 +652,7 @@ export default function Maintenance() {
 
       {tab === 'config' && (
         <div className="space-y-3">
-          {configLoading && (
-            <div className="flex items-center gap-2 text-base-content/60">
-              <span className="loading loading-spinner loading-sm" /> {t('common.loading')}
-            </div>
-          )}
+          {configLoading && <LoadingRow>{t('common.loading')}</LoadingRow>}
           {config && (
             <pre className="mockup-code text-xs overflow-x-auto max-h-128">
               <code className="whitespace-pre px-4">{config}</code>

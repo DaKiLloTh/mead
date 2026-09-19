@@ -1,19 +1,37 @@
 import type { Meta, StoryObj } from '@storybook/preact-vite'
-import { useState } from 'preact/hooks'
-import Sidebar, { type ViewKey } from './Sidebar'
+import { useArgs } from 'storybook/preview-api'
+import Sidebar, { navItems, type ViewKey } from './Sidebar'
 
-// Sidebar takes no context, just props -- a real (not mocked) working
-// component in a story, wired to Preact state so clicking a nav item in
-// the Storybook canvas actually changes which one is highlighted, the
-// same way it does in the real app.
-function InteractiveSidebar(props: { outdatedCount: number }) {
-  const [view, setView] = useState<ViewKey>('dashboard')
-  return <Sidebar view={view} onSelect={setView} outdatedCount={props.outdatedCount} />
+// `view` is genuinely two-way bound: the Controls panel's select can change
+// it, and clicking a nav item in the canvas updates the same arg back via
+// useArgs()'s setter -- Storybook's documented "controlled component"
+// pattern. useArgs must be called directly in the function assigned to
+// meta.render -- that's the one call Storybook's hooks system actually
+// wraps; calling it one JSX level deeper, in a component *rendered by*
+// render(), throws "Storybook preview hooks can only be called inside
+// decorators and story functions" (confirmed by trying that first). Named
+// `Render` (not an inline arrow) purely so react-hooks/rules-of-hooks'
+// naming heuristic recognizes it as a component and allows the hook call.
+function Render(args: { view: ViewKey; outdatedCount: number }) {
+  const [, updateArgs] = useArgs<typeof args>()
+  return <Sidebar {...args} onSelect={(v) => updateArgs({ view: v })} />
 }
 
-const meta: Meta<typeof InteractiveSidebar> = {
+const meta: Meta<typeof Sidebar> = {
   title: 'Components/Sidebar',
-  component: InteractiveSidebar,
+  component: Sidebar,
+  argTypes: {
+    view: {
+      control: 'select',
+      options: navItems.map((item) => item.key),
+    },
+    outdatedCount: { control: { type: 'number', min: 0 } },
+    onHover: { control: false },
+  },
+  args: {
+    view: 'dashboard',
+    outdatedCount: 3,
+  },
   decorators: [
     (Story) => (
       <div style={{ height: '600px', display: 'flex' }}>
@@ -21,13 +39,11 @@ const meta: Meta<typeof InteractiveSidebar> = {
       </div>
     ),
   ],
-  args: {
-    outdatedCount: 3,
-  },
+  render: Render,
 }
 export default meta
 
-type Story = StoryObj<typeof InteractiveSidebar>
+type Story = StoryObj<typeof Sidebar>
 
 export const Default: Story = {}
 

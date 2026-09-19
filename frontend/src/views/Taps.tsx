@@ -6,6 +6,7 @@ import { useJobs } from '../context/JobsContext'
 import { useConfirm } from '../context/ConfirmContext'
 import { ChevronDownIcon, ExternalLinkIcon, RefreshIcon, TapIcon, TrashIcon } from '../components/Icons'
 import ExternalLink from '../components/ExternalLink'
+import LoadingRow from '../components/LoadingRow'
 
 interface Props {
   refreshToken: number
@@ -123,9 +124,7 @@ export default function Taps({ refreshToken, bump }: Props) {
       </form>
 
       {loading ? (
-        <div className="flex items-center gap-2 text-base-content/60">
-          <span className="loading loading-spinner loading-sm" /> {t('common.loading')}
-        </div>
+        <LoadingRow>{t('common.loading')}</LoadingRow>
       ) : error ? (
         <div className="alert alert-error alert-soft">
           <div>

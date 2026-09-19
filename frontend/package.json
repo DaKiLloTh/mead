@@ -28,6 +28,7 @@
     "react-i18next": "^17.0.12"
   },
   "devDependencies": {
+    "@dakilloth/storybook-wails-mock": "^0.1.1",
     "@eslint/js": "^10.0.1",
     "@preact/preset-vite": "^2.10.6",
     "@storybook/preact-vite": "^10.5.10",
