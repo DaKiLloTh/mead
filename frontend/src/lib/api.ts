@@ -1,5 +1,5 @@
 import * as App from '../../wailsjs/go/app/App'
-import { brew, security, store } from '../../wailsjs/go/models'
+import { brew, security, store, touchid } from '../../wailsjs/go/models'
 
 export type BrewPackage = brew.BrewPackage
 export type CacheInfo = brew.CacheInfo
@@ -18,6 +18,7 @@ export type Collection = brew.Collection
 export type TapDetail = brew.TapDetail
 export type BundleCleanupItem = brew.BundleCleanupItem
 export type PackageSize = brew.PackageSize
+export type TouchIDStatus = touchid.Status
 export type DependencyGraph = brew.DependencyGraph
 export type DependencyNode = brew.DependencyNode
 export type DependencyEdge = brew.DependencyEdge
@@ -67,6 +68,9 @@ export const api = {
   serviceRestart: (name: string) => App.ServiceRestart(name),
   servicesCleanup: () => App.ServicesCleanup(),
   cancelJob: (id: string) => App.CancelJob(id),
+  sendJobInput: (id: string, text: string) => App.SendJobInput(id, text),
+  touchIDSudoStatus: () => App.TouchIDSudoStatus(),
+  startTouchIDSudoSetup: () => App.StartTouchIDSudoSetup(),
 
   autoremove: (dryRun: boolean) => App.Autoremove(dryRun),
 

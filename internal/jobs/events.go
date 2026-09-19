@@ -11,6 +11,12 @@ type StartEvent struct {
 	// themselves. Used by the periodic background `brew update` (see
 	// jobs.Manager.StartQuietWithEnv and App.UpdateQuiet).
 	Quiet bool `json:"quiet,omitempty"`
+	// Interactive marks a job that's attached to a real pty and can
+	// therefore accept input via App.SendJobInput -- currently only mas
+	// upgrade jobs (see jobs.Manager.StartMas), which may need to answer a
+	// sudo password prompt partway through. Lets the frontend show an input
+	// box for this job without needing to guess from its output text.
+	Interactive bool `json:"interactive,omitempty"`
 }
 
 // OutputEvent is emitted for each line of a job's combined stdout/stderr.

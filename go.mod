@@ -3,6 +3,7 @@ module mead
 go 1.27.0
 
 require (
+	github.com/creack/pty v1.1.24
 	github.com/getlantern/systray v1.2.2
 	github.com/wailsapp/wails/v2 v2.15.0
 	golang.org/x/text v0.41.0

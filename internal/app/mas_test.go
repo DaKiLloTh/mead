@@ -32,3 +32,23 @@ func TestBuildMasUpgradeArgs(t *testing.T) {
 		}
 	})
 }
+
+// TestBuildMasUpgradeTitle covers the title text MasUpgrade/MasUpgradeAll
+// hand to the job manager.
+func TestBuildMasUpgradeTitle(t *testing.T) {
+	tests := []struct {
+		name string
+		id   string
+		want string
+	}{
+		{"single app", "1451685025", "Upgrade App Store app 1451685025"},
+		{"all apps", "", "Upgrade all App Store apps"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := buildMasUpgradeTitle(tt.id); got != tt.want {
+				t.Errorf("buildMasUpgradeTitle(%q) = %q, want %q", tt.id, got, tt.want)
+			}
+		})
+	}
+}

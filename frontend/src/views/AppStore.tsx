@@ -1,24 +1,42 @@
 import { useEffect, useState } from 'preact/hooks'
 import { Trans, useTranslation } from 'react-i18next'
-import { api } from '../lib/api'
+import { api, type TouchIDStatus } from '../lib/api'
 import { useJobs } from '../context/JobsContext'
+import { useConfirm } from '../context/ConfirmContext'
 import { appStoreSignal, ensureAppStoreLoaded, loadAppStore } from '../context/AppStoreSignal'
 import { ArrowUpCircleIcon, DownloadIcon, RefreshIcon, StoreIcon } from '../components/Icons'
 import ExternalLink from '../components/ExternalLink'
 import PackageIcon from '../components/PackageIcon'
+import TouchIdBanner from '../components/TouchIdBanner'
+
+// How often, and for how long, to check whether the Terminal window finished.
+const TOUCH_ID_POLL_MS = 2000
+const TOUCH_ID_WAIT_MS = 5 * 60 * 1000
 
 export default function AppStore() {
   const { t } = useTranslation()
-  const { runAction } = useJobs()
+  const { runAction, notify } = useJobs()
+  const confirm = useConfirm()
   const { available, apps, outdated, loading, error } = appStoreSignal.value
   const [rowBusy, setRowBusy] = useState<string | null>(null)
   const [installingMas, setInstallingMas] = useState(false)
+  const [upgradingAll, setUpgradingAll] = useState(false)
+  const [touchId, setTouchId] = useState<TouchIDStatus | null>(null)
+  const [awaitingTouchId, setAwaitingTouchId] = useState(false)
+
+  function loadTouchIdStatus() {
+    api
+      .touchIDSudoStatus()
+      .then(setTouchId)
+      .catch(() => {})
+  }
 
   // Idempotent: a no-op if Sidebar's onMouseEnter already started this
   // fetch before the view mounted. mas is the slowest CLI this app shells
   // out to, so the hover head-start matters more here than most views.
   useEffect(() => {
     ensureAppStoreLoaded()
+    loadTouchIdStatus()
   }, [])
 
   async function installMas() {
@@ -28,10 +46,62 @@ export default function AppStore() {
     loadAppStore()
   }
 
+  // Only ever runs from an explicit click plus a confirm: this edits a
+  // system-wide security setting (sudo's PAM config), so mead never does it
+  // silently. The write happens in a Terminal window the user types their
+  // password into (macOS blocks mead from writing /etc/pam.d itself), so this
+  // only opens it, then polls until the setting shows up.
+  async function enableTouchId() {
+    const { ok } = await confirm({
+      title: t('appstore.touchIdConfirmTitle'),
+      body: t('appstore.touchIdConfirmBody'),
+      confirmLabel: t('appstore.touchIdConfirmLabel'),
+    })
+    if (!ok) return
+    try {
+      await api.startTouchIDSudoSetup()
+      setAwaitingTouchId(true)
+    } catch (e) {
+      notify('error', String(e))
+    }
+  }
+
+  useEffect(() => {
+    if (!awaitingTouchId) return
+    const started = Date.now()
+    const timer = setInterval(async () => {
+      try {
+        const status = await api.touchIDSudoStatus()
+        setTouchId(status)
+        if (status.enabled) {
+          setAwaitingTouchId(false)
+          notify('success', t('appstore.touchIdEnabledToast'))
+        }
+      } catch {
+        // keep polling; a transient failure shouldn't end the wait early
+      }
+      if (Date.now() - started > TOUCH_ID_WAIT_MS) setAwaitingTouchId(false)
+    }, TOUCH_ID_POLL_MS)
+    return () => clearInterval(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [awaitingTouchId])
+
+  // If mas needs sudo partway through (Xcode's App Store delivery pipeline
+  // is the known case), the backend job runs with a controlling pty, so sudo
+  // prompts normally: a Touch ID sheet if enabled (see the banner above),
+  // otherwise a "Password:" line in the job console with an input box.
+  // Nothing for this view to catch or retry.
   async function upgrade(id: string) {
     setRowBusy(id)
     await runAction(() => api.masUpgrade(id))
     setRowBusy(null)
+    loadAppStore()
+  }
+
+  async function upgradeAll() {
+    setUpgradingAll(true)
+    await runAction(() => api.masUpgradeAll())
+    setUpgradingAll(false)
     loadAppStore()
   }
 
@@ -100,19 +170,21 @@ export default function AppStore() {
 
       {!loading && !error && available && (
         <>
+          {touchId?.available && !touchId.enabled && (
+            <TouchIdBanner waiting={awaitingTouchId} onEnable={enableTouchId} />
+          )}
           <div className="flex items-center justify-between mb-3">
             <p className="text-sm text-base-content/60">
               {t('appstore.countsSummary', { appCount: apps.length, outdatedCount: outdated.length })}
             </p>
             {outdated.length > 0 && (
-              <button
-                className="btn btn-sm btn-primary"
-                onClick={async () => {
-                  await runAction(() => api.masUpgradeAll())
-                  loadAppStore()
-                }}
-              >
-                <ArrowUpCircleIcon className="size-4" /> {t('common.upgradeAll')}
+              <button className="btn btn-sm btn-primary" disabled={upgradingAll} onClick={upgradeAll}>
+                {upgradingAll ? (
+                  <span className="loading loading-spinner loading-xs" />
+                ) : (
+                  <ArrowUpCircleIcon className="size-4" />
+                )}
+                {t('common.upgradeAll')}
               </button>
             )}
           </div>

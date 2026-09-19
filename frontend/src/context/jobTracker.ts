@@ -37,6 +37,13 @@ export interface JobState {
    * handleDone below. It still appears in the job list like any other job.
    */
   quiet: boolean
+  /**
+   * True for a job attached to a real pty that can accept input (currently
+   * only mas upgrade jobs, which may need a sudo password mid-run -- see
+   * App.SendJobInput). Lets JobConsole show an input box for this job
+   * without guessing from its output text.
+   */
+  interactive: boolean
 }
 
 export type ToastType = 'success' | 'error' | 'info'
@@ -45,6 +52,7 @@ export interface JobStartPayload {
   id: string
   title: string
   quiet?: boolean
+  interactive?: boolean
 }
 
 export interface JobOutputPayload {
@@ -92,9 +100,10 @@ export class JobTracker {
 
   handleStart = (payload: JobStartPayload): void => {
     const quiet = payload.quiet ?? false
+    const interactive = payload.interactive ?? false
     this.setJobs([
       ...this.jobs,
-      { id: payload.id, title: payload.title, lines: [], status: 'running', startedAt: this.now(), quiet },
+      { id: payload.id, title: payload.title, lines: [], status: 'running', startedAt: this.now(), quiet, interactive },
     ])
     // A quiet job (e.g. the periodic background `brew update`, see
     // App.UpdateQuiet) still lands in the job list above, but shouldn't pop

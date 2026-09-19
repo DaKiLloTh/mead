@@ -156,6 +156,24 @@ describe('quiet jobs', () => {
   })
 })
 
+describe('interactive jobs', () => {
+  it('defaults to false when the start payload omits it', () => {
+    const { tracker, jobsSnapshots } = makeTracker()
+
+    tracker.handleStart({ id: 'job-plain', title: 'Install wget' })
+
+    expect(jobsSnapshots.at(-1)).toEqual([expect.objectContaining({ id: 'job-plain', interactive: false })])
+  })
+
+  it('carries through true when the backend marks a job interactive (e.g. a pty-backed mas upgrade)', () => {
+    const { tracker, jobsSnapshots } = makeTracker()
+
+    tracker.handleStart({ id: 'job-mas', title: 'Upgrade App Store app 497799835', interactive: true })
+
+    expect(jobsSnapshots.at(-1)).toEqual([expect.objectContaining({ id: 'job-mas', interactive: true })])
+  })
+})
+
 // Reproduces the shape of the ORIGINAL (pre-fix) resolver bookkeeping in
 // JobsContext.tsx: the resolver was registered only *after* `action()`
 // resolved, with no fallback check for a job that had already reached a
@@ -171,6 +189,7 @@ describe('naive (pre-fix) resolver registration', () => {
         title: 'Import Brewfile',
         lines: [],
         quiet: false,
+        interactive: false,
         status: payload.success ? 'success' : 'error',
         exitCode: payload.exitCode,
         error: payload.error,
