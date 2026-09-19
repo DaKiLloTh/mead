@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.11.0](https://github.com/DaKiLloTh/mead/compare/v0.10.5...v0.11.0) (2026-09-19)
+
+
+### Features
+
+* German translation ([#164](https://github.com/DaKiLloTh/mead/issues/164)) ([cac4f3e](https://github.com/DaKiLloTh/mead/commit/cac4f3e387944943fb5cb3fe09810c652185bf97))
+* Touch ID and password prompts for App Store upgrades that need sudo ([#162](https://github.com/DaKiLloTh/mead/issues/162)) ([f0ad26e](https://github.com/DaKiLloTh/mead/commit/f0ad26e4d0e4670bed7ec410437d2831760dc4db))
+
 ## [0.10.5](https://github.com/DaKiLloTh/mead/compare/v0.10.4...v0.10.5) (2026-08-29)
 
 
