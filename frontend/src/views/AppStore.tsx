@@ -7,6 +7,8 @@ import { appStoreSignal, ensureAppStoreLoaded, loadAppStore } from '../context/A
 import { ArrowUpCircleIcon, DownloadIcon, RefreshIcon, StoreIcon } from '../components/Icons'
 import ExternalLink from '../components/ExternalLink'
 import PackageIcon from '../components/PackageIcon'
+import TableShell from '../components/TableShell'
+import LoadingRow from '../components/LoadingRow'
 import TouchIdBanner from '../components/TouchIdBanner'
 
 // How often, and for how long, to check whether the Terminal window finished.
@@ -115,10 +117,9 @@ export default function AppStore() {
       </p>
 
       {loading && (
-        <div className="flex items-center gap-2 text-base-content/60">
-          <span className="loading loading-spinner loading-sm" />{' '}
+        <LoadingRow>
           <Trans i18nKey="appstore.checkingForMas" components={{ cli: <span className="font-mono" /> } as any} />
-        </div>
+        </LoadingRow>
       )}
 
       {!loading && error && (
@@ -189,65 +190,58 @@ export default function AppStore() {
             )}
           </div>
 
-          <div className="overflow-x-auto rounded-box border border-base-300">
-            <table className="table table-sm table-fixed">
-              <colgroup>
-                <col />
-                <col className="w-56" />
-                <col className="w-24" />
-              </colgroup>
-              <thead>
-                <tr>
-                  <th>{t('appstore.colName')}</th>
-                  <th>{t('appstore.colVersion')}</th>
-                  <th className="text-right">{t('appstore.colActions')}</th>
+          <TableShell colgroup={[<col />, <col className="w-56" />, <col className="w-24" />]}>
+            <thead>
+              <tr>
+                <th>{t('appstore.colName')}</th>
+                <th>{t('appstore.colVersion')}</th>
+                <th className="text-right">{t('appstore.colActions')}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {apps.map((app) => (
+                <tr key={app.id} className="hover:bg-base-200">
+                  <td className="font-medium">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <PackageIcon name={app.name} isCask={false} isMas className="size-5" />
+                      <span className="truncate">{app.name}</span>
+                    </div>
+                  </td>
+                  <td className="font-mono text-xs wrap-break-word">
+                    {app.installedVersion}
+                    {outdatedIds.has(app.id) && (
+                      <>
+                        {' '}
+                        → <span className="text-warning">{outdated.find((o) => o.id === app.id)?.latestVersion}</span>
+                      </>
+                    )}
+                  </td>
+                  <td className="text-right">
+                    {outdatedIds.has(app.id) && (
+                      <button
+                        className="btn btn-xs btn-primary"
+                        disabled={rowBusy === app.id}
+                        onClick={() => upgrade(app.id)}
+                      >
+                        {rowBusy === app.id ? (
+                          <span className="loading loading-spinner loading-xs" />
+                        ) : (
+                          t('common.upgrade')
+                        )}
+                      </button>
+                    )}
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {apps.map((app) => (
-                  <tr key={app.id} className="hover:bg-base-200">
-                    <td className="font-medium">
-                      <div className="flex items-center gap-1.5 min-w-0">
-                        <PackageIcon name={app.name} isCask={false} isMas className="size-5" />
-                        <span className="truncate">{app.name}</span>
-                      </div>
-                    </td>
-                    <td className="font-mono text-xs wrap-break-word">
-                      {app.installedVersion}
-                      {outdatedIds.has(app.id) && (
-                        <>
-                          {' '}
-                          → <span className="text-warning">{outdated.find((o) => o.id === app.id)?.latestVersion}</span>
-                        </>
-                      )}
-                    </td>
-                    <td className="text-right">
-                      {outdatedIds.has(app.id) && (
-                        <button
-                          className="btn btn-xs btn-primary"
-                          disabled={rowBusy === app.id}
-                          onClick={() => upgrade(app.id)}
-                        >
-                          {rowBusy === app.id ? (
-                            <span className="loading loading-spinner loading-xs" />
-                          ) : (
-                            t('common.upgrade')
-                          )}
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-                {apps.length === 0 && (
-                  <tr>
-                    <td colSpan={3} className="text-center text-base-content/50 py-8">
-                      {t('appstore.noApps')}
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+              ))}
+              {apps.length === 0 && (
+                <tr>
+                  <td colSpan={3} className="text-center text-base-content/50 py-8">
+                    {t('appstore.noApps')}
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </TableShell>
         </>
       )}
     </div>

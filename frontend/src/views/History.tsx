@@ -3,6 +3,8 @@ import { useTranslation } from 'react-i18next'
 import { api, HistoryEntry } from '../lib/api'
 import { useConfirm } from '../context/ConfirmContext'
 import { CheckIcon, ClockIcon, TrashIcon, XIcon } from '../components/Icons'
+import LoadingRow from '../components/LoadingRow'
+import EmptyState from '../components/EmptyState'
 
 export default function History() {
   const { t } = useTranslation()
@@ -43,14 +45,9 @@ export default function History() {
       </div>
 
       {entries === null ? (
-        <div className="flex items-center gap-2 text-base-content/60">
-          <span className="loading loading-spinner loading-sm" /> {t('common.loading')}
-        </div>
+        <LoadingRow>{t('common.loading')}</LoadingRow>
       ) : sorted.length === 0 ? (
-        <div className="text-center text-base-content/50 py-16">
-          <ClockIcon className="size-8 mx-auto mb-2 opacity-40" />
-          {t('history.noActivity')}
-        </div>
+        <EmptyState icon={ClockIcon}>{t('history.noActivity')}</EmptyState>
       ) : (
         <ul className="timeline timeline-vertical timeline-compact">
           {sorted.map((e, i) => (

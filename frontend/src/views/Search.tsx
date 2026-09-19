@@ -3,28 +3,10 @@ import { useTranslation } from 'react-i18next'
 import { api, SearchResult } from '../lib/api'
 import { useJobs } from '../context/JobsContext'
 import PackageDetailModal, { DetailTarget } from '../components/PackageDetailModal'
-import ExternalLink from '../components/ExternalLink'
-import {
-  BadgeBrokenIcon,
-  BadgeInstalledIcon,
-  DownloadIcon,
-  ExternalLinkIcon,
-  SearchIcon,
-  TapIcon,
-} from '../components/Icons'
+import SearchResultCard from '../components/SearchResultCard'
+import { SearchIcon } from '../components/Icons'
 
 type Filter = 'all' | 'formula' | 'cask'
-
-// The two official taps every formula/cask not from a third party belongs
-// to. Anything else means the result comes from a tap Homebrew itself
-// doesn't vet -- worth flagging on a search result specifically, since
-// that's the one place in the app someone might install something they've
-// never heard of before.
-const OFFICIAL_TAPS = new Set(['homebrew/core', 'homebrew/cask'])
-
-function formulaeBrewShUrl(r: SearchResult): string {
-  return `https://formulae.brew.sh/${r.isCask ? 'cask' : 'formula'}/${encodeURIComponent(r.name)}`
-}
 
 interface Props {
   refreshToken: number
@@ -188,91 +170,15 @@ export default function Search({ refreshToken, bump }: Props) {
         <div className={`flex flex-col gap-3 transition-opacity ${loading ? 'opacity-50' : ''}`}>
           {filtered.map((r) => {
             const key = `${r.isCask ? 'c' : 'f'}:${r.name}`
-            const isInstalled = installedKeys.has(key)
             return (
-              <div
+              <SearchResultCard
                 key={key}
-                className="rounded-box border border-base-300 p-4 flex flex-col gap-2 hover:bg-base-200/60 transition-colors cursor-pointer"
-                onClick={() => setDetail({ name: r.name, isCask: r.isCask })}
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <div className="font-medium wrap-break-word">{r.name}</div>
-                    {r.desc && <div className="text-xs text-base-content/50 wrap-break-word">{r.desc}</div>}
-                  </div>
-                  <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
-                    {r.homepage && (
-                      <ExternalLink
-                        href={r.homepage}
-                        className="btn btn-ghost btn-xs btn-square"
-                        title={t('search.homepageLink')}
-                      >
-                        <ExternalLinkIcon className="size-3.5" />
-                      </ExternalLink>
-                    )}
-                    <ExternalLink
-                      href={formulaeBrewShUrl(r)}
-                      className="btn btn-ghost btn-xs btn-square"
-                      title={t('search.formulaeBrewShLink')}
-                    >
-                      <TapIcon className="size-3.5" />
-                    </ExternalLink>
-                    <span className={`badge badge-sm badge-outline ${r.isCask ? 'badge-secondary' : 'badge-primary'}`}>
-                      {r.isCask ? t('common.cask') : t('common.formula')}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="border-t border-base-300/50 pt-2 flex items-center justify-between gap-3 flex-wrap">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    {r.version && <span className="font-mono text-xs text-base-content/60">{r.version}</span>}
-                    {r.tap && !OFFICIAL_TAPS.has(r.tap.toLowerCase()) && (
-                      <span
-                        className="badge badge-sm badge-warning badge-outline gap-1"
-                        title={t('search.nonStandardTapTooltip')}
-                      >
-                        <TapIcon className="size-3" />
-                        {r.tap}
-                      </span>
-                    )}
-                    {r.deprecated && (
-                      <span className="badge badge-sm badge-error badge-outline gap-1">
-                        <BadgeBrokenIcon className="size-3" />
-                        {t('common.badgeDeprecated')}
-                      </span>
-                    )}
-                    {r.disabled && (
-                      <span className="badge badge-sm badge-error gap-1">{t('common.badgeDisabled')}</span>
-                    )}
-                    {r.isCask && r.autoUpdates && (
-                      <span className="badge badge-sm badge-ghost">{t('common.badgeAutoUpdates')}</span>
-                    )}
-                  </div>
-
-                  {isInstalled ? (
-                    <span className="badge badge-success badge-outline shrink-0 gap-1">
-                      <BadgeInstalledIcon className="size-3" />
-                      {t('common.badgeInstalled')}
-                    </span>
-                  ) : (
-                    <button
-                      className="btn btn-xs btn-primary shrink-0"
-                      disabled={rowBusy === key}
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        void quickInstall(r)
-                      }}
-                    >
-                      {rowBusy === key ? (
-                        <span className="loading loading-spinner loading-xs" />
-                      ) : (
-                        <DownloadIcon className="size-3.5" />
-                      )}
-                      {t('common.install')}
-                    </button>
-                  )}
-                </div>
-              </div>
+                result={r}
+                installed={installedKeys.has(key)}
+                busy={rowBusy === key}
+                onOpenDetail={() => setDetail({ name: r.name, isCask: r.isCask })}
+                onInstall={() => void quickInstall(r)}
+              />
             )
           })}
           {filtered.length === 0 && !loading && (

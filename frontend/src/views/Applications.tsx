@@ -6,6 +6,8 @@ import { useInstalledPackages } from '../context/InstalledPackagesSignal'
 import PackageDetailModal, { DetailTarget } from '../components/PackageDetailModal'
 import PackageIcon from '../components/PackageIcon'
 import { RefreshIcon, SearchIcon } from '../components/Icons'
+import LoadingRow from '../components/LoadingRow'
+import EmptyState from '../components/EmptyState'
 
 interface Props {
   bump: () => void
@@ -71,11 +73,9 @@ export default function Applications({ bump }: Props) {
           </button>
         </div>
       ) : loading && (cachedPkgs?.length ?? 0) === 0 ? (
-        <div className="flex items-center gap-2 text-base-content/60">
-          <span className="loading loading-spinner loading-sm" /> {t('common.loading')}
-        </div>
+        <LoadingRow>{t('common.loading')}</LoadingRow>
       ) : apps.length === 0 ? (
-        <div className="text-center text-base-content/50 py-12">{t('applications.noMatches')}</div>
+        <EmptyState>{t('applications.noMatches')}</EmptyState>
       ) : (
         <div className="grid grid-cols-[repeat(auto-fill,minmax(6.5rem,1fr))] gap-3">
           {apps.map((p) => (
