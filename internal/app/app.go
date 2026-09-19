@@ -22,6 +22,7 @@ import (
 	"mead/internal/security"
 	"mead/internal/store"
 	"mead/internal/system"
+	"mead/internal/touchid"
 )
 
 // gistURLRe matches a gist.github.com URL embedded in `brew gist-logs`
@@ -485,6 +486,31 @@ func (a *App) CancelJob(id string) bool {
 	return a.jobs.Cancel(id)
 }
 
+// TouchIDSudoStatus reports whether fingerprint authorization for sudo is
+// available on this Mac and whether it's already enabled (see package
+// touchid). Used to offer it on the App Store view, since Xcode upgrades
+// run sudo internally.
+func (a *App) TouchIDSudoStatus() touchid.Status {
+	return touchid.GetStatus()
+}
+
+// StartTouchIDSudoSetup opens a Terminal window that adds Touch ID to sudo's
+// PAM config once the user types their sudo password there (macOS blocks
+// mead itself from writing /etc/pam.d, see package touchid). Returns as soon
+// as Terminal is open; the frontend polls TouchIDSudoStatus for the result.
+// Only ever called from an explicit, confirmed user action.
+func (a *App) StartTouchIDSudoSetup() error {
+	return touchid.OpenSetupInTerminal()
+}
+
+// SendJobInput answers a running interactive job's prompt (currently only
+// mas upgrade jobs, which run attached to a real pty -- see
+// jobs.Manager.StartMas) with the given text, as if the user had typed it
+// and pressed Return in a terminal.
+func (a *App) SendJobInput(id string, text string) bool {
+	return a.jobs.SendInput(id, text)
+}
+
 // ---- user data: favorites, tags, notes, snoozes, history ----
 
 func (a *App) GetUserData() store.UserData {
@@ -903,15 +929,34 @@ func buildMasUpgradeArgs(id string) []string {
 	return args
 }
 
+// buildMasUpgradeTitle builds the human-readable job title for
+// MasUpgrade/MasUpgradeAll -- pulled out alongside buildMasUpgradeArgs so
+// both are independently unit testable.
+func buildMasUpgradeTitle(id string) string {
+	if id != "" {
+		return fmt.Sprintf("Upgrade App Store app %s", id)
+	}
+	return "Upgrade all App Store apps"
+}
+
+// MasUpgrade and MasUpgradeAll run through jobs.Manager.StartMas, which sets
+// SUDO_ASKPASS on the mas subprocess (see askpass.go) so that if mas's
+// underlying install process needs sudo partway through -- Xcode's App
+// Store delivery pipeline is the known case -- it can prompt for a password
+// via a native dialog instead of failing outright with sudo's "a terminal
+// is required to read the password". An earlier version of this ran the
+// whole mas invocation elevated (mirroring brew uninstall's elevation
+// retry), which broke Xcode's installer differently: it needs mas running
+// as the real, logged-in user to reach the App Store session, not as root.
 func (a *App) MasUpgrade(id string) string {
 	if id == "" {
 		return a.jobs.Fail("App Store upgrade", "missing app id")
 	}
-	return a.jobs.StartMas(fmt.Sprintf("Upgrade App Store app %s", id), buildMasUpgradeArgs(id)...)
+	return a.jobs.StartMas(buildMasUpgradeTitle(id), buildMasUpgradeArgs(id)...)
 }
 
 func (a *App) MasUpgradeAll() string {
-	return a.jobs.StartMas("Upgrade all App Store apps", buildMasUpgradeArgs("")...)
+	return a.jobs.StartMas(buildMasUpgradeTitle(""), buildMasUpgradeArgs("")...)
 }
 
 // ---- Brewfile import/export (native file dialogs) ----

@@ -263,7 +263,15 @@
     "colName": "Name",
     "colVersion": "Version",
     "colActions": "Actions",
-    "noApps": "No Mac App Store apps found."
+    "noApps": "No Mac App Store apps found.",
+    "touchIdTitle": "Use Touch ID for updates that need administrator access",
+    "touchIdBody": "Some App Store updates, Xcode in particular, need administrator access. Use your fingerprint instead of typing your password.",
+    "touchIdEnable": "Enable Touch ID",
+    "touchIdConfirmTitle": "Enable Touch ID for sudo?",
+    "touchIdConfirmBody": "This opens a Terminal window that adds one line to /etc/pam.d/sudo_local so sudo accepts your fingerprint. You'll type your password there once. It applies to sudo everywhere on this Mac and survives macOS updates. To undo it, delete that file.",
+    "touchIdConfirmLabel": "Open Terminal",
+    "touchIdEnabledToast": "Touch ID is now enabled for sudo.",
+    "touchIdWaiting": "Finish in the Terminal window that just opened. This banner goes away when it's done."
   },
   "security": {
     "title": "Security",
@@ -479,7 +487,8 @@
     "failedExitCode": "Failed (exit {{code}})",
     "cancel": "Cancel",
     "createGist": "Create gist with logs",
-    "uploading": "Uploading…"
+    "uploading": "Uploading…",
+    "inputPlaceholder": "If asked for a password, type it here and press Enter…"
   },
   "confirmDialog": {
     "cancel": "Cancel",

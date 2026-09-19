@@ -18,7 +18,15 @@ export function useJobs() {
     runAction: async (action: () => Promise<string>): Promise<JobState> => {
       console.log('[storybook mock] runAction called')
       await action().catch(() => {})
-      return { id: 'story-job', title: 'Story job', lines: [], status: 'success', startedAt: Date.now(), quiet: false }
+      return {
+        id: 'story-job',
+        title: 'Story job',
+        lines: [],
+        status: 'success',
+        startedAt: Date.now(),
+        quiet: false,
+        interactive: false,
+      }
     },
     notify: (type: string, message: string) => {
       console.log(`[storybook mock] notify(${type}): ${message}`)

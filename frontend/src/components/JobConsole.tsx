@@ -68,8 +68,23 @@ export default function JobConsole() {
     clearFinishedJobs,
   } = useJobs()
   const bodyRef = useRef<HTMLDivElement>(null)
+  const [inputValue, setInputValue] = useState('')
 
   const selected = jobs.find((j) => j.id === selectedJobId) ?? jobs[jobs.length - 1]
+
+  // Only a pty-backed job (currently mas upgrade -- see App.SendJobInput)
+  // can actually receive this; reset whenever the selected job changes so a
+  // half-typed password from a previous job never lingers into the next
+  // one's input box.
+  useEffect(() => {
+    setInputValue('')
+  }, [selected?.id])
+
+  function sendInput() {
+    if (!selected || !inputValue) return
+    void api.sendJobInput(selected.id, inputValue)
+    setInputValue('')
+  }
 
   useEffect(() => {
     if (bodyRef.current) {
@@ -162,6 +177,21 @@ export default function JobConsole() {
               )}
               {selected?.error && <div className="text-warning mt-1">{selected.error}</div>}
             </div>
+            {selected?.interactive && selected.status === 'running' && (
+              <div className="border-t border-base-300 p-2">
+                <input
+                  type="password"
+                  autoFocus
+                  className="input input-sm w-full font-mono"
+                  placeholder={t('jobConsole.inputPlaceholder')}
+                  value={inputValue}
+                  onChange={(e) => setInputValue(e.currentTarget.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') sendInput()
+                  }}
+                />
+              </div>
+            )}
           </div>
         </div>
       )}
