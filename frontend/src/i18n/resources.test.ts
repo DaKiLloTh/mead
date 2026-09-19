@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import { createInstance, type i18n as I18nInstance } from 'i18next'
@@ -160,6 +160,71 @@ describe('en translation resource file', () => {
       'commandPalette',
     ]
     expect(Object.keys(en).sort()).toEqual(expectedNamespaces.sort())
+  })
+})
+
+// Every other locale under locales/, discovered from disk rather than
+// hardcoded, so a new language directory gets this coverage automatically
+// without anyone remembering to update this file.
+const localesDir = path.join(path.dirname(fileURLToPath(import.meta.url)), 'locales')
+const otherLocaleCodes = readdirSync(localesDir, { withFileTypes: true })
+  .filter((entry) => entry.isDirectory() && entry.name !== 'en')
+  .map((entry) => entry.name)
+  .sort()
+const enLeafKeys = collectLeaves(en)
+  .map(([k]) => k)
+  .sort()
+
+describe.each(otherLocaleCodes)('%s translation resource file', (code) => {
+  const raw = readFileSync(path.join(localesDir, code, 'translation.json'), 'utf-8')
+
+  it('is valid, parseable JSON', () => {
+    expect(() => JSON.parse(raw)).not.toThrow()
+  })
+
+  it('has no duplicate keys anywhere in the tree', () => {
+    expect(findDuplicateKeys(raw)).toEqual([])
+  })
+
+  it('has no empty-string leaf values', () => {
+    const empties = collectLeaves(JSON.parse(raw))
+      .filter(([, v]) => typeof v === 'string' && v.trim() === '')
+      .map(([k]) => k)
+    expect(empties).toEqual([])
+  })
+
+  it('has only string leaves (no stray numbers/booleans/nulls/arrays)', () => {
+    const nonStrings = collectLeaves(JSON.parse(raw))
+      .filter(([, v]) => typeof v !== 'string')
+      .map(([k]) => k)
+    expect(nonStrings).toEqual([])
+  })
+
+  it('has exactly the same set of leaf keys as en -- nothing missing, nothing orphaned', () => {
+    const localeLeafKeys = collectLeaves(JSON.parse(raw))
+      .map(([k]) => k)
+      .sort()
+    expect(localeLeafKeys).toEqual(enLeafKeys)
+  })
+
+  it("every interpolation placeholder used in a matching en value also appears in this locale's value", () => {
+    const enByKey = new Map(collectLeaves(en))
+    const localeByKey = new Map(collectLeaves(JSON.parse(raw)))
+    const placeholderRe = /\{\{\s*(\w+)\s*\}\}/g
+    const mismatches: string[] = []
+    for (const [key, enValue] of enByKey) {
+      if (typeof enValue !== 'string') continue
+      const enPlaceholders = new Set([...enValue.matchAll(placeholderRe)].map((m) => m[1]))
+      if (enPlaceholders.size === 0) continue
+      const localeValue = localeByKey.get(key)
+      const localePlaceholders = new Set(
+        typeof localeValue === 'string' ? [...localeValue.matchAll(placeholderRe)].map((m) => m[1]) : []
+      )
+      for (const p of enPlaceholders) {
+        if (!localePlaceholders.has(p)) mismatches.push(`${key}: missing {{${p}}}`)
+      }
+    }
+    expect(mismatches).toEqual([])
   })
 })
 

@@ -23,6 +23,7 @@ type SizeKey = (typeof SIZES)[number]['key']
 // i18n/index.ts as new locales are added.
 const LANGUAGE_NAMES: Record<string, string> = {
   en: 'English',
+  de: 'Deutsch',
 }
 
 function getInitialSize(): SizeKey {
