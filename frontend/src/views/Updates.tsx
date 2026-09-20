@@ -10,6 +10,7 @@ import TableShell from '../components/TableShell'
 import LoadingRow from '../components/LoadingRow'
 import EmptyState from '../components/EmptyState'
 import { ArrowUpCircleIcon, CheckIcon, ClockIcon } from '../components/Icons'
+import ErrorAlert from '../components/ErrorAlert'
 
 interface Props {
   refreshToken: number
@@ -142,12 +143,7 @@ export default function Updates({ refreshToken, bump }: Props) {
       </div>
 
       {error ? (
-        <div className="alert alert-error alert-soft">
-          <div>
-            <div className="font-medium">{t('updates.errorTitle')}</div>
-            <p className="text-sm mt-1">{error}</p>
-          </div>
-        </div>
+        <ErrorAlert title={t('updates.errorTitle')} message={error} />
       ) : loading && items.length === 0 ? (
         <LoadingRow>{t('updates.checking')}</LoadingRow>
       ) : list.length === 0 ? (

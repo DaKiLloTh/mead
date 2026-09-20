@@ -4,12 +4,13 @@ import { api, type TouchIDStatus } from '../lib/api'
 import { useJobs } from '../context/JobsContext'
 import { useConfirm } from '../context/ConfirmContext'
 import { appStoreSignal, ensureAppStoreLoaded, loadAppStore } from '../context/AppStoreSignal'
-import { ArrowUpCircleIcon, DownloadIcon, RefreshIcon, StoreIcon } from '../components/Icons'
+import { ArrowUpCircleIcon, DownloadIcon, StoreIcon } from '../components/Icons'
 import ExternalLink from '../components/ExternalLink'
 import PackageIcon from '../components/PackageIcon'
 import TableShell from '../components/TableShell'
 import LoadingRow from '../components/LoadingRow'
 import TouchIdBanner from '../components/TouchIdBanner'
+import ErrorAlert from '../components/ErrorAlert'
 
 // How often, and for how long, to check whether the Terminal window finished.
 const TOUCH_ID_POLL_MS = 2000
@@ -122,17 +123,7 @@ export default function AppStore() {
         </LoadingRow>
       )}
 
-      {!loading && error && (
-        <div className="alert alert-error alert-soft">
-          <div>
-            <div className="font-medium">{t('appstore.errorTitle')}</div>
-            <p className="text-sm mt-1">{error}</p>
-          </div>
-          <button className="btn btn-sm" onClick={loadAppStore}>
-            <RefreshIcon className="size-4" /> {t('common.tryAgain')}
-          </button>
-        </div>
-      )}
+      {!loading && error && <ErrorAlert title={t('appstore.errorTitle')} message={error} onRetry={loadAppStore} />}
 
       {!loading && !error && available === false && (
         <div className="card bg-base-200">

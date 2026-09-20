@@ -4,9 +4,10 @@ import { useTranslation } from 'react-i18next'
 import { api, TapDetail } from '../lib/api'
 import { useJobs } from '../context/JobsContext'
 import { useConfirm } from '../context/ConfirmContext'
-import { ChevronDownIcon, ExternalLinkIcon, RefreshIcon, TapIcon, TrashIcon } from '../components/Icons'
+import { ChevronDownIcon, ExternalLinkIcon, TapIcon, TrashIcon } from '../components/Icons'
 import ExternalLink from '../components/ExternalLink'
 import LoadingRow from '../components/LoadingRow'
+import ErrorAlert from '../components/ErrorAlert'
 
 interface Props {
   refreshToken: number
@@ -126,15 +127,7 @@ export default function Taps({ refreshToken, bump }: Props) {
       {loading ? (
         <LoadingRow>{t('common.loading')}</LoadingRow>
       ) : error ? (
-        <div className="alert alert-error alert-soft">
-          <div>
-            <div className="font-medium">{t('taps.errorTitle')}</div>
-            <p className="text-sm mt-1">{error}</p>
-          </div>
-          <button className="btn btn-sm" onClick={load}>
-            <RefreshIcon className="size-4" /> {t('common.tryAgain')}
-          </button>
-        </div>
+        <ErrorAlert title={t('taps.errorTitle')} message={error} onRetry={load} />
       ) : (
         <ul className="menu bg-base-200 rounded-box w-full">
           {taps.map((tapName) => (

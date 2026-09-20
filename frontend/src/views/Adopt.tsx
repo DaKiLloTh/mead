@@ -5,6 +5,7 @@ import { useJobs } from '../context/JobsContext'
 import { useConfirm } from '../context/ConfirmContext'
 import { DownloadIcon, ImportIcon, AlertIcon, CheckIcon } from '../components/Icons'
 import PackageDetailModal, { DetailTarget } from '../components/PackageDetailModal'
+import ErrorAlert from '../components/ErrorAlert'
 
 interface Props {
   bump: () => void
@@ -95,14 +96,7 @@ export default function Adopt({ bump }: Props) {
 
       {loading && <p className="text-sm text-base-content/50">{t('adopt.scanningHint')}</p>}
 
-      {error && !loading && (
-        <div className="alert alert-error alert-soft text-sm mb-4">
-          <div>
-            <div className="font-medium">{t('adopt.scanFailedTitle')}</div>
-            <p className="text-sm mt-1">{error}</p>
-          </div>
-        </div>
-      )}
+      {error && !loading && <ErrorAlert title={t('adopt.scanFailedTitle')} message={error} className="text-sm mb-4" />}
 
       {candidates && !loading && (
         <>

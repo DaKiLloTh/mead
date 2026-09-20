@@ -10,15 +10,8 @@ import PackageIcon from '../components/PackageIcon'
 import TypeBadge from '../components/TypeBadge'
 import TableShell from '../components/TableShell'
 import LoadingRow from '../components/LoadingRow'
-import {
-  ArrowUpCircleIcon,
-  BadgeOutdatedIcon,
-  PinIcon,
-  RefreshIcon,
-  SearchIcon,
-  StarIcon,
-  TrashIcon,
-} from '../components/Icons'
+import { ArrowUpCircleIcon, BadgeOutdatedIcon, PinIcon, SearchIcon, StarIcon, TrashIcon } from '../components/Icons'
+import ErrorAlert from '../components/ErrorAlert'
 import { isSudoTerminalRequiredFailure } from '../lib/uninstallElevation'
 
 export type Filter = 'all' | 'formula' | 'cask' | 'outdated' | 'favorites' | 'deprecated' | 'disabled' | 'pinned'
@@ -295,15 +288,7 @@ export default function Installed({ refreshToken, bump, initialFilter }: Props) 
       </div>
 
       {error ? (
-        <div className="alert alert-error alert-soft">
-          <div>
-            <div className="font-medium">{t('installed.errorTitle')}</div>
-            <p className="text-sm mt-1">{error}</p>
-          </div>
-          <button className="btn btn-sm" onClick={load}>
-            <RefreshIcon className="size-4" /> {t('common.tryAgain')}
-          </button>
-        </div>
+        <ErrorAlert title={t('installed.errorTitle')} message={error} onRetry={load} />
       ) : loading && pkgs.length === 0 ? (
         <LoadingRow>{t('common.loading')}</LoadingRow>
       ) : (
