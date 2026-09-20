@@ -1,9 +1,12 @@
 package brew
 
 import (
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -313,4 +316,105 @@ func TestBatchSlugs(t *testing.T) {
 			}
 		})
 	}
+}
+
+func fakeCaskTokens(n int) []string {
+	out := make([]string, n)
+	for i := range out {
+		out[i] = fmt.Sprintf("cask-%d", i)
+	}
+	return out
+}
+
+func TestCheckCaskListComplete(t *testing.T) {
+	tokens := fakeCaskTokens
+	tests := []struct {
+		name    string
+		tokens  []string
+		wantErr bool
+	}{
+		{"nil list", nil, true},
+		{"only locally tapped casks", []string{"dakilloth/mead/mead", "mead"}, true},
+		{"just under the floor", tokens(minPlausibleCaskCount - 1), true},
+		{"at the floor", tokens(minPlausibleCaskCount), false},
+		{"a real-sized list", tokens(7743), false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := checkCaskListComplete(tt.tokens)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("checkCaskListComplete(%d tokens) error = %v, wantErr %v", len(tt.tokens), err, tt.wantErr)
+			}
+			if err != nil && err != errCaskListIncomplete {
+				t.Errorf("error = %v, want errCaskListIncomplete", err)
+			}
+		})
+	}
+}
+
+func TestKnownCasks(t *testing.T) {
+	stub := []string{"dakilloth/mead/mead", "mead"}
+	full := fakeCaskTokens(7743)
+	boom := errors.New("boom")
+
+	// listSeq returns each result in turn, one per call.
+	type listResult struct {
+		tokens []string
+		err    error
+	}
+	run := func(lists []listResult, rebuildErr error) (got []string, err error, listCalls, rebuildCalls int) {
+		list := func() ([]string, error) {
+			r := lists[listCalls]
+			listCalls++
+			return r.tokens, r.err
+		}
+		rebuild := func() error {
+			rebuildCalls++
+			return rebuildErr
+		}
+		got, err = knownCasks(list, rebuild)
+		return
+	}
+
+	t.Run("complete list is returned without rebuilding", func(t *testing.T) {
+		got, err, lists, rebuilds := run([]listResult{{full, nil}}, nil)
+		if err != nil || len(got) != len(full) || lists != 1 || rebuilds != 0 {
+			t.Fatalf("got %d tokens, err %v, %d lists, %d rebuilds", len(got), err, lists, rebuilds)
+		}
+	})
+
+	t.Run("stub list is rebuilt once and re-read", func(t *testing.T) {
+		got, err, lists, rebuilds := run([]listResult{{stub, nil}, {full, nil}}, nil)
+		if err != nil || len(got) != len(full) || lists != 2 || rebuilds != 1 {
+			t.Fatalf("got %d tokens, err %v, %d lists, %d rebuilds", len(got), err, lists, rebuilds)
+		}
+	})
+
+	t.Run("still a stub after rebuilding is an error, not a retry loop", func(t *testing.T) {
+		_, err, lists, rebuilds := run([]listResult{{stub, nil}, {stub, nil}}, nil)
+		if !errors.Is(err, errCaskListIncomplete) || lists != 2 || rebuilds != 1 {
+			t.Fatalf("err %v, %d lists, %d rebuilds", err, lists, rebuilds)
+		}
+	})
+
+	t.Run("a failed rebuild reports the incomplete list and why", func(t *testing.T) {
+		_, err, lists, rebuilds := run([]listResult{{stub, nil}}, boom)
+		if !errors.Is(err, errCaskListIncomplete) || !strings.Contains(err.Error(), "boom") || lists != 1 || rebuilds != 1 {
+			t.Fatalf("err %v, %d lists, %d rebuilds", err, lists, rebuilds)
+		}
+	})
+
+	t.Run("a listing error is returned as is, with no rebuild", func(t *testing.T) {
+		_, err, _, rebuilds := run([]listResult{{nil, boom}}, nil)
+		if err != boom || rebuilds != 0 {
+			t.Fatalf("err %v, %d rebuilds", err, rebuilds)
+		}
+	})
+
+	t.Run("a listing error after rebuilding is returned as is", func(t *testing.T) {
+		_, err, _, _ := run([]listResult{{stub, nil}, {nil, boom}}, nil)
+		if err != boom {
+			t.Fatalf("err %v", err)
+		}
+	})
 }
