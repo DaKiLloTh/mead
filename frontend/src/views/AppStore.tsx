@@ -4,9 +4,10 @@ import { api, type TouchIDStatus } from '../lib/api'
 import { useJobs } from '../context/JobsContext'
 import { useConfirm } from '../context/ConfirmContext'
 import { appStoreSignal, ensureAppStoreLoaded, loadAppStore } from '../context/AppStoreSignal'
-import { ArrowUpCircleIcon, DownloadIcon, StoreIcon } from '../components/Icons'
+import { ArrowUpCircleIcon, DownloadIcon, ExternalLinkIcon, StoreIcon } from '../components/Icons'
 import ExternalLink from '../components/ExternalLink'
 import PackageIcon from '../components/PackageIcon'
+import { appStoreUrl } from '../lib/appStoreUrl'
 import TableShell from '../components/TableShell'
 import LoadingRow from '../components/LoadingRow'
 import TouchIdBanner from '../components/TouchIdBanner'
@@ -181,7 +182,7 @@ export default function AppStore() {
             )}
           </div>
 
-          <TableShell colgroup={[<col />, <col className="w-56" />, <col className="w-24" />]}>
+          <TableShell colgroup={[<col />, <col className="w-56" />, <col className="w-28" />]}>
             <thead>
               <tr>
                 <th>{t('appstore.colName')}</th>
@@ -208,19 +209,30 @@ export default function AppStore() {
                     )}
                   </td>
                   <td className="text-right">
-                    {outdatedIds.has(app.id) && (
-                      <button
-                        className="btn btn-xs btn-primary"
-                        disabled={rowBusy === app.id}
-                        onClick={() => upgrade(app.id)}
-                      >
-                        {rowBusy === app.id ? (
-                          <span className="loading loading-spinner loading-xs" />
-                        ) : (
-                          t('common.upgrade')
-                        )}
-                      </button>
-                    )}
+                    <div className="flex justify-end gap-1">
+                      {appStoreUrl(app.id) && (
+                        <ExternalLink
+                          href={appStoreUrl(app.id)!}
+                          className="btn btn-xs btn-ghost btn-square"
+                          title={t('appstore.openInAppStore')}
+                        >
+                          <ExternalLinkIcon className="size-3.5" />
+                        </ExternalLink>
+                      )}
+                      {outdatedIds.has(app.id) && (
+                        <button
+                          className="btn btn-xs btn-primary"
+                          disabled={rowBusy === app.id}
+                          onClick={() => upgrade(app.id)}
+                        >
+                          {rowBusy === app.id ? (
+                            <span className="loading loading-spinner loading-xs" />
+                          ) : (
+                            t('common.upgrade')
+                          )}
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}

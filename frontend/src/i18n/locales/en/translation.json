@@ -264,6 +264,7 @@
     "colVersion": "Version",
     "colActions": "Actions",
     "noApps": "No Mac App Store apps found.",
+    "openInAppStore": "Open in the App Store",
     "touchIdTitle": "Use Touch ID for updates that need administrator access",
     "touchIdBody": "Some App Store updates, Xcode in particular, need administrator access. Use your fingerprint instead of typing your password.",
     "touchIdEnable": "Enable Touch ID",
