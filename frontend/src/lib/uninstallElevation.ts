@@ -21,3 +21,44 @@ const SUDO_TERMINAL_REQUIRED_PATTERNS = [
 export function isSudoTerminalRequiredFailure(lines: { text: string }[]): boolean {
   return lines.some((line) => SUDO_TERMINAL_REQUIRED_PATTERNS.some((pattern) => line.text.includes(pattern)))
 }
+
+export interface UninstallTarget {
+  name: string
+  isCask: boolean
+  zap: boolean
+  force?: boolean
+}
+
+export interface ElevationPrompt {
+  title: string
+  body: string
+  confirmLabel: string
+}
+
+export interface UninstallDeps {
+  runAction: (action: () => Promise<string>) => Promise<{ status: string; lines: { text: string }[] }>
+  confirm: (opts: ElevationPrompt) => Promise<{ ok: boolean }>
+  uninstall: (name: string, isCask: boolean, zap?: boolean, force?: boolean) => Promise<string>
+  uninstallElevated: (name: string, isCask: boolean, zap?: boolean, force?: boolean) => Promise<string>
+}
+
+/**
+ * Runs the uninstall job and, only when it failed with the sudo-needs-a-
+ * terminal error, asks the user whether to retry with administrator
+ * privileges and does so on a yes. Shared by the Installed row action and the
+ * package detail modal, which each had their own copy of this flow. Returns
+ * true when the elevated retry ran.
+ */
+export async function uninstallWithElevationRetry(
+  deps: UninstallDeps,
+  target: UninstallTarget,
+  prompt: ElevationPrompt
+): Promise<boolean> {
+  const { name, isCask, zap, force } = target
+  const job = await deps.runAction(() => deps.uninstall(name, isCask, zap, force))
+  if (job.status !== 'error' || !isSudoTerminalRequiredFailure(job.lines)) return false
+  const retry = await deps.confirm(prompt)
+  if (!retry.ok) return false
+  await deps.runAction(() => deps.uninstallElevated(name, isCask, zap, force))
+  return true
+}

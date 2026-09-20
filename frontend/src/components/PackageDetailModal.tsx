@@ -25,7 +25,7 @@ import PackageIcon from './PackageIcon'
 import TypeBadge from './TypeBadge'
 import DependencyGraph from './DependencyGraph'
 import { deriveChangelogUrl } from '../lib/changelog'
-import { isSudoTerminalRequiredFailure } from '../lib/uninstallElevation'
+import { useUninstall } from '../lib/useUninstall'
 
 export interface DetailTarget {
   name: string
@@ -44,6 +44,7 @@ export default function PackageDetailModal({ target, onClose, onChanged }: Props
   const { t } = useTranslation()
   const { runAction, notify } = useJobs()
   const confirm = useConfirm()
+  const uninstallWithElevation = useUninstall()
   const userData = useUserData()
   const [pkg, setPkg] = useState<BrewPackage | null>(null)
   const [loading, setLoading] = useState(false)
@@ -197,17 +198,14 @@ export default function PackageDetailModal({ target, onClose, onChanged }: Props
         notify('error', String(e))
       }
     }
-    const job = await runAction(() => api.uninstall(viewTarget.name, viewTarget.isCask, zap, force))
-    if (job.status === 'error' && isSudoTerminalRequiredFailure(job.lines)) {
-      const retry = await confirm({
+    await uninstallWithElevation(
+      { name: viewTarget.name, isCask: viewTarget.isCask, zap, force },
+      {
         title: t('packageDetail.elevateUninstallTitle'),
         body: t('packageDetail.elevateUninstallBody'),
         confirmLabel: t('packageDetail.elevateUninstallConfirmLabel'),
-      })
-      if (retry.ok) {
-        await runAction(() => api.uninstallElevated(viewTarget.name, viewTarget.isCask, zap, force))
       }
-    }
+    )
     setBusy(false)
     refresh()
   }
