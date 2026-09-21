@@ -193,6 +193,35 @@ describe('Installed list', () => {
     expect(screen.getByText('installed.noMatches')).toBeTruthy()
   })
 
+  it('puts an exact name match first, not buried among the others (the rar case)', () => {
+    show(
+      pkg('7-zip-rar', { isCask: true, desc: 'unpacks rar files' }),
+      pkg('rarcrack'),
+      pkg('rar', { isCask: true }),
+      pkg('unrar'),
+      pkg('zip', { desc: 'not related to r-a-r' })
+    )
+    renderInstalled()
+    fireEvent.change(screen.getByPlaceholderText('installed.filterPlaceholder'), { target: { value: 'rar' } })
+    expect(names()).toEqual(['rar', 'rarcrack', '7-zip-rar', 'unrar'])
+  })
+
+  it('goes back to the list order when the search is cleared', () => {
+    show(pkg('b'), pkg('a'))
+    renderInstalled()
+    const box = screen.getByPlaceholderText('installed.filterPlaceholder')
+    fireEvent.change(box, { target: { value: 'a' } })
+    fireEvent.change(box, { target: { value: '' } })
+    expect(names()).toEqual(['b', 'a'])
+  })
+
+  it('applies the search within the selected tab', () => {
+    show(pkg('rar', { isCask: true }), pkg('rarcrack'), pkg('unrar', { isCask: true }))
+    renderInstalled({ initialFilter: 'cask' })
+    fireEvent.change(screen.getByPlaceholderText('installed.filterPlaceholder'), { target: { value: 'rar' } })
+    expect(names()).toEqual(['rar', 'unrar'])
+  })
+
   it('shows status badges and marks favourites', () => {
     sample()
     m.favorites = new Set(['wget'])
