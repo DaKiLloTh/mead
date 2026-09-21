@@ -6,6 +6,7 @@ import { useConfirm } from '../context/ConfirmContext'
 import { DownloadIcon, ImportIcon, AlertIcon, CheckIcon } from '../components/Icons'
 import PackageDetailModal, { DetailTarget } from '../components/PackageDetailModal'
 import ErrorAlert from '../components/ErrorAlert'
+import ResultCard from '../components/ResultCard'
 
 interface Props {
   bump: () => void
@@ -113,13 +114,12 @@ export default function Adopt({ bump }: Props) {
                     : t('adopt.adoptButton')
 
                 return (
-                  <div key={c.appPath} className="rounded-box border border-base-300 p-4 flex flex-col gap-2">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <div className="font-medium wrap-break-word">{c.appName}</div>
-                        <div className="text-xs text-base-content/50 wrap-break-word">{c.caskDesc}</div>
-                      </div>
-                      <div className="flex items-center gap-1.5 shrink-0">
+                  <ResultCard
+                    key={c.appPath}
+                    title={c.appName}
+                    description={c.caskDesc}
+                    headerRight={
+                      <>
                         {c.matchConfidence === 'possible' ? (
                           <AlertIcon className="size-4 text-warning" />
                         ) : (
@@ -132,9 +132,33 @@ export default function Adopt({ bump }: Props) {
                         ) : (
                           <span className="badge badge-success badge-soft badge-sm">{t('adopt.matchExact')}</span>
                         )}
+                      </>
+                    }
+                    footerLeft={
+                      <div
+                        className={`text-xs font-mono wrap-break-word flex items-center gap-1.5 ${c.possibleDowngrade ? 'text-warning' : ''}`}
+                      >
+                        {c.possibleDowngrade && <AlertIcon className="size-3 shrink-0" />}
+                        <span>{c.installedVersion || t('adopt.versionUnknown')}</span>
+                        <span className="text-base-content/40 shrink-0">→</span>
+                        <span>{c.caskVersion || t('adopt.versionUnknown')}</span>
                       </div>
-                    </div>
-
+                    }
+                    footerRight={
+                      <button
+                        className="btn btn-xs btn-primary shrink-0"
+                        disabled={adopting === c.caskToken}
+                        onClick={() => adopt(c)}
+                      >
+                        {adopting === c.caskToken ? (
+                          <span className="loading loading-spinner loading-xs" />
+                        ) : (
+                          <DownloadIcon className="size-3.5" />
+                        )}
+                        {adoptLabel}
+                      </button>
+                    }
+                  >
                     <div className="text-xs wrap-break-word">
                       <span className="text-base-content/50">{t('adopt.caskLabel')} </span>
                       <button
@@ -151,31 +175,7 @@ export default function Adopt({ bump }: Props) {
                         <span>{t('adopt.appStoreWarning')}</span>
                       </div>
                     )}
-
-                    <div className="border-t border-base-300/50 pt-2 flex items-center justify-between gap-3 flex-wrap">
-                      <div
-                        className={`text-xs font-mono wrap-break-word flex items-center gap-1.5 ${c.possibleDowngrade ? 'text-warning' : ''}`}
-                      >
-                        {c.possibleDowngrade && <AlertIcon className="size-3 shrink-0" />}
-                        <span>{c.installedVersion || t('adopt.versionUnknown')}</span>
-                        <span className="text-base-content/40 shrink-0">→</span>
-                        <span>{c.caskVersion || t('adopt.versionUnknown')}</span>
-                      </div>
-
-                      <button
-                        className="btn btn-xs btn-primary shrink-0"
-                        disabled={adopting === c.caskToken}
-                        onClick={() => adopt(c)}
-                      >
-                        {adopting === c.caskToken ? (
-                          <span className="loading loading-spinner loading-xs" />
-                        ) : (
-                          <DownloadIcon className="size-3.5" />
-                        )}
-                        {adoptLabel}
-                      </button>
-                    </div>
-                  </div>
+                  </ResultCard>
                 )
               })}
             </div>

@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next'
 import type { SearchResult } from '../lib/api'
 import ExternalLink from './ExternalLink'
 import TypeBadge from './TypeBadge'
+import ResultCard from './ResultCard'
 import { BadgeBrokenIcon, BadgeInstalledIcon, DownloadIcon, ExternalLinkIcon, TapIcon } from './Icons'
 
 // The two official taps every formula/cask not from a third party belongs
@@ -33,16 +34,12 @@ export default function SearchResultCard({ result: r, installed, busy, onOpenDet
   const { t } = useTranslation()
 
   return (
-    <div
-      className="rounded-box border border-base-300 p-4 flex flex-col gap-2 hover:bg-base-200/60 transition-colors cursor-pointer"
+    <ResultCard
+      title={r.name}
+      description={r.desc}
       onClick={onOpenDetail}
-    >
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <div className="font-medium wrap-break-word">{r.name}</div>
-          {r.desc && <div className="text-xs text-base-content/50 wrap-break-word">{r.desc}</div>}
-        </div>
-        <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+      headerRight={
+        <>
           {r.homepage && (
             <ExternalLink
               href={r.homepage}
@@ -60,10 +57,9 @@ export default function SearchResultCard({ result: r, installed, busy, onOpenDet
             <TapIcon className="size-3.5" />
           </ExternalLink>
           <TypeBadge isCask={r.isCask} />
-        </div>
-      </div>
-
-      <div className="border-t border-base-300/50 pt-2 flex items-center justify-between gap-3 flex-wrap">
+        </>
+      }
+      footerLeft={
         <div className="flex items-center gap-2 flex-wrap">
           {r.version && <span className="font-mono text-xs text-base-content/60">{r.version}</span>}
           {r.tap && !OFFICIAL_TAPS.has(r.tap.toLowerCase()) && (
@@ -86,8 +82,9 @@ export default function SearchResultCard({ result: r, installed, busy, onOpenDet
             <span className="badge badge-sm badge-ghost">{t('common.badgeAutoUpdates')}</span>
           )}
         </div>
-
-        {installed ? (
+      }
+      footerRight={
+        installed ? (
           <span className="badge badge-success badge-outline shrink-0 gap-1">
             <BadgeInstalledIcon className="size-3" />
             {t('common.badgeInstalled')}
@@ -104,8 +101,8 @@ export default function SearchResultCard({ result: r, installed, busy, onOpenDet
             {busy ? <span className="loading loading-spinner loading-xs" /> : <DownloadIcon className="size-3.5" />}
             {t('common.install')}
           </button>
-        )}
-      </div>
-    </div>
+        )
+      }
+    />
   )
 }
