@@ -5,9 +5,10 @@ import { useJobs } from '../context/JobsContext'
 import { useInstalledPackages } from '../context/InstalledPackagesSignal'
 import PackageDetailModal, { DetailTarget } from '../components/PackageDetailModal'
 import PackageIcon from '../components/PackageIcon'
-import { RefreshIcon, SearchIcon } from '../components/Icons'
+import { SearchIcon } from '../components/Icons'
 import LoadingRow from '../components/LoadingRow'
 import EmptyState from '../components/EmptyState'
+import ErrorAlert from '../components/ErrorAlert'
 
 interface Props {
   bump: () => void
@@ -63,15 +64,7 @@ export default function Applications({ bump }: Props) {
       </div>
 
       {error ? (
-        <div className="alert alert-error alert-soft">
-          <div>
-            <div className="font-medium">{t('applications.errorTitle')}</div>
-            <p className="text-sm mt-1">{error}</p>
-          </div>
-          <button className="btn btn-sm" onClick={refresh}>
-            <RefreshIcon className="size-4" /> {t('common.tryAgain')}
-          </button>
-        </div>
+        <ErrorAlert title={t('applications.errorTitle')} message={error} onRetry={refresh} />
       ) : loading && (cachedPkgs?.length ?? 0) === 0 ? (
         <LoadingRow>{t('common.loading')}</LoadingRow>
       ) : apps.length === 0 ? (

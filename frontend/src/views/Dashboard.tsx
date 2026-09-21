@@ -7,6 +7,7 @@ import { ArrowUpCircleIcon, ExternalLinkIcon, RefreshIcon, WrenchIcon } from '..
 import ExternalLink from '../components/ExternalLink'
 import LoadingRow from '../components/LoadingRow'
 import type { ViewKey } from '../components/Sidebar'
+import ErrorAlert from '../components/ErrorAlert'
 import type { Filter as InstalledFilter } from './Installed'
 
 interface Props {
@@ -41,12 +42,7 @@ export default function Dashboard({ onNavigate, onNavigateInstalled, refreshToke
     return (
       <div className="p-6 max-w-2xl">
         <h1 className="text-2xl font-bold mb-1">{t('dashboard.title')}</h1>
-        <div className="alert alert-error alert-soft mt-4">
-          <div>
-            <div className="font-medium">{t('dashboard.errorTitle')}</div>
-            <p className="text-sm mt-1">{error}</p>
-          </div>
-        </div>
+        <ErrorAlert title={t('dashboard.errorTitle')} message={error} className="mt-4" />
         <p className="text-sm text-base-content/70 mt-4">{t('dashboard.installHint')}</p>
         <pre className="mockup-code text-xs mt-2">
           <code className="px-4">
