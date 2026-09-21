@@ -12,7 +12,7 @@ import TableShell from '../components/TableShell'
 import LoadingRow from '../components/LoadingRow'
 import { ArrowUpCircleIcon, BadgeOutdatedIcon, PinIcon, SearchIcon, StarIcon, TrashIcon } from '../components/Icons'
 import ErrorAlert from '../components/ErrorAlert'
-import { isSudoTerminalRequiredFailure } from '../lib/uninstallElevation'
+import { useUninstall } from '../lib/useUninstall'
 
 export type Filter = 'all' | 'formula' | 'cask' | 'outdated' | 'favorites' | 'deprecated' | 'disabled' | 'pinned'
 
@@ -30,6 +30,7 @@ export default function Installed({ refreshToken, bump, initialFilter }: Props) 
   const { t } = useTranslation()
   const { runAction } = useJobs()
   const confirm = useConfirm()
+  const uninstallWithElevation = useUninstall()
   const userData = useUserData()
   const { packages: cachedPkgs, loading, error, refresh: refreshPackages } = useInstalledPackages()
   const pkgs = cachedPkgs ?? []
@@ -121,17 +122,14 @@ export default function Installed({ refreshToken, bump, initialFilter }: Props) 
     if (!ok) return
     const zap = checked[0] ?? false
     setRowBusy(p.name)
-    const job = await runAction(() => api.uninstall(p.name, p.isCask, zap))
-    if (job.status === 'error' && isSudoTerminalRequiredFailure(job.lines)) {
-      const retry = await confirm({
+    await uninstallWithElevation(
+      { name: p.name, isCask: p.isCask, zap },
+      {
         title: t('installed.elevateUninstallTitle'),
         body: t('installed.elevateUninstallBody'),
         confirmLabel: t('installed.elevateUninstallConfirmLabel'),
-      })
-      if (retry.ok) {
-        await runAction(() => api.uninstallElevated(p.name, p.isCask, zap))
       }
-    }
+    )
     setRowBusy(null)
     loadLeaves()
     bump()
