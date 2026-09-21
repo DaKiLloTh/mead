@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.12.0](https://github.com/DaKiLloTh/mead/compare/v0.11.1...v0.12.0) (2026-09-21)
+
+
+### Features
+
+* open an App Store app's page from its row ([#172](https://github.com/DaKiLloTh/mead/issues/172)) ([d4ae5de](https://github.com/DaKiLloTh/mead/commit/d4ae5de588ca1aca567962c68b70903f2d81cec3))
+
 ## [0.11.1](https://github.com/DaKiLloTh/mead/compare/v0.11.0...v0.11.1) (2026-09-21)
 
 
