@@ -10,3 +10,4 @@ frontend/storybook-static
 /cmd/mead-mon/mead-mon
 .idea/
 .DS_Store
+/Mead app icon set.zip
