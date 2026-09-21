@@ -18,5 +18,14 @@ export default defineConfig({
     // environment, since pure-logic tests (the overwhelming majority)
     // don't need a DOM at all.
     include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
+    // `npm run coverage`. Report-only, no thresholds: run it before opening a
+    // PR and read the rows for the files you changed. Stories are left out
+    // because Storybook is their test.
+    coverage: {
+      provider: 'v8',
+      include: ['src/**/*.{ts,tsx}'],
+      exclude: ['src/**/*.test.{ts,tsx}', 'src/**/*.stories.tsx', 'src/**/*.d.ts', 'src/main.tsx'],
+      reporter: ['text', 'html'],
+    },
   },
 })
