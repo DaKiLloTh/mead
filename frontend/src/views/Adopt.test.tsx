@@ -81,6 +81,19 @@ describe('Adopt', () => {
     expect(screen.getByText('Beta')).toBeTruthy()
   })
 
+  it('warns on App Store apps only', async () => {
+    scanAdoptableApps.mockResolvedValue([{ ...candidate('Windows App'), isAppStoreApp: true }, candidate('Discord')])
+    render(<Adopt bump={vi.fn()} />)
+    fireEvent.click(screen.getByText('adopt.scanButton'))
+    await waitFor(() => expect(screen.getByText('Windows App')).toBeTruthy())
+    // One warning for the one App Store app, not one per card.
+    expect(screen.getAllByText('adopt.appStoreWarning')).toHaveLength(1)
+    const card = screen.getByText('Windows App').closest('.rounded-box') as HTMLElement
+    expect(card.textContent).toContain('adopt.appStoreWarning')
+    const other = screen.getByText('Discord').closest('.rounded-box') as HTMLElement
+    expect(other.textContent).not.toContain('adopt.appStoreWarning')
+  })
+
   it('says so when a scan finds nothing', async () => {
     scanAdoptableApps.mockResolvedValue([])
     render(<Adopt bump={vi.fn()} />)
