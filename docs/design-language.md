@@ -20,7 +20,7 @@ setting it is served in.
 ## Color tokens
 
 Source of truth: the design handoff at
-`design_handoff_mead_icons/README.md` (already used for the app icon in
+`docs/design_handoff_mead_icons/README.md` (already used for the app icon in
 #87). The values below are exactly those tokens, mapped onto daisyUI 5's
 theme slots in `frontend/src/style.css`.
 
@@ -110,9 +110,10 @@ future change needs one that isn't already vendored.
 
 ## Icon set
 
-Source: `design_handoff_mead_icons/icons/*.svg` (see the handoff's
+Source: `docs/design_handoff_mead_icons/icons/*.svg` (see the handoff's
 `README.md`), recreated as React SVG components in
-`frontend/src/components/Icons.tsx`.
+`frontend/src/components/Icons.tsx`. The handoff is checked in unchanged, as
+received.
 
 ### Integrated
 
