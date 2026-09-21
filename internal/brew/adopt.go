@@ -2,6 +2,7 @@ package brew
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -41,6 +42,55 @@ const fuzzyMatchThreshold = 0.9
 // with hundreds of /Applications entries) is worth avoiding, so candidates
 // are split into batches of this size rather than one unbounded call.
 const adoptInfoBatchSize = 25
+
+// minPlausibleCaskCount is the fewest tokens `brew casks` can return and
+// still be the real cask list. The real one has thousands. Homebrew builds it
+// from a cached API index (api/cask_names.txt in its cache directory). A plain
+// `brew update` -- which is what mead's Update Homebrew button and its
+// background update run -- renames that file to cask_names.before.txt and, when
+// Homebrew is already up to date, does not write a new one. With the file
+// missing, `brew casks` exits 0 having listed only the casks in locally tapped
+// repositories: a couple of lines. Matching against that stub finds no
+// candidates at all, which used to be shown as a reassuring "nothing to
+// adopt", but only after an update had run, so it looked intermittent.
+const minPlausibleCaskCount = 500
+
+var errCaskListIncomplete = errors.New(
+	"Homebrew's list of casks is missing. Run `brew update --force` in Terminal, then scan again.")
+
+// checkCaskListComplete returns errCaskListIncomplete when tokens is too short
+// to be Homebrew's real cask list. See minPlausibleCaskCount.
+func checkCaskListComplete(tokens []string) error {
+	if len(tokens) < minPlausibleCaskCount {
+		return errCaskListIncomplete
+	}
+	return nil
+}
+
+// knownCasks returns Homebrew's full list of cask tokens. If list comes back
+// incomplete (see minPlausibleCaskCount) it calls rebuild once, which should
+// regenerate Homebrew's index, and lists again. list and rebuild are
+// parameters so the recovery logic is testable without a real brew.
+func knownCasks(list func() ([]string, error), rebuild func() error) ([]string, error) {
+	tokens, err := list()
+	if err != nil {
+		return nil, err
+	}
+	if checkCaskListComplete(tokens) == nil {
+		return tokens, nil
+	}
+	if err := rebuild(); err != nil {
+		return nil, fmt.Errorf("%w (rebuilding it failed: %v)", errCaskListIncomplete, err)
+	}
+	tokens, err = list()
+	if err != nil {
+		return nil, err
+	}
+	if err := checkCaskListComplete(tokens); err != nil {
+		return nil, err
+	}
+	return tokens, nil
+}
 
 // stripAccents best-effort transliterates accented Latin characters to
 // their base ASCII form (e.g. "é" -> "e") by Unicode-decomposing the string
@@ -293,7 +343,15 @@ func ScanAdoptableApps(ctx context.Context) ([]AdoptCandidate, error) {
 	// fast, local `brew casks` call), matchCaskToken only ever returns a
 	// token from that real set, and only those are ever passed to
 	// `brew info`, keeping every batched info call valid.
-	knownTokens, err := runBrewLines(ctx, "casks")
+	knownTokens, err := knownCasks(
+		func() ([]string, error) { return runBrewLines(ctx, "casks") },
+		func() error {
+			// --force: a plain `brew update` says "Already up-to-date" and
+			// leaves the missing index missing.
+			_, err := runBrewWithEnv(ctx, EnvAllowingAutoUpdate(), "update", "--force")
+			return err
+		},
+	)
 	if err != nil {
 		return nil, err
 	}
