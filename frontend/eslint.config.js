@@ -5,7 +5,7 @@ import globals from 'globals'
 import eslintConfigPrettier from 'eslint-config-prettier'
 
 export default tseslint.config(
-  { ignores: ['dist', 'coverage', 'node_modules', 'wailsjs'] },
+  { ignores: ['dist', 'coverage', 'storybook-static', 'node_modules', 'wailsjs'] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
