@@ -12,7 +12,8 @@ import TableShell from '../components/TableShell'
 import LoadingRow from '../components/LoadingRow'
 import { ArrowUpCircleIcon, BadgeOutdatedIcon, PinIcon, SearchIcon, StarIcon, TrashIcon } from '../components/Icons'
 import ErrorAlert from '../components/ErrorAlert'
-import { useUninstall } from '../lib/useUninstall'
+import { useUninstall, useUninstallMany } from '../lib/useUninstall'
+import { rankBySearch } from '../lib/searchRelevance'
 
 export type Filter = 'all' | 'formula' | 'cask' | 'outdated' | 'favorites' | 'deprecated' | 'disabled' | 'pinned'
 
@@ -31,6 +32,7 @@ export default function Installed({ refreshToken, bump, initialFilter }: Props) 
   const { runAction } = useJobs()
   const confirm = useConfirm()
   const uninstallWithElevation = useUninstall()
+  const uninstallMany = useUninstallMany()
   const userData = useUserData()
   const { packages: cachedPkgs, loading, error, refresh: refreshPackages } = useInstalledPackages()
   const pkgs = cachedPkgs ?? []
@@ -70,8 +72,7 @@ export default function Installed({ refreshToken, bump, initialFilter }: Props) 
   }
 
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase()
-    return pkgs.filter((p) => {
+    const inTab = pkgs.filter((p) => {
       if (filter === 'formula' && p.isCask) return false
       if (filter === 'cask' && !p.isCask) return false
       if (filter === 'outdated' && !p.outdated) return false
@@ -79,15 +80,11 @@ export default function Installed({ refreshToken, bump, initialFilter }: Props) 
       if (filter === 'deprecated' && !p.deprecated) return false
       if (filter === 'disabled' && !p.disabled) return false
       if (filter === 'pinned' && !p.pinned) return false
-      if (
-        q &&
-        !p.name.toLowerCase().includes(q) &&
-        !p.fullName?.toLowerCase().includes(q) &&
-        !p.desc?.toLowerCase().includes(q)
-      )
-        return false
       return true
     })
+    // With a query, matches are ordered by relevance (an exact name first)
+    // instead of the list's own order.
+    return rankBySearch(inTab, query)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pkgs, filter, query, userData.data])
 
@@ -155,9 +152,14 @@ export default function Installed({ refreshToken, bump, initialFilter }: Props) 
     if (!ok) return
     const zap = checked[0] ?? false
     setBulkBusy(true)
-    for (const p of selectedPkgs) {
-      await runAction(() => api.uninstall(p.name, p.isCask, zap))
-    }
+    await uninstallMany(
+      selectedPkgs.map((p) => ({ name: p.name, isCask: p.isCask, zap })),
+      (names) => ({
+        title: t('installed.elevateUninstallTitle'),
+        body: t('installed.elevateBulkUninstallBody', { names: names.join(', ') }),
+        confirmLabel: t('installed.elevateUninstallConfirmLabel'),
+      })
+    )
     setBulkBusy(false)
     setSelected(new Set())
     loadLeaves()
