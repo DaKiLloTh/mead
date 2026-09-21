@@ -9,15 +9,25 @@ on:
 permissions:
   contents: read
 
+# A new push to a PR supersedes the run in progress for it. Runs on master
+# always finish, so every merge gets a complete result.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   build:
     runs-on: macos-14
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
+      # go.mod's `go` line is the source of truth. A hardcoded version here
+      # had drifted behind it (1.25 vs 1.27), which made setup-go download a
+      # second toolchain on every run.
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.25'
+          go-version-file: go.mod
 
       - uses: actions/setup-node@v4
         with:
@@ -27,6 +37,15 @@ jobs:
 
       - name: Install Wails CLI
         run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.15.0
+
+      - name: gofmt
+        run: |
+          unformatted=$(gofmt -l cmd internal *.go)
+          if [ -n "$unformatted" ]; then
+            echo "These files are not gofmt-formatted (run gofmt -w):"
+            echo "$unformatted"
+            exit 1
+          fi
 
       # main.go does //go:embed all:frontend/dist, which fails to compile
       # (even just for `wails generate module`'s introspection of the App
@@ -45,13 +64,37 @@ jobs:
         working-directory: frontend
         run: npm ci
 
+      # The same four checks as `npm run check`, split into steps so a
+      # failure says which one. Format and lint come first because they are
+      # the cheapest to fix.
+      - name: Frontend format check
+        working-directory: frontend
+        run: npx prettier --check .
+
+      - name: Frontend lint
+        working-directory: frontend
+        run: npm run lint
+
       - name: Frontend typecheck + build
         working-directory: frontend
         run: npm run build
 
-      - name: Frontend tests
+      - name: Frontend tests with coverage
         working-directory: frontend
-        run: npx vitest run
+        run: |
+          npm run coverage -- --coverage.reporter=text --coverage.reporter=text-summary | tee coverage.txt
+          {
+            echo '### Frontend coverage'
+            echo '```'
+            sed -n '/Coverage summary/,$p' coverage.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # Stories are the component tests' visual counterpart; a story that no
+      # longer compiles or renders should fail the PR that broke it.
+      - name: Storybook build
+        working-directory: frontend
+        run: npm run storybook:build
 
       - name: Go vet
         run: go vet ./...
@@ -59,8 +102,17 @@ jobs:
       - name: Go build
         run: go build ./...
 
+      # -race matters here: the jobs package runs goroutines that share maps
+      # behind a mutex.
       - name: Go test
-        run: go test ./...
+        run: |
+          go test -race -coverprofile=cover.out ./...
+          {
+            echo '### Go coverage'
+            echo '```'
+            go tool cover -func=cover.out | grep 'total:'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Wails build
         run: wails build

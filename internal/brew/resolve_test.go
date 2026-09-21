@@ -142,4 +142,3 @@ func TestResolveBrewPathErrorsWhenNotFoundAnywhere(t *testing.T) {
 		}
 	})
 }
-
