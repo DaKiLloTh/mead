@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
-import { isSudoTerminalRequiredFailure, uninstallWithElevationRetry } from './uninstallElevation'
+import {
+  isSudoTerminalRequiredFailure,
+  uninstallManyWithElevationRetry,
+  uninstallWithElevationRetry,
+} from './uninstallElevation'
 
 function lines(...texts: string[]) {
   return texts.map((text) => ({ text }))
@@ -106,5 +110,85 @@ describe('uninstallWithElevationRetry', () => {
     const { deps, calls } = setup([{ status: 'success', lines: [] }])
     await uninstallWithElevationRetry(deps, { name: 'wget', isCask: false, zap: false }, prompt)
     expect(calls).toEqual(['uninstall wget,false,false,'])
+  })
+})
+
+describe('uninstallManyWithElevationRetry', () => {
+  const ok = { status: 'success', lines: [] as { text: string }[] }
+  const sudoFailure = { status: 'error', lines: lines('sudo: a terminal is required to read the password') }
+  const otherFailure = { status: 'error', lines: lines('Error: package is in use') }
+  const promptFor = (names: string[]) => ({ title: 'Retry?', body: names.join(', '), confirmLabel: 'Retry' })
+  const targets = [
+    { name: 'wget', isCask: false, zap: false },
+    { name: 'jdk-a', isCask: true, zap: true },
+    { name: 'jdk-b', isCask: true, zap: true },
+  ]
+
+  function setup(results: Record<string, { status: string; lines: { text: string }[] }>, confirmOk = true) {
+    const calls: string[] = []
+    let current = ''
+    const deps = {
+      // The job for each uninstall is keyed by the name of the package being uninstalled.
+      runAction: vi.fn(async (fn: () => Promise<string>) => {
+        await fn()
+        return results[current]
+      }),
+      confirm: vi.fn(async () => ({ ok: confirmOk })),
+      uninstall: vi.fn(async (name: string, ...rest: unknown[]) => {
+        current = name
+        calls.push(`uninstall ${name},${rest.join(',')}`)
+        return 'job'
+      }),
+      uninstallElevated: vi.fn(async (name: string, ...rest: unknown[]) => {
+        current = `${name}:elevated`
+        calls.push(`elevated ${name},${rest.join(',')}`)
+        return 'job'
+      }),
+    }
+    return { deps, calls }
+  }
+
+  it('uninstalls everything and never asks when nothing needs sudo', async () => {
+    const { deps, calls } = setup({ wget: ok, 'jdk-a': ok, 'jdk-b': ok })
+    const result = await uninstallManyWithElevationRetry(deps, targets, promptFor)
+    expect(result).toEqual({ needElevation: [], retried: [] })
+    expect(deps.confirm).not.toHaveBeenCalled()
+    expect(calls.map((c) => c.split(',')[0])).toEqual(['uninstall wget', 'uninstall jdk-a', 'uninstall jdk-b'])
+  })
+
+  it('asks once for all the sudo failures, then retries only those, with their flags', async () => {
+    const { deps, calls } = setup({
+      wget: ok,
+      'jdk-a': sudoFailure,
+      'jdk-b': sudoFailure,
+      'jdk-a:elevated': ok,
+      'jdk-b:elevated': ok,
+    })
+    const result = await uninstallManyWithElevationRetry(deps, targets, promptFor)
+    expect(deps.confirm).toHaveBeenCalledTimes(1)
+    expect(deps.confirm).toHaveBeenCalledWith(promptFor(['jdk-a', 'jdk-b']))
+    expect(result).toEqual({ needElevation: ['jdk-a', 'jdk-b'], retried: ['jdk-a', 'jdk-b'] })
+    expect(calls.slice(3)).toEqual(['elevated jdk-a,true,true,', 'elevated jdk-b,true,true,'])
+  })
+
+  it('does not retry anything when the user declines', async () => {
+    const { deps } = setup({ wget: ok, 'jdk-a': sudoFailure, 'jdk-b': ok }, false)
+    const result = await uninstallManyWithElevationRetry(deps, targets, promptFor)
+    expect(result).toEqual({ needElevation: ['jdk-a'], retried: [] })
+    expect(deps.uninstallElevated).not.toHaveBeenCalled()
+  })
+
+  it('leaves a package that failed for another reason alone', async () => {
+    const { deps } = setup({ wget: otherFailure, 'jdk-a': ok, 'jdk-b': ok })
+    const result = await uninstallManyWithElevationRetry(deps, targets, promptFor)
+    expect(result).toEqual({ needElevation: [], retried: [] })
+    expect(deps.confirm).not.toHaveBeenCalled()
+    expect(deps.uninstallElevated).not.toHaveBeenCalled()
+  })
+
+  it('does nothing for an empty selection', async () => {
+    const { deps } = setup({})
+    expect(await uninstallManyWithElevationRetry(deps, [], promptFor)).toEqual({ needElevation: [], retried: [] })
+    expect(deps.runAction).not.toHaveBeenCalled()
   })
 })

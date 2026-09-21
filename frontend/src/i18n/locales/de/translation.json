@@ -136,6 +136,7 @@
     "checkboxRemoveAppDataCasks": "App-Daten für alle Casks ebenfalls entfernen (Einstellungen, Caches, Support-Dateien)",
     "elevateUninstallTitle": "Administratorrechte erforderlich",
     "elevateUninstallBody": "Zum Entfernen einiger Dateien sind Administratorrechte erforderlich. Mit Berechtigung erneut versuchen?",
+    "elevateBulkUninstallBody": "Zum Entfernen einiger Dateien sind Administratorrechte erforderlich: {{names}}. Mit Berechtigung erneut versuchen?",
     "elevateUninstallConfirmLabel": "Mit Berechtigung erneut versuchen"
   },
   "search": {
