@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.11.1](https://github.com/DaKiLloTh/mead/compare/v0.11.0...v0.11.1) (2026-09-21)
+
+
+### Bug Fixes
+
+* Adopt finds nothing after a Homebrew update ([#169](https://github.com/DaKiLloTh/mead/issues/169)) ([a719bb2](https://github.com/DaKiLloTh/mead/commit/a719bb20306126e2b9529e33eae3a21402e1d553))
+
 ## [0.11.0](https://github.com/DaKiLloTh/mead/compare/v0.10.5...v0.11.0) (2026-09-19)
 
 
