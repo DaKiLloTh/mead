@@ -339,6 +339,75 @@ export function GearIcon(p: IconProps) {
   )
 }
 
+// Sidebar category tiles below are redrawn from the mead visual identity
+// handoff's sidebar-*.svg files (see GitHub issue #95): a rounded-square
+// amber tile with a white glyph, self-colored rather than currentColor,
+// since the handoff treats these as small illustrations rather than
+// monochrome UI glyphs. Not currently wired into Sidebar.tsx: every nav
+// item there renders the same size-4 currentColor line icon, and swapping
+// only 2 of the sidebar's 13 items (taps/services have a 1:1 match;
+// formulas/casks don't, since "Installed" already covers both formulae
+// and casks together) to filled amber tiles would read as inconsistent
+// rather than intentional. Kept here for a future pass that redoes the
+// whole nav icon set, or a different call site -- see the PR description
+// for the full rationale.
+
+export function SidebarFormulasIcon(p: IconProps) {
+  return (
+    <svg viewBox="0 0 32 32" {...p}>
+      <rect width="32" height="32" rx="7" fill="#D4A24C" />
+      <polygon points="16,8 24,12.5 24,21.5 16,26 8,21.5 8,12.5" fill="white" />
+    </svg>
+  )
+}
+
+export function SidebarCasksIcon(p: IconProps) {
+  return (
+    <svg viewBox="0 0 32 32" {...p}>
+      <rect width="32" height="32" rx="7" fill="#D4A24C" />
+      <path
+        d="M11 8 H21 C22 8 22.5 10 22.5 16 C22.5 22 22 24 21 24 H11 C10 24 9.5 22 9.5 16 C9.5 10 10 8 11 8 Z"
+        fill="none"
+        stroke="white"
+        strokeWidth={1.8}
+      />
+      <path d="M9.5 13 H22.5" stroke="white" strokeWidth={1.4} />
+      <path d="M9.5 19 H22.5" stroke="white" strokeWidth={1.4} />
+    </svg>
+  )
+}
+
+export function SidebarTapsIcon(p: IconProps) {
+  return (
+    <svg viewBox="0 0 32 32" {...p}>
+      <rect width="32" height="32" rx="7" fill="#D4A24C" />
+      <path d="M10 11 H22" stroke="white" strokeWidth={2} strokeLinecap="round" />
+      <path d="M16 11 V16" stroke="white" strokeWidth={2} strokeLinecap="round" />
+      <rect x="13" y="16" width="6" height="3.5" rx="1" fill="white" />
+      <path d="M16 21 C13.5 23.5 13.5 27 16 27 C18.5 27 18.5 23.5 16 21 Z" fill="white" />
+    </svg>
+  )
+}
+
+export function SidebarServicesIcon(p: IconProps) {
+  return (
+    <svg viewBox="0 0 32 32" {...p}>
+      <rect width="32" height="32" rx="7" fill="#D4A24C" />
+      <g fill="white">
+        <circle cx="16" cy="16" r="4.4" />
+        <rect x="14.5" y="4" width="3" height="5.5" rx="1" />
+        <rect x="14.5" y="22.5" width="3" height="5.5" rx="1" />
+        <rect x="14.5" y="4" width="3" height="5.5" rx="1" transform="rotate(60 16 16)" />
+        <rect x="14.5" y="4" width="3" height="5.5" rx="1" transform="rotate(120 16 16)" />
+        <rect x="14.5" y="4" width="3" height="5.5" rx="1" transform="rotate(180 16 16)" />
+        <rect x="14.5" y="4" width="3" height="5.5" rx="1" transform="rotate(240 16 16)" />
+        <rect x="14.5" y="4" width="3" height="5.5" rx="1" transform="rotate(300 16 16)" />
+      </g>
+      <circle cx="16" cy="16" r="2" fill="#D4A24C" />
+    </svg>
+  )
+}
+
 // Status badge glyphs below are redrawn from the mead visual identity
 // handoff's badge-*.svg files (see GitHub issue #95): a small self-colored
 // circle with a white glyph, meant to sit alongside the app's existing
@@ -386,6 +455,21 @@ export function BadgeBrokenIcon(p: IconProps) {
       <circle cx="12" cy="12" r="12" fill="#C1503D" />
       <line x1="12" y1="6" x2="12" y2="14" stroke="white" strokeWidth={2.6} strokeLinecap="round" />
       <circle cx="12" cy="18" r="1.4" fill="white" />
+    </svg>
+  )
+}
+
+// Generic package fallback icon, redrawn from the handoff's
+// package-placeholder.svg. Added for future use -- see the PR description
+// for why it isn't wired into PackageIcon.tsx's current fallback (a
+// deterministic colored monogram, see lib/monogram.ts) yet.
+
+export function PackagePlaceholderIcon(p: IconProps) {
+  return (
+    <svg viewBox="0 0 32 32" fill="none" stroke="#847A67" strokeWidth={1.8} strokeLinejoin="round" {...p}>
+      <path d="M16 4 L28 10 L28 22 L16 28 L4 22 L4 10 Z" />
+      <path d="M4 10 L16 16 L28 10" />
+      <path d="M16 16 V28" />
     </svg>
   )
 }
