@@ -255,7 +255,7 @@ describe('t() resolution against the en resource', () => {
 
   it('interpolates multiple variables', () => {
     expect(instance.t('security.scanSummary', { count: 42, affectedCount: 3 })).toBe(
-      'Scanned 42 formulae, 3 with known advisories'
+      'Scanned 42 formulae, 3 with open vulnerabilities'
     )
   })
 

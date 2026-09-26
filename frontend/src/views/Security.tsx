@@ -1,8 +1,10 @@
 import { useState } from 'preact/hooks'
 import { Trans, useTranslation } from 'react-i18next'
-import { api, DuplicateApp, VulnResult } from '../lib/api'
+import { api, DuplicateApp, VulnResult, VulnSeverity } from '../lib/api'
 import { AlertIcon, CopyIcon, ExternalLinkIcon, ShieldIcon, WrenchIcon } from '../components/Icons'
 import ExternalLink from '../components/ExternalLink'
+import SeverityBadge from '../components/SeverityBadge'
+import PatchedBadge from '../components/PatchedBadge'
 
 type Tab = 'vulns' | 'duplicates' | 'missing'
 
@@ -49,7 +51,8 @@ export default function Security() {
     }
   }
 
-  const affected = (vulns ?? []).filter((v) => v.vulnIds.length > 0)
+  const affected = (vulns ?? []).filter((v) => v.open.length > 0)
+  const patchedOnly = (vulns ?? []).filter((v) => v.open.length === 0 && v.patched.length > 0)
   const errored = (vulns ?? []).filter((v) => v.error)
 
   return (
@@ -95,53 +98,102 @@ export default function Security() {
           </button>
 
           {vulns && (
-            <div className="mt-2">
-              <div className="text-sm text-base-content/60 mb-2">
+            <div className="mt-2 space-y-3">
+              <div className="text-sm text-base-content/60">
                 {t('security.scanSummary', { count: vulns.length, affectedCount: affected.length })}
+                {patchedOnly.length > 0 && t('security.scanSummaryPatchedSuffix', { count: patchedOnly.length })}
                 {errored.length > 0 && t('security.scanSummaryErroredSuffix', { count: errored.length })}.
               </div>
-              {affected.length === 0 ? (
+
+              {affected.length === 0 && patchedOnly.length === 0 ? (
                 <div className="alert alert-success alert-soft text-sm">{t('security.noVulnerabilities')}</div>
               ) : (
-                <div className="overflow-x-auto rounded-box border border-base-300">
-                  <table className="table table-sm table-fixed">
-                    <colgroup>
-                      <col />
-                      <col className="w-28" />
-                      <col className="w-72" />
-                    </colgroup>
-                    <thead>
-                      <tr>
-                        <th>{t('security.colPackage')}</th>
-                        <th>{t('security.colVersion')}</th>
-                        <th>{t('security.colAdvisories')}</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {affected.map((v) => (
-                        <tr key={v.name} className="hover:bg-base-200">
-                          <td className="font-medium truncate">{v.name}</td>
-                          <td className="font-mono text-xs truncate" title={v.version}>
-                            {v.version}
-                          </td>
-                          <td>
+                <>
+                  {affected.length > 0 && (
+                    <div className="overflow-x-auto rounded-box border border-base-300">
+                      <table className="table table-sm table-fixed">
+                        <colgroup>
+                          <col />
+                          <col className="w-24" />
+                          <col className="w-80" />
+                          <col className="w-24" />
+                        </colgroup>
+                        <thead>
+                          <tr>
+                            <th>{t('security.colPackage')}</th>
+                            <th>{t('security.colVersion')}</th>
+                            <th>{t('security.colAdvisories')}</th>
+                            <th>{t('security.colPatched')}</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {affected.map((v) => (
+                            <tr key={v.name} className="hover:bg-base-200">
+                              <td className="font-medium truncate">{v.name}</td>
+                              <td className="font-mono text-xs truncate" title={v.version}>
+                                {v.version}
+                              </td>
+                              <td>
+                                <div className="flex flex-wrap gap-1">
+                                  {v.open.map((vuln) => (
+                                    <ExternalLink
+                                      key={vuln.id}
+                                      className="badge badge-sm badge-outline gap-1"
+                                      href={`https://osv.dev/vulnerability/${vuln.id}`}
+                                      title={vuln.summary || vuln.id}
+                                    >
+                                      {vuln.id}
+                                      <SeverityBadge severity={vuln.severity as VulnSeverity} size="xs" />
+                                      <ExternalLinkIcon className="size-3" />
+                                    </ExternalLink>
+                                  ))}
+                                </div>
+                              </td>
+                              <td>
+                                {v.patched.length > 0 && (
+                                  <span className="inline-flex items-center gap-1">
+                                    <PatchedBadge size="xs" /> {t('security.patchedCount', { count: v.patched.length })}
+                                  </span>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+
+                  {patchedOnly.length > 0 && (
+                    <div className="rounded-box border border-base-300 p-3 space-y-2">
+                      <div className="text-xs text-base-content/60 flex items-center gap-1.5">
+                        <PatchedBadge size="xs" />
+                        {t('security.patchedOnlyHeading', { count: patchedOnly.length })}
+                      </div>
+                      <div className="space-y-1.5">
+                        {patchedOnly.map((v) => (
+                          <div key={v.name} className="flex flex-wrap items-center gap-2 text-xs">
+                            <span className="font-medium">{v.name}</span>
+                            <span className="font-mono text-base-content/50" title={v.version}>
+                              {v.version}
+                            </span>
                             <div className="flex flex-wrap gap-1">
-                              {v.vulnIds.map((id) => (
+                              {v.patched.map((vuln) => (
                                 <ExternalLink
-                                  key={id}
-                                  className="badge badge-sm badge-error badge-outline gap-1"
-                                  href={`https://osv.dev/vulnerability/${id}`}
+                                  key={vuln.id}
+                                  className="badge badge-xs badge-outline gap-1"
+                                  href={`https://osv.dev/vulnerability/${vuln.id}`}
+                                  title={vuln.summary || vuln.id}
                                 >
-                                  {id} <ExternalLinkIcon className="size-3" />
+                                  {vuln.id} <ExternalLinkIcon className="size-3" />
                                 </ExternalLink>
                               ))}
                             </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           )}

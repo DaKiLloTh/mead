@@ -21,7 +21,235 @@ import (
 	"mead/internal/system"
 )
 
-// ---- CVE scanning via OSV.dev (best-effort, no API key required) ----
+// ---- CVE scanning: `brew vulns` (Homebrew >= 7) with an OSV.dev direct-API
+// fallback for older Homebrew installs that don't have the command ----
+//
+// Homebrew 7 added a native `brew vulns` command that checks installed
+// formulae against the same OSV.dev database mead used to query directly
+// itself, but with more: severity, fixed-version info, and a formula's own
+// patch already resolving a CVE reported separately from one that's still
+// open. ScanVulnerabilities prefers that native command -- one fewer
+// network-calling code path for mead to maintain, and strictly more
+// information for the same check -- and only falls back to the old direct
+// OSV.dev HTTP call when `brew vulns` genuinely isn't available (Homebrew
+// 6 and earlier). That's a real capability check (see HasVulnsCommand),
+// not a hardcoded minimum-version guess: it asks Homebrew itself, via
+// `brew commands`, whether the command exists.
+//
+// Casks were never covered by the old OSV.dev path (it only ever built
+// queries for non-cask, installed, versioned packages) and aren't covered
+// by `brew vulns` either -- see its own --help: "Check formula for known
+// security vulnerabilities". vulnScanTargets preserves that exclusion for
+// both paths.
+
+// vulnScanTargets is the pure filtering logic behind ScanVulnerabilities:
+// only installed formulae with a known version are worth checking. Casks
+// are always excluded here, matching what `brew vulns` itself limits
+// itself to (see its --help text) and what the old direct OSV.dev call
+// did too.
+func vulnScanTargets(pkgs []brew.BrewPackage) []brew.BrewPackage {
+	var targets []brew.BrewPackage
+	for _, p := range pkgs {
+		if !p.IsCask && p.Installed && p.InstalledVersion != "" {
+			targets = append(targets, p)
+		}
+	}
+	return targets
+}
+
+// hasCommand is the pure lookup behind HasVulnsCommand: does `want` appear
+// in a list of command names (as `brew commands --quiet` reports them)?
+func hasCommand(names []string, want string) bool {
+	for _, n := range names {
+		if n == want {
+			return true
+		}
+	}
+	return false
+}
+
+// HasVulnsCommand reports whether this Homebrew installation has a native
+// `brew vulns` command (added in Homebrew 7). It's checked via
+// `brew commands --quiet`, which lists every command Homebrew currently
+// recognizes, rather than by parsing `brew --version` against a hardcoded
+// minimum -- that way this reflects a real, present capability instead of
+// an assumption about what a given version number implies, which holds up
+// better against forks/vendored Homebrew builds that don't track upstream
+// version numbers exactly. A failure to even list commands is treated as
+// "not available" -- the safe direction for a feature-detection check --
+// which naturally routes to the OSV.dev fallback rather than a genuine
+// error.
+func HasVulnsCommand(ctx context.Context) bool {
+	names, err := brew.CommandNames(ctx)
+	if err != nil {
+		return false
+	}
+	return hasCommand(names, "vulns")
+}
+
+// normalizeSeverity lower-cases and validates a severity string (as
+// reported by `brew vulns --json`, e.g. "MEDIUM", "UNKNOWN") against
+// VulnSeverity's known set, falling back to VulnSeverityUnknown for
+// anything else -- including "", which brew vulns itself never actually
+// emits (its own severity_display falls back to the literal string
+// "UNKNOWN"), but which is worth handling defensively rather than
+// producing a badge with no matching style.
+func normalizeSeverity(s string) VulnSeverity {
+	switch VulnSeverity(strings.ToLower(strings.TrimSpace(s))) {
+	case VulnSeverityCritical:
+		return VulnSeverityCritical
+	case VulnSeverityHigh:
+		return VulnSeverityHigh
+	case VulnSeverityMedium:
+		return VulnSeverityMedium
+	case VulnSeverityLow:
+		return VulnSeverityLow
+	default:
+		return VulnSeverityUnknown
+	}
+}
+
+// ---- `brew vulns --json` ----
+
+// brewVulnsOutput mirrors the top-level shape of `brew vulns --json`,
+// authoritatively sourced from Homebrew's own vulns/output.rb
+// (Output.json), not just its --help text -- see the PR description for
+// the real captured output this was checked against on Homebrew 7.0.6.
+type brewVulnsOutput struct {
+	Findings        []brewVulnsFinding `json:"findings"`
+	SkippedFormulae []string           `json:"skipped_formulae"`
+}
+
+type brewVulnsFinding struct {
+	Formula         string          `json:"formula"`
+	Version         string          `json:"version"`
+	Tag             string          `json:"tag"`
+	RepoURL         string          `json:"repo_url"`
+	Vulnerabilities []brewVulnEntry `json:"vulnerabilities"`
+	Patched         []brewVulnEntry `json:"patched"`
+}
+
+type brewVulnEntry struct {
+	ID            string   `json:"id"`
+	Severity      string   `json:"severity"`
+	Summary       string   `json:"summary"`
+	Aliases       []string `json:"aliases"`
+	FixedVersions []string `json:"fixed_versions"`
+}
+
+// parseBrewVulnsJSON decodes `brew vulns --json`'s stdout. It's the pure
+// half of scanVulnerabilitiesViaBrew: given the raw bytes, either a valid
+// payload or a decode error, with no process-running involved, so it's
+// exercisable directly against real captured output.
+func parseBrewVulnsJSON(data []byte) (*brewVulnsOutput, error) {
+	var out brewVulnsOutput
+	if err := json.Unmarshal(data, &out); err != nil {
+		return nil, fmt.Errorf("parsing brew vulns output: %w", err)
+	}
+	return &out, nil
+}
+
+// toVulnerabilities converts brew vulns' JSON vulnerability entries to
+// mead's own Vulnerability type, normalizing severity and guaranteeing
+// non-nil Aliases/FixedVersions slices (so they marshal to `[]`, not
+// `null`, across the Wails RPC boundary).
+func toVulnerabilities(entries []brewVulnEntry) []Vulnerability {
+	out := make([]Vulnerability, 0, len(entries))
+	for _, e := range entries {
+		aliases := e.Aliases
+		if aliases == nil {
+			aliases = []string{}
+		}
+		fixed := e.FixedVersions
+		if fixed == nil {
+			fixed = []string{}
+		}
+		out = append(out, Vulnerability{
+			ID:            e.ID,
+			Severity:      normalizeSeverity(e.Severity),
+			Summary:       e.Summary,
+			Aliases:       aliases,
+			FixedVersions: fixed,
+		})
+	}
+	return out
+}
+
+// buildVulnResults is the pure decision logic behind
+// scanVulnerabilitiesViaBrew: given the packages that were actually asked
+// about and brew vulns' parsed response, produce exactly one VulnResult
+// per target -- including ones brew vulns didn't mention at all (nothing
+// to report: clean) and ones it explicitly skipped -- rather than only
+// the subset that had findings.
+func buildVulnResults(targets []brew.BrewPackage, parsed *brewVulnsOutput) []VulnResult {
+	findingByFormula := make(map[string]brewVulnsFinding, len(parsed.Findings))
+	for _, f := range parsed.Findings {
+		findingByFormula[f.Formula] = f
+	}
+	skipped := make(map[string]bool, len(parsed.SkippedFormulae))
+	for _, s := range parsed.SkippedFormulae {
+		skipped[s] = true
+	}
+
+	results := make([]VulnResult, len(targets))
+	for i, p := range targets {
+		// brew vulns reports tap formulae by their full name
+		// ("hashicorp/tap/terraform"), while p.Name is the short name.
+		f, ok := findingByFormula[p.Name]
+		if !ok && p.FullName != "" {
+			f, ok = findingByFormula[p.FullName]
+		}
+		if ok {
+			results[i] = VulnResult{
+				Name:    p.Name,
+				Version: p.InstalledVersion,
+				Open:    toVulnerabilities(f.Vulnerabilities),
+				Patched: toVulnerabilities(f.Patched),
+			}
+			continue
+		}
+		results[i] = VulnResult{
+			Name:    p.Name,
+			Version: p.InstalledVersion,
+			Open:    []Vulnerability{},
+			Patched: []Vulnerability{},
+			Skipped: skipped[p.Name] || skipped[p.FullName],
+		}
+	}
+	return results
+}
+
+// scanVulnerabilitiesViaBrew runs `brew vulns --json` against exactly the
+// given targets and turns its output into mead's own VulnResult shape.
+//
+// `brew vulns` exits non-zero whenever it reports any finding (open or
+// patched) -- that's the answer, not a failure to report, the same
+// non-zero-on-findings convention brew.BundleCheck already relies on for
+// `brew bundle check`. So a non-nil error from RunBrew here isn't treated
+// as fatal on its own: if stdout still decodes as brew vulns' expected
+// JSON shape, that's used regardless of exit status, and only a payload
+// that doesn't parse at all (brew missing, an unknown formula name, a
+// network failure inside brew vulns' own OSV.dev call, etc) is reported
+// as a real error.
+func scanVulnerabilitiesViaBrew(ctx context.Context, targets []brew.BrewPackage) ([]VulnResult, error) {
+	names := make([]string, len(targets))
+	for i, p := range targets {
+		names[i] = p.Name
+	}
+	args := append([]string{"vulns", "--json"}, names...)
+	out, runErr := brew.RunBrew(ctx, args...)
+	parsed, parseErr := parseBrewVulnsJSON([]byte(out))
+	if parseErr != nil {
+		if runErr != nil {
+			return nil, runErr
+		}
+		return nil, parseErr
+	}
+	return buildVulnResults(targets, parsed), nil
+}
+
+// ---- OSV.dev direct API (fallback for Homebrew < 7, which has no
+// `brew vulns` command) ----
 
 const osvBatchURL = "https://api.osv.dev/v1/querybatch"
 
@@ -51,22 +279,40 @@ type osvBatchResponse struct {
 	Results []osvResult `json:"results"`
 }
 
-// ScanVulnerabilities checks installed formulae against OSV.dev's
-// Homebrew ecosystem advisories. It's best-effort: any network/API
-// failure degrades to "no known vulnerabilities found" for that package
-// rather than failing the whole scan, since this is informational, not
-// load-bearing.
-func ScanVulnerabilities(ctx context.Context, pkgs []brew.BrewPackage) ([]VulnResult, error) {
-	var targets []brew.BrewPackage
-	for _, p := range pkgs {
-		if !p.IsCask && p.Installed && p.InstalledVersion != "" {
-			targets = append(targets, p)
+// buildOSVResults is the pure decision logic behind
+// scanVulnerabilitiesViaOSV: given the packages that were queried and
+// OSV.dev's batch response (aligned index-for-index with the request's own
+// queries), produce one VulnResult per target. OSV.dev's querybatch
+// endpoint returns bare vulnerability IDs with no severity, summary, or
+// patched-vs-open distinction, so Open only ever gets an ID plus
+// VulnSeverityUnknown -- this is strictly less informative than
+// scanVulnerabilitiesViaBrew's result, which is exactly why `brew vulns`
+// is preferred whenever it's available.
+func buildOSVResults(targets []brew.BrewPackage, batchResp osvBatchResponse) []VulnResult {
+	results := make([]VulnResult, len(targets))
+	for i, p := range targets {
+		open := []Vulnerability{}
+		if i < len(batchResp.Results) {
+			for _, v := range batchResp.Results[i].Vulns {
+				open = append(open, Vulnerability{
+					ID:            v.ID,
+					Severity:      VulnSeverityUnknown,
+					Aliases:       []string{},
+					FixedVersions: []string{},
+				})
+			}
 		}
+		results[i] = VulnResult{Name: p.Name, Version: p.InstalledVersion, Open: open, Patched: []Vulnerability{}}
 	}
-	if len(targets) == 0 {
-		return []VulnResult{}, nil
-	}
+	return results
+}
 
+// scanVulnerabilitiesViaOSV is the original direct-HTTP OSV.dev path, kept
+// as a fallback for Homebrew installs older than 7 that don't have
+// `brew vulns` (see HasVulnsCommand). It's best-effort: any network/API
+// failure degrades to an Error on each result rather than failing the
+// whole scan, since this is informational, not load-bearing.
+func scanVulnerabilitiesViaOSV(ctx context.Context, targets []brew.BrewPackage) ([]VulnResult, error) {
 	req := osvBatchRequest{}
 	for _, p := range targets {
 		req.Queries = append(req.Queries, osvQuery{
@@ -91,7 +337,7 @@ func ScanVulnerabilities(ctx context.Context, pkgs []brew.BrewPackage) ([]VulnRe
 	if err != nil {
 		results := make([]VulnResult, len(targets))
 		for i, p := range targets {
-			results[i] = VulnResult{Name: p.Name, IsCask: false, Version: p.InstalledVersion, VulnIDs: []string{}, Error: "network error: " + err.Error()}
+			results[i] = VulnResult{Name: p.Name, Version: p.InstalledVersion, Open: []Vulnerability{}, Patched: []Vulnerability{}, Error: "network error: " + err.Error()}
 		}
 		return results, nil
 	}
@@ -100,7 +346,7 @@ func ScanVulnerabilities(ctx context.Context, pkgs []brew.BrewPackage) ([]VulnRe
 	if resp.StatusCode != http.StatusOK {
 		results := make([]VulnResult, len(targets))
 		for i, p := range targets {
-			results[i] = VulnResult{Name: p.Name, IsCask: false, Version: p.InstalledVersion, VulnIDs: []string{}, Error: fmt.Sprintf("osv.dev returned HTTP %d", resp.StatusCode)}
+			results[i] = VulnResult{Name: p.Name, Version: p.InstalledVersion, Open: []Vulnerability{}, Patched: []Vulnerability{}, Error: fmt.Sprintf("osv.dev returned HTTP %d", resp.StatusCode)}
 		}
 		return results, nil
 	}
@@ -110,17 +356,42 @@ func ScanVulnerabilities(ctx context.Context, pkgs []brew.BrewPackage) ([]VulnRe
 		return nil, err
 	}
 
-	results := make([]VulnResult, len(targets))
-	for i, p := range targets {
-		ids := []string{}
-		if i < len(batchResp.Results) {
-			for _, v := range batchResp.Results[i].Vulns {
-				ids = append(ids, v.ID)
-			}
-		}
-		results[i] = VulnResult{Name: p.Name, IsCask: false, Version: p.InstalledVersion, VulnIDs: ids}
+	return buildOSVResults(targets, batchResp), nil
+}
+
+// ScanVulnerabilities checks installed formulae for known vulnerabilities,
+// preferring Homebrew's own `brew vulns` command (Homebrew >= 7) and
+// falling back to a direct OSV.dev API call when it isn't available. See
+// the doc comment above vulnScanTargets for the full reasoning.
+//
+// If `brew vulns` is available but fails at runtime (no network path to
+// OSV.dev, an unexpected output shape, etc), that's reported per-package
+// via VulnResult.Error rather than silently retried against the OSV.dev
+// fallback -- both paths would hit the same underlying OSV.dev outage for
+// the same reason, so a second network round-trip wouldn't recover
+// anything, and silently switching data sources given failure could also
+// mask what's actually wrong. The fallback exists specifically for
+// Homebrew installs where the command itself doesn't exist, not for
+// papering over `brew vulns` having a bad day.
+func ScanVulnerabilities(ctx context.Context, pkgs []brew.BrewPackage) ([]VulnResult, error) {
+	targets := vulnScanTargets(pkgs)
+	if len(targets) == 0 {
+		return []VulnResult{}, nil
 	}
-	return results, nil
+
+	if HasVulnsCommand(ctx) {
+		results, err := scanVulnerabilitiesViaBrew(ctx, targets)
+		if err == nil {
+			return results, nil
+		}
+		results = make([]VulnResult, len(targets))
+		for i, p := range targets {
+			results[i] = VulnResult{Name: p.Name, Version: p.InstalledVersion, Open: []Vulnerability{}, Patched: []Vulnerability{}, Error: err.Error()}
+		}
+		return results, nil
+	}
+
+	return scanVulnerabilitiesViaOSV(ctx, targets)
 }
 
 // ---- Gatekeeper / code-signing inspection ----

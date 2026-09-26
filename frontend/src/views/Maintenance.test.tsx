@@ -390,8 +390,8 @@ describe('Maintenance Brewfile tab', () => {
   })
 
   const previewItems = [
-    { name: 'jq', isCask: false },
-    { name: 'iterm2', isCask: true },
+    { name: 'jq', isCask: false, type: 'formula' },
+    { name: 'iterm2', isCask: true, type: 'cask' },
   ]
 
   async function withPreview() {
@@ -401,6 +401,22 @@ describe('Maintenance Brewfile tab', () => {
     await waitFor(() => expect(screen.getByText('jq')).toBeTruthy())
     expect(screen.getByText('iterm2')).toBeTruthy()
   }
+
+  it('badges each previewed entry by its own type, not just formula/cask', async () => {
+    await withBrewfile()
+    m.api.bundleCleanupPreview.mockResolvedValue([
+      { name: 'wget', isCask: false, type: 'formula' },
+      { name: 'iterm2', isCask: true, type: 'cask' },
+      { name: 'ms-python.python', isCask: false, type: 'vscode' },
+      { name: 'org.gimp.GIMP', isCask: false, type: 'flatpak' },
+    ])
+    click('maintenance.previewCleanup')
+    await waitFor(() => expect(screen.getByText('org.gimp.GIMP')).toBeTruthy())
+    expect(screen.getByText('common.formula')).toBeTruthy()
+    expect(screen.getByText('common.cask')).toBeTruthy()
+    expect(screen.getByText('common.entryTypeVscode')).toBeTruthy()
+    expect(screen.getByText('common.entryTypeFlatpak')).toBeTruthy()
+  })
 
   it('does not remove anything when the confirmation is declined', async () => {
     await withPreview()

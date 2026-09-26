@@ -677,9 +677,95 @@ func BundleList(ctx context.Context, path string) (string, error) {
 	return RunBrew(ctx, "bundle", "list", "--all", "--file="+path)
 }
 
-// bundleCleanupSectionRe matches the section headers `brew bundle cleanup`
-// prints before each group of names, e.g. "Would uninstall casks:".
-var bundleCleanupSectionRe = regexp.MustCompile(`^Would uninstall (formulae|casks):$`)
+// bundleCleanupUninstallHeadingRe matches the "Would uninstall <heading>:"
+// section headers `brew bundle cleanup` prints before each group of
+// names -- e.g. "Would uninstall casks:", "Would uninstall Go packages:".
+// The captured heading text is looked up in
+// bundleCleanupHeadingTypes to classify the section; "Would untap:" (taps
+// have no descriptive heading of their own) is handled as a literal
+// special case in parseBundleCleanupPreview instead.
+var bundleCleanupUninstallHeadingRe = regexp.MustCompile("^Would uninstall (.+):$")
+
+// bundleCleanupHeadingTypes maps the descriptive text `brew bundle
+// cleanup` prints after "Would uninstall " to the BundleEntryType it
+// represents. Each string here is copied verbatim from the corresponding
+// entry type's own heading in Homebrew's source (Homebrew 7.0.6,
+// installed at /opt/homebrew/Library/Homebrew on the machine this was
+// verified against):
+//
+//   - "formulae"             PackageType formula heading (bundle/subcommand/cleanup.rb)
+//   - "casks"                PackageType cask heading (bundle/subcommand/cleanup.rb)
+//   - "Mac App Store apps"   MacAppStore.cleanup_heading (bundle/extensions/mac_app_store.rb)
+//   - "VSCode extensions"    VscodeExtension.cleanup_heading (bundle/extensions/vscode_extension.rb)
+//   - "Go packages"          Go.cleanup_heading / banner_name (bundle/extensions/go.rb)
+//   - "Cargo packages"       Cargo.cleanup_heading / banner_name (bundle/extensions/cargo.rb)
+//   - "uv tools"             Uv.cleanup_heading / banner_name (bundle/extensions/uv.rb)
+//   - "Krew plugins"         Krew.cleanup_heading / banner_name (bundle/extensions/krew.rb)
+//   - "flatpaks"             Flatpak.cleanup_heading (bundle/extensions/flatpak.rb) -- Linux only
+//     in practice (see BundleEntryType's doc comment), but recognized here
+//     regardless so a Brewfile written for another platform still parses.
+//   - "WinGet packages"      Winget.cleanup_heading / banner_name (bundle/extensions/winget.rb) -- WSL only
+//   - "npm packages"         Npm.cleanup_heading / banner_name (bundle/extensions/npm.rb)
+//
+// A heading that doesn't appear here (a future Homebrew entry type this
+// hasn't been taught about yet) is deliberately *not* silently folded into
+// whatever section came before it -- see parseBundleCleanupPreview.
+var bundleCleanupHeadingTypes = map[string]BundleEntryType{
+	"formulae":           BundleEntryFormula,
+	"casks":              BundleEntryCask,
+	"Mac App Store apps": BundleEntryMas,
+	"VSCode extensions":  BundleEntryVSCode,
+	"Go packages":        BundleEntryGo,
+	"Cargo packages":     BundleEntryCargo,
+	"uv tools":           BundleEntryUv,
+	"Krew plugins":       BundleEntryKrew,
+	"flatpaks":           BundleEntryFlatpak,
+	"WinGet packages":    BundleEntryWinget,
+	"npm packages":       BundleEntryNpm,
+}
+
+// parseBundleCleanupPreview is the pure parsing logic behind
+// BundleCleanupPreview: turn `brew bundle cleanup` (run without --force,
+// so it only ever prints a dry-run preview) into a structured item list.
+//
+// Section-header lines this function doesn't recognize -- most notably
+// "Would `brew cleanup`:", the unrelated preview `brew bundle cleanup`
+// always tacks on for Homebrew's own download-cache cleanup, which is
+// *not* a Brewfile entry type at all -- end whatever section came before
+// them rather than letting their content lines (e.g. "Would remove:
+// /path/to/some.dmg (35.9MB)") get silently misattributed to the last
+// real entry-type section. The same applies to any future heading this
+// hasn't been taught about yet in bundleCleanupHeadingTypes: better to
+// drop lines under an unrecognized heading than to mislabel them.
+func parseBundleCleanupPreview(out string) []BundleCleanupItem {
+	items := []BundleCleanupItem{}
+	var current BundleEntryType
+	inSection := false
+
+	for line := range strings.SplitSeq(out, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+
+		switch {
+		case line == "Would untap:":
+			current, inSection = BundleEntryTap, true
+		case bundleCleanupUninstallHeadingRe.MatchString(line):
+			heading := bundleCleanupUninstallHeadingRe.FindStringSubmatch(line)[1]
+			if t, ok := bundleCleanupHeadingTypes[heading]; ok {
+				current, inSection = t, true
+			} else {
+				inSection = false
+			}
+		case strings.HasPrefix(line, "Would `brew cleanup`") || strings.HasPrefix(line, "Run `brew bundle cleanup"):
+			inSection = false
+		case inSection:
+			items = append(items, BundleCleanupItem{Name: line, IsCask: current == BundleEntryCask, Type: current})
+		}
+	}
+	return items
+}
 
 // BundleCleanupPreview runs `brew bundle cleanup` *without* --force, which
 // only ever prints what would be removed, and parses that into a structured
@@ -689,23 +775,7 @@ func BundleCleanupPreview(ctx context.Context, path string) ([]BundleCleanupItem
 	if err != nil {
 		return nil, err
 	}
-	items := []BundleCleanupItem{}
-	isCask := false
-	for line := range strings.SplitSeq(out, "\n") {
-		line = strings.TrimSpace(line)
-		if line == "" {
-			continue
-		}
-		if m := bundleCleanupSectionRe.FindStringSubmatch(line); m != nil {
-			isCask = m[1] == "casks"
-			continue
-		}
-		if strings.HasPrefix(line, "Run `brew bundle cleanup") {
-			continue
-		}
-		items = append(items, BundleCleanupItem{Name: line, IsCask: isCask})
-	}
-	return items, nil
+	return parseBundleCleanupPreview(out), nil
 }
 
 // cellarAndCaskroomPaths resolves brew's install prefix and derives the

@@ -1,12 +1,71 @@
 package security
 
-// VulnResult is one package's outcome from a best-effort OSV.dev scan.
+// VulnSeverity is a normalized (lowercase) severity level for a
+// Vulnerability. `brew vulns` reports critical/high/medium/low (upper-cased
+// in its own text/JSON output, e.g. "MEDIUM") or "UNKNOWN" when it can't
+// determine one; normalizeSeverity lower-cases and validates against this
+// set so the frontend has one small, stable enum to badge against instead
+// of whatever casing/spelling a given advisory source happens to use.
+type VulnSeverity string
+
+const (
+	VulnSeverityCritical VulnSeverity = "critical"
+	VulnSeverityHigh     VulnSeverity = "high"
+	VulnSeverityMedium   VulnSeverity = "medium"
+	VulnSeverityLow      VulnSeverity = "low"
+	VulnSeverityUnknown  VulnSeverity = "unknown"
+)
+
+// Vulnerability is one advisory affecting a package. When scanned via
+// `brew vulns` (see security.ScanVulnerabilities), every field is
+// populated from its JSON output. On the OSV.dev direct-API fallback used
+// when `brew vulns` isn't available (Homebrew < 7), only ID is known --
+// OSV.dev's querybatch endpoint returns bare vulnerability IDs with no
+// severity/summary/fixed-version detail, so the rest are left at their
+// zero value rather than fabricated.
+type Vulnerability struct {
+	ID       string       `json:"id"`
+	Severity VulnSeverity `json:"severity"`
+	Summary  string       `json:"summary,omitempty"`
+	// Aliases are other identifiers for the same advisory (e.g. a CVE ID
+	// alongside the primary OSV/GHSA one).
+	Aliases []string `json:"aliases"`
+	// FixedVersions are upstream versions/commits that resolve this
+	// vulnerability, if any are known.
+	FixedVersions []string `json:"fixedVersions"`
+}
+
+// VulnResult is one package's outcome from a vulnerability scan --
+// `brew vulns` when available, OSV.dev's direct API otherwise. See
+// security.ScanVulnerabilities.
 type VulnResult struct {
-	Name    string   `json:"name"`
-	IsCask  bool     `json:"isCask"`
-	Version string   `json:"version"`
-	VulnIDs []string `json:"vulnIds"`
-	Error   string   `json:"error,omitempty"`
+	Name    string `json:"name"`
+	IsCask  bool   `json:"isCask"`
+	Version string `json:"version"`
+	// Open are vulnerabilities not resolved by anything -- what
+	// "vulnerable" means for this package. Always a non-nil (possibly
+	// empty) slice.
+	Open []Vulnerability `json:"open"`
+	// Patched are vulnerabilities the formula's own patch already
+	// resolves. `brew vulns` calls these out separately instead of
+	// silently dropping them or counting them as still-open (its own CLI
+	// text output likewise reports them as "resolved by formula patches
+	// (not counted)"); surfaced here so the UI can show an "already
+	// patched" note rather than either treating them as open or hiding
+	// them entirely. Always empty on the OSV.dev fallback, which has no
+	// concept of this distinction. Always a non-nil (possibly empty)
+	// slice.
+	Patched []Vulnerability `json:"patched"`
+	// Skipped is true when `brew vulns` itself excluded this package
+	// (its own `skipped_formulae` list) rather than checking it -- in
+	// practice a missing or unsupported source URL. Distinct from Error:
+	// this isn't a failure, brew vulns just doesn't have enough
+	// information to check this particular formula.
+	Skipped bool `json:"skipped"`
+	// Error is set when the scan itself couldn't be completed for this
+	// package (network failure, unexpected command output, etc) -- an
+	// operational failure, not "no vulnerabilities found".
+	Error string `json:"error,omitempty"`
 }
 
 // SecurityInfo is a Gatekeeper / code-signing snapshot for an installed app.
