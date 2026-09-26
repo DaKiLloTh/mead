@@ -651,6 +651,23 @@ func (a *App) InspectCaskSecurity(name string) (*security.SecurityInfo, error) {
 	return security.InspectAppSecurity(a.ctx, appPath)
 }
 
+// InspectCaskBeforeInstall is the pre-install counterpart to
+// InspectCaskSecurity (issue #50): rather than inspecting an
+// already-installed cask's .app, it fetches the cask's artifact into
+// Homebrew's own cache via `brew fetch --cask` -- nothing is installed,
+// nothing touches /Applications -- and inspects that downloaded file
+// directly. This downloads exactly what `brew install --cask` would (there
+// is no lighter-weight probe for code-signing status in Homebrew's model),
+// so the frontend must only call this from an explicit, opt-in action with
+// an upfront download-size warning, never automatically (e.g. on tab open).
+func (a *App) InspectCaskBeforeInstall(name string) (*security.PreInstallSecurityInfo, error) {
+	pkg, err := brew.GetInfo(a.ctx, name, true)
+	if err != nil {
+		return nil, err
+	}
+	return security.InspectCaskBeforeInstall(a.ctx, pkg)
+}
+
 // RemoveQuarantine is synchronous (a single xattr call) so it's exposed as
 // a plain error-returning method rather than a streaming job. It takes a
 // cask name -- not a raw filesystem path -- and resolves the .app path
