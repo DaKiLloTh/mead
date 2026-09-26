@@ -69,7 +69,7 @@ reimplemented, because the underlying OS concept does not exist there.
 | Gatekeeper / code-signing inspection, quarantine removal | `internal/security/security.go` (`codesign`, `spctl`, `xattr`, `pkgutil`, `hdiutil`, `ditto`); `internal/security/precheck.go` (from #50/PR #189, same tools against a fetched-but-not-installed cask) | No equivalent. There is no cask ecosystem on Linux to gatekeep (see next row), so this entire feature area is inert there, not degraded. |
 | `tmutil` local snapshots | `internal/security/security.go`'s snapshot helpers | Btrfs/LVM/ZFS snapshots exist on Linux but are filesystem-specific and not a single OS-level command; out of scope for a first Linux build, not a straightforward port. |
 | Mac App Store (`mas`) | `internal/brew/mas.go`, `internal/brew/exec.go`'s `ResolveMasPath`, `internal/jobs/jobs.go`'s `StartMas`, `internal/app/app.go`'s Mas* methods, the whole App Store view/Adopt's `isAppStoreApp`/`detectAppStoreApp` in `internal/brew/adopt.go` | No equivalent; the App Store nav item disappears entirely on Linux. |
-| Casks | `internal/brew/types.go` (`IsCask` runs through nearly every type), `internal/brew/brewinfo.go`, `internal/brew/adopt.go`, `internal/security/leftovers.go`'s `~/Library/*` scan paths, `--appdir`/zap-trash flag building, `RevealInFinder` (`open -R`) | Linuxbrew casks exist for a handful of packages (mostly via third-party taps) but are not a first-class, broadly-populated concept the way they are on macOS. The cask-specific UI (Adopt, zap, appdir settings, the cask/formula split throughout Installed/Search) needs to either hide entirely or degrade to "formulae only" on Linux; this needs a product decision (see Open questions), not just an engineering one. |
+| Casks | `internal/brew/types.go` (`IsCask` runs through nearly every type), `internal/brew/brewinfo.go`, `internal/brew/adopt.go`, `internal/security/leftovers.go`'s `~/Library/*` scan paths, `--appdir`/zap-trash flag building, `RevealInFinder` (`open -R`) | **Verified, not assumed**: casks do not run on Linux at all. `brew install --cask` there errors outright ("Casks are not supported on Linux," see [Homebrew Discussion #3999](https://github.com/orgs/Homebrew/discussions/3999)); this is not a smaller cask surface, it is none. The cask-specific UI (Adopt, zap, appdir settings, the cask/formula split throughout Installed/Search) hides entirely on Linux, full stop -- see Flatpak, below, for what actually replaces it. |
 | Notifications | `cmd/mead-mon/notify.go` (`osascript -e 'display notification'`, chosen specifically over `UNUserNotificationCenter` per that file's own doc comment) | Real Linux equivalent exists (`notify-send` / D-Bus `org.freedesktop.Notifications`), needs its own implementation, not a shared code path. |
 | Icon extraction | `internal/security/icons.go` (`plutil -convert xml1`, `.icns` via `sips`) | Linux apps/packages don't carry `.icns`/`Info.plist`; icon sourcing on Linux (`.desktop` file `Icon=` keys, XDG icon theme lookup) is a different mechanism entirely, needs its own implementation. |
 | Reveal-in-Finder | `internal/security/security.go`'s `RevealInFinder` (`open -R`) | `xdg-open <containing dir>` is the closest equivalent but doesn't support "select this specific file," only "open this folder" -- a real behavior difference to decide on, not just a swapped command. |
@@ -122,13 +122,43 @@ problem (a Windows build execing into `wsl.exe`, not a Wails Linux build at
 all) and shouldn't be conflated with "Linux support" in scope or in a single
 milestone.
 
+## Flatpak: the actual Linux equivalent to a cask
+
+Checked directly rather than assumed, since the first draft of this document
+got this wrong (see the corrected table row above): Homebrew itself shipped
+a real answer to "what's a cask on Linux" in **v5.0.4** (December 2025) --
+`flatpak` as a first-class `Brewfile` entry type, Linux-only, with the same
+verb set casks get on macOS: `brew bundle dump --flatpak --flatpak-remotes`,
+`brew bundle install`, `brew bundle check`, `brew bundle list --flatpak`,
+`brew bundle cleanup`. Sources:
+[webpronews.com](https://www.webpronews.com/homebrew-5-0-4-update-adds-flatpak-support-for-cross-platform-apps/),
+[Bluefin project docs](https://docs.projectbluefin.io/blog/flatpak-support-in-brewfiles/).
+
+This is not a stretch or a mead-invented mapping: it is Homebrew's own,
+Homebrew-shipped mechanism for exactly the gap casks leave on Linux (GUI
+application packaging), using the same `Brewfile`/`brew bundle` plumbing
+`internal/brew` and Maintenance's Brewfile tab already drive. A native Linux
+build has a real path to feature parity with the macOS cask experience
+without inventing a new package format itself: implement a `flatpak`
+counterpart to the existing `Cask`/formula handling (own type, own icon/
+name/version lookup via `flatpak info`, own install/uninstall job) rather
+than trying to force Flatpak data through `BrewPackage`'s `IsCask` field.
+
+Prior art worth knowing about, not competing with mead's own scope here:
+[bold-brew](https://bold-brew.com/) is an existing terminal UI that already
+manages Homebrew formulae, Mac App Store apps and Flatpak across macOS and
+Linux -- confirms this is a validated direction, and is the closest thing
+to a cross-platform "mead" that already exists today (as a TUI, not a native
+GUI).
+
 ## Open questions for a real product decision, not an engineering one
 
-- **Casks on Linux**: hide the formula/cask distinction entirely (Installed/
-  Search become formula-only, cleanest UI) or keep it and let Linuxbrew's
-  (currently small) cask surface show through as-is? This changes a lot of
-  UI, not just backend plumbing, and should be decided before step 2 above
-  starts, not discovered partway through it.
+- ~~Casks on Linux~~ **resolved, not actually a choice**: casks do not run
+  on Linux at all (Homebrew itself refuses), so Installed/Search become
+  formula-only there regardless of preference. The real open question this
+  becomes: does mead add Flatpak support as the Linux build's cask
+  equivalent (see below), or ship formula-only for the first milestone and
+  revisit Flatpak later?
 - **Which distro/desktop environment to target first** for packaging
   (a `.deb`, a Flatpak, an AppImage) and for the tray/notification testing
   matrix (GNOME's D-Bus tray situation is notably different from KDE's).
