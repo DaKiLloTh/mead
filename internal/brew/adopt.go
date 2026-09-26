@@ -427,7 +427,7 @@ func ScanAdoptableApps(ctx context.Context) ([]AdoptCandidate, error) {
 			continue
 		}
 		confidence, reason := buildMatchConfidence(c.exact, c.appDir, info)
-		installedVersion := readInstalledAppVersion(ctx, c.appPath)
+		installedVersion := ReadInstalledAppVersion(ctx, c.appPath)
 		results = append(results, AdoptCandidate{
 			AppName:           c.appName,
 			AppPath:           c.appPath,

@@ -11,7 +11,7 @@ import (
 
 // cfBundleShortVersionRe and cfBundleVersionRe extract the two possible
 // version keys from an Info.plist that's already been normalized to XML
-// text via `plutil -convert xml1` (see readInstalledAppVersion below).
+// text via `plutil -convert xml1` (see ReadInstalledAppVersion below).
 //
 // This mirrors the plutil-based plist reading in
 // internal/security/icons.go (readPlistXML / parseCFBundleIconFile) --
@@ -42,14 +42,14 @@ func parseInstalledAppVersion(plistXML string) string {
 	return ""
 }
 
-// readInstalledAppVersion shells out to `plutil -convert xml1 -o -` to
+// ReadInstalledAppVersion shells out to `plutil -convert xml1 -o -` to
 // read an app bundle's Info.plist (handling both XML and binary plist
 // storage) and returns its own version via parseInstalledAppVersion.
 // Returns "" rather than an error on any failure -- missing Info.plist,
 // unreadable plist, neither version key present -- since a version mead
 // can't determine is treated the same as "not shown" throughout the adopt
 // flow rather than a hard failure that would block the rest of the scan.
-func readInstalledAppVersion(ctx context.Context, appPath string) string {
+func ReadInstalledAppVersion(ctx context.Context, appPath string) string {
 	plistPath := filepath.Join(appPath, "Contents", "Info.plist")
 	out, err := system.RunCmd(ctx, "plutil", "-convert", "xml1", "-o", "-", plistPath)
 	if err != nil {

@@ -77,6 +77,10 @@
       "maintenance": "Maintenance",
       "history": "History",
       "settings": "Settings"
+    },
+    "restartBanner": {
+      "message": "mead has been updated to version {{version}}. Restart to use the new version.",
+      "restartButton": "Restart now"
     }
   },
   "dashboard": {
