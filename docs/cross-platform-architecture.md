@@ -66,10 +66,11 @@ reimplemented, because the underlying OS concept does not exist there.
 
 | Concept | Files | Linux story |
 |---|---|---|
-| Gatekeeper / code-signing inspection, quarantine removal | `internal/security/security.go` (`codesign`, `spctl`, `xattr`, `pkgutil`, `hdiutil`, `ditto`); `internal/security/precheck.go` (from #50/PR #189, same tools against a fetched-but-not-installed cask) | No equivalent. There is no cask ecosystem on Linux to gatekeep (see next row), so this entire feature area is inert there, not degraded. |
+| Gatekeeper / code-signing inspection, quarantine removal | `internal/security/security.go` (`codesign`, `spctl`, `xattr`, `pkgutil`, `hdiutil`, `ditto`); `internal/security/precheck.go` (from #50/PR #189, same tools against a fetched-but-not-installed cask) | No equivalent, but not for the reason an earlier draft of this document gave (see the corrected Casks row below: casks do run on Linux). Gatekeeper/`codesign`/`spctl`/`xattr` are Apple's own OS security framework, unrelated to whether a cask exists -- a Linux cask's `appimage`/`binary` artifacts never go through anything like it, on any packaging format. This entire feature area stays macOS-only because the OS concept does, not because Linux casks don't exist. |
 | `tmutil` local snapshots | `internal/security/security.go`'s snapshot helpers | Btrfs/LVM/ZFS snapshots exist on Linux but are filesystem-specific and not a single OS-level command; out of scope for a first Linux build, not a straightforward port. |
 | Mac App Store (`mas`) | `internal/brew/mas.go`, `internal/brew/exec.go`'s `ResolveMasPath`, `internal/jobs/jobs.go`'s `StartMas`, `internal/app/app.go`'s Mas* methods, the whole App Store view/Adopt's `isAppStoreApp`/`detectAppStoreApp` in `internal/brew/adopt.go` | No equivalent; the App Store nav item disappears entirely on Linux. |
-| Casks | `internal/brew/types.go` (`IsCask` runs through nearly every type), `internal/brew/brewinfo.go`, `internal/brew/adopt.go`, `internal/security/leftovers.go`'s `~/Library/*` scan paths, `--appdir`/zap-trash flag building, `RevealInFinder` (`open -R`) | **Verified, not assumed**: casks do not run on Linux at all. `brew install --cask` there errors outright ("Casks are not supported on Linux," see [Homebrew Discussion #3999](https://github.com/orgs/Homebrew/discussions/3999)); this is not a smaller cask surface, it is none. The cask-specific UI (Adopt, zap, appdir settings, the cask/formula split throughout Installed/Search) hides entirely on Linux, full stop -- see Flatpak, below, for what actually replaces it. |
+| **Correction: casks are not macOS-only.** An earlier draft of this document said flatly that casks don't run on Linux at all, sourced from a years-old GitHub Discussion thread rather than checked against the Homebrew actually installed on this machine (7.0.6). Wrong, and corrected below once the maintainer caught it. | | |
+| Casks (the macOS-only *artifact types* within them) | `internal/brew/types.go` (`IsCask` runs through nearly every type), `internal/security/security.go`/`precheck.go`'s Gatekeeper checks, `internal/security/leftovers.go`'s `~/Library/*` scan paths, `RevealInFinder` (`open -R`) | Cask itself is not macOS-only. Verified directly against this machine's installed Homebrew source (`$(brew --repository)/Library/Homebrew/cask/`): the Cask DSL has real `on_system`/`on_macos`/`on_linux` conditional blocks (`cask/dsl.rb`) so one cask file can declare different behavior per OS, and `cask/artifact/appimage.rb` and `binary.rb` are genuine, implemented Linux-native artifact types (AppImage's `install_phase` really does `chmod +x` and places the file at `config.appimagedir`; `binary` symlinks into `HOMEBREW_PREFIX/bin`) -- not stubs, not DSL-only. Shell completions (`bashcompletion.rb`/`zshcompletion.rb`/etc.) and `manpage.rb` are unix-generic too. What's genuinely macOS-only are the artifact types tied to Apple-specific OS integration: `app` (`.app` bundles), `pkg`, `prefpane`, `qlplugin`, `mdimporter`, `input_method`, `colorpicker`, `screen_saver`, `dictionary`, `internet_plugin`, plus `zap`'s trash paths, which are written against macOS `~/Library` conventions specifically. So the correct framing is per-artifact-type, not per-cask: `internal/brew/types.go`'s single `IsCask bool` needs to become artifact-type-aware (does this specific cask define anything Linux can act on) rather than a blanket "cask = macOS" assumption, and `--appdir`/Adopt's `/Applications` scan stay macOS-specific regardless (nothing maps `appimagedir`/`binarydir` to an "Adopt existing installs" flow yet). This needs its own, separate investigation before implementation -- not done here, flagged as follow-up. |
 | Notifications | `cmd/mead-mon/notify.go` (`osascript -e 'display notification'`, chosen specifically over `UNUserNotificationCenter` per that file's own doc comment) | Real Linux equivalent exists (`notify-send` / D-Bus `org.freedesktop.Notifications`), needs its own implementation, not a shared code path. |
 | Icon extraction | `internal/security/icons.go` (`plutil -convert xml1`, `.icns` via `sips`) | Linux apps/packages don't carry `.icns`/`Info.plist`; icon sourcing on Linux (`.desktop` file `Icon=` keys, XDG icon theme lookup) is a different mechanism entirely, needs its own implementation. |
 | Reveal-in-Finder | `internal/security/security.go`'s `RevealInFinder` (`open -R`) | `xdg-open <containing dir>` is the closest equivalent but doesn't support "select this specific file," only "open this folder" -- a real behavior difference to decide on, not just a swapped command. |
@@ -83,8 +84,11 @@ it:
 
 1. **`internal/platform` (new package).** One file per build target
    (`darwin.go` with `//go:build darwin`, `linux.go` with `//go:build linux`),
-   exporting a single `Capabilities` struct: `HasGatekeeper`, `HasCasks`,
-   `HasAppStore`, `HasTimeMachine`, `HasTouchID`, plus whatever
+   exporting a single `Capabilities` struct: `HasGatekeeper`, `HasAppStore`,
+   `HasTimeMachine`, `HasTouchID`, plus whatever (deliberately no
+   `HasCasks` -- see the corrected Casks row above, cask itself isn't a
+   per-platform on/off switch, it's per-artifact-type, so this needs its
+   own design rather than one boolean)
    platform-appropriate implementations each file provides for
    notifications/reveal-in-folder/icon extraction behind a shared interface.
    `internal/app/app.go` gets one new bound method, `App.Capabilities()`,
@@ -122,27 +126,25 @@ problem (a Windows build execing into `wsl.exe`, not a Wails Linux build at
 all) and shouldn't be conflated with "Linux support" in scope or in a single
 milestone.
 
-## Flatpak: the actual Linux equivalent to a cask
+## Flatpak: a second, complementary Linux app-install path
 
-Checked directly rather than assumed, since the first draft of this document
-got this wrong (see the corrected table row above): Homebrew itself shipped
-a real answer to "what's a cask on Linux" in **v5.0.4** (December 2025) --
-`flatpak` as a first-class `Brewfile` entry type, Linux-only, with the same
-verb set casks get on macOS: `brew bundle dump --flatpak --flatpak-remotes`,
-`brew bundle install`, `brew bundle check`, `brew bundle list --flatpak`,
-`brew bundle cleanup`. Sources:
+Not a cask replacement (cask itself works on Linux, see the corrected table
+above) -- an additional option Homebrew itself added for the large existing
+world of Linux GUI apps that are packaged as Flatpaks rather than as
+Homebrew casks with an `appimage`/`binary` artifact. Homebrew shipped
+`flatpak` as a first-class `Brewfile` entry type, Linux-only, in **v5.0.4**
+(December 2025), with the same verb set casks get on macOS: `brew bundle
+dump --flatpak --flatpak-remotes`, `brew bundle install`, `brew bundle
+check`, `brew bundle list --flatpak`, `brew bundle cleanup`. Sources:
 [webpronews.com](https://www.webpronews.com/homebrew-5-0-4-update-adds-flatpak-support-for-cross-platform-apps/),
 [Bluefin project docs](https://docs.projectbluefin.io/blog/flatpak-support-in-brewfiles/).
 
-This is not a stretch or a mead-invented mapping: it is Homebrew's own,
-Homebrew-shipped mechanism for exactly the gap casks leave on Linux (GUI
-application packaging), using the same `Brewfile`/`brew bundle` plumbing
-`internal/brew` and Maintenance's Brewfile tab already drive. A native Linux
-build has a real path to feature parity with the macOS cask experience
-without inventing a new package format itself: implement a `flatpak`
-counterpart to the existing `Cask`/formula handling (own type, own icon/
-name/version lookup via `flatpak info`, own install/uninstall job) rather
-than trying to force Flatpak data through `BrewPackage`'s `IsCask` field.
+Using the same `Brewfile`/`brew bundle` plumbing `internal/brew` and
+Maintenance's Brewfile tab already drive, a native Linux build could
+implement a `flatpak` counterpart to the existing `Cask`/formula handling
+(own type, own icon/name/version lookup via `flatpak info`, own install/
+uninstall job) as a second catalog alongside Linux casks and formulae, not
+instead of them.
 
 Prior art worth knowing about, not competing with mead's own scope here:
 [bold-brew](https://bold-brew.com/) is an existing terminal UI that already
@@ -153,12 +155,16 @@ GUI).
 
 ## Open questions for a real product decision, not an engineering one
 
-- ~~Casks on Linux~~ **resolved, not actually a choice**: casks do not run
-  on Linux at all (Homebrew itself refuses), so Installed/Search become
-  formula-only there regardless of preference. The real open question this
-  becomes: does mead add Flatpak support as the Linux build's cask
-  equivalent (see below), or ship formula-only for the first milestone and
-  revisit Flatpak later?
+- **Casks on Linux**: corrected above -- cask itself runs on Linux, for a
+  real subset of artifact types (`appimage`, `binary`, shell completions,
+  man pages). The open question is now which of those mead's Installed/
+  Search/Adopt UI should surface for a Linux cask (probably `appimage` and
+  `binary` at minimum, since those are the ones a user would actually want
+  to browse/install/remove through a GUI) versus treating a Linux cask that
+  only defines macOS-only artifact types as simply absent from the Linux
+  catalog. Also still open: whether mead additionally adds Flatpak support
+  (see below) as a second, complementary Linux app-install path alongside
+  cask, given Homebrew's own `brew bundle --flatpak` now exists too.
 - **Which distro/desktop environment to target first** for packaging
   (a `.deb`, a Flatpak, an AppImage) and for the tray/notification testing
   matrix (GNOME's D-Bus tray situation is notably different from KDE's).
