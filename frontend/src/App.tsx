@@ -6,6 +6,7 @@ import { UserDataProvider, useUserData } from './context/UserDataContext'
 import { useInstalledPackages, startInstalledPackagesPolling } from './context/InstalledPackagesSignal'
 import { useSystemInfo, startSystemInfoPolling } from './context/SystemInfoSignal'
 import { useOutdated, startOutdatedPolling } from './context/OutdatedSignal'
+import { useUpdateAvailable, startUpdateAvailablePolling } from './context/UpdateAvailableSignal'
 import { ensureServicesLoaded } from './context/ServicesSignal'
 import { ensureAppStoreLoaded } from './context/AppStoreSignal'
 import { RefreshIcon } from './components/Icons'
@@ -13,6 +14,7 @@ import { formatHomebrewLastUpdated } from './lib/formatHomebrewLastUpdated'
 import Sidebar, { type ViewKey } from './components/Sidebar'
 import JobConsole from './components/JobConsole'
 import Toasts from './components/Toasts'
+import RestartBanner from './components/RestartBanner'
 import CommandPalette from './components/CommandPalette'
 import Dashboard from './views/Dashboard'
 import Installed, { type Filter as InstalledFilter } from './views/Installed'
@@ -65,6 +67,7 @@ function AppShell() {
   const { info: systemInfo, refresh: refreshSystemInfo } = useSystemInfo()
   const userData = useUserData()
   const outdated = useOutdated()
+  const { version: updateAvailableVersion } = useUpdateAvailable()
   const [view, setView] = useState<ViewKey>('dashboard')
   const [refreshToken, setRefreshToken] = useState(0)
   const [installedInitialFilter, setInstalledInitialFilter] = useState<InstalledFilter | undefined>(undefined)
@@ -81,6 +84,7 @@ function AppShell() {
     startInstalledPackagesPolling()
     startSystemInfoPolling()
     startOutdatedPolling()
+    startUpdateAvailablePolling()
   }, [])
 
   // Dashboard's Health tile and stat tiles need to land on Installed
@@ -155,6 +159,20 @@ function AppShell() {
       })
   }
 
+  // Restarts mead from its (already-replaced) on-disk bundle, see
+  // RestartBanner.tsx. No confirmation dialog: the banner itself is the
+  // confirmation, staying up until the user acts on it rather than
+  // vanishing on its own, and RestartApp only relaunches + quits, it never
+  // touches Homebrew or installed packages. A failure is only logged --
+  // there's no good recovery action beyond "the banner stays up and the
+  // user can try again", which is already what happens if this does
+  // nothing.
+  const handleRestart = () => {
+    api.restartApp().catch((e) => {
+      console.error('Failed to restart mead:', e)
+    })
+  }
+
   // Derived from the shared OutdatedContext cache (see OutdatedContext.tsx),
   // not a separate fetch -- App.tsx and Updates.tsx used to each run their
   // own independent `api.outdated()` call, which raced on every refresh and
@@ -199,6 +217,19 @@ function AppShell() {
 
   return (
     <div className="h-full flex flex-col bg-base-100 text-base-content">
+      {/* Traffic lights (macOS TitleBarHiddenInset, see main.go's mac.Options) are
+          painted by the OS at a fixed pixel offset from the window's actual top
+          edge, independent of DOM layout -- they aren't reserved by any element,
+          they just need empty draggable background sitting under them. This strip
+          used to live inside Sidebar (its own first child) since the sidebar was
+          always the thing at y=0, but RestartBanner now needs to render above
+          Sidebar when an update is detected, which would otherwise put the
+          banner's own colored content at y=0 and paint it right under the lights.
+          Keeping this strip here, unconditionally above RestartBanner, means
+          something neutral always occupies y=0 regardless of whether the banner
+          is showing -- see Sidebar.tsx for the matching removal. */}
+      <div className="drag-region h-9 shrink-0" />
+      {updateAvailableVersion && <RestartBanner version={updateAvailableVersion} onRestart={handleRestart} />}
       <div className="flex flex-1 min-h-0">
         <Sidebar view={view} onSelect={changeView} onHover={handleNavHover} outdatedCount={outdatedCount} />
         <div className="flex-1 min-w-0 flex flex-col">

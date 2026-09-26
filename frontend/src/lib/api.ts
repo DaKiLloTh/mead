@@ -143,6 +143,10 @@ export const api = {
 
   // locale
   systemLocale: () => App.SystemLocale(),
+
+  // self-update detection (see UpdateAvailableSignal.ts)
+  updateAvailable: () => App.UpdateAvailable(),
+  restartApp: () => App.RestartApp(),
 }
 
 export function pkgKey(name: string, isCask: boolean): string {
