@@ -24,6 +24,8 @@ export type DependencyNode = brew.DependencyNode
 export type DependencyEdge = brew.DependencyEdge
 export type LeftoverItem = security.LeftoverItem
 export type LeftoverKind = 'applicationSupport' | 'caches' | 'preferences' | 'logs' | 'savedState'
+export type PreInstallSecurityInfo = security.PreInstallSecurityInfo
+export type ContainerKind = 'dmg' | 'pkg' | 'zip' | 'unknown'
 
 export const api = {
   getSystemInfo: () => App.GetSystemInfo(),
@@ -86,6 +88,7 @@ export const api = {
   // security
   scanVulnerabilities: () => App.ScanVulnerabilities(),
   inspectCaskSecurity: (name: string) => App.InspectCaskSecurity(name),
+  inspectCaskBeforeInstall: (name: string) => App.InspectCaskBeforeInstall(name),
   removeQuarantine: (name: string) => App.RemoveQuarantine(name),
 
   // adopt & duplicates

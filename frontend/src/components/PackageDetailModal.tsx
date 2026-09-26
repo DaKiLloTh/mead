@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'preact/hooks'
 import { useTranslation } from 'react-i18next'
-import { api, BrewPackage, SecurityInfo } from '../lib/api'
+import { api, BrewPackage, PreInstallSecurityInfo, SecurityInfo } from '../lib/api'
 import { useJobs } from '../context/JobsContext'
 import { useConfirm } from '../context/ConfirmContext'
 import { useUserData } from '../context/UserDataContext'
@@ -58,6 +58,9 @@ export default function PackageDetailModal({ target, onClose, onChanged }: Props
   const [security, setSecurity] = useState<SecurityInfo | null>(null)
   const [securityLoading, setSecurityLoading] = useState(false)
   const [securityError, setSecurityError] = useState<string | null>(null)
+  const [preInstallSecurity, setPreInstallSecurity] = useState<PreInstallSecurityInfo | null>(null)
+  const [preInstallLoading, setPreInstallLoading] = useState(false)
+  const [preInstallError, setPreInstallError] = useState<string | null>(null)
 
   // The currently-displayed package. Usually just `target` (the prop), but
   // clicking a node in the dependency graph swaps this to view a different
@@ -84,6 +87,8 @@ export default function PackageDetailModal({ target, onClose, onChanged }: Props
     setPkg(null)
     setSecurity(null)
     setSecurityError(null)
+    setPreInstallSecurity(null)
+    setPreInstallError(null)
     setNote(userData.noteFor(viewTarget.name, viewTarget.isCask))
     api
       .getInfo(viewTarget.name, viewTarget.isCask)
@@ -134,6 +139,26 @@ export default function PackageDetailModal({ target, onClose, onChanged }: Props
       setSecurityError(String(e))
     } finally {
       setSecurityLoading(false)
+    }
+  }
+
+  async function verifyBeforeInstall() {
+    if (!viewTarget) return
+    const { ok } = await confirm({
+      title: t('packageDetail.verifyBeforeInstallConfirmTitle'),
+      body: t('packageDetail.verifyBeforeInstallConfirmBody'),
+      confirmLabel: t('packageDetail.verifyBeforeInstallConfirmLabel'),
+    })
+    if (!ok) return
+    setPreInstallLoading(true)
+    setPreInstallError(null)
+    try {
+      const info = await api.inspectCaskBeforeInstall(viewTarget.name)
+      setPreInstallSecurity(info)
+    } catch (e) {
+      setPreInstallError(String(e))
+    } finally {
+      setPreInstallLoading(false)
     }
   }
 
@@ -412,13 +437,13 @@ export default function PackageDetailModal({ target, onClose, onChanged }: Props
               >
                 {t('packageDetail.tabDependencyGraph')}
               </button>
-              {pkg.isCask && pkg.installed && (
+              {pkg.isCask && (
                 <button
                   role="tab"
                   className={`tab ${tab === 'security' ? 'tab-active' : ''}`}
                   onClick={() => {
                     setTab('security')
-                    void loadSecurity()
+                    if (pkg.installed) void loadSecurity()
                   }}
                 >
                   {t('packageDetail.tabSecurity')}
@@ -523,7 +548,7 @@ export default function PackageDetailModal({ target, onClose, onChanged }: Props
 
             {tab === 'graph' && <DependencyGraph target={viewTarget} onSelectPackage={(t) => setViewTarget(t)} />}
 
-            {tab === 'security' && (
+            {tab === 'security' && pkg.installed && (
               <div className="mt-3 text-sm">
                 {securityLoading && (
                   <div className="flex items-center gap-2 text-base-content/60 py-4">
@@ -569,6 +594,77 @@ export default function PackageDetailModal({ target, onClose, onChanged }: Props
                     <pre className="mockup-code text-xs overflow-x-auto max-h-40 mt-2">
                       <code className="whitespace-pre px-4">{security.assessment}</code>
                     </pre>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {tab === 'security' && !pkg.installed && (
+              <div className="mt-3 text-sm space-y-3">
+                <p className="text-xs text-base-content/60">{t('packageDetail.verifyBeforeInstallExplainer')}</p>
+                {!preInstallSecurity && !preInstallLoading && (
+                  <button className="btn btn-sm" onClick={verifyBeforeInstall}>
+                    <ShieldIcon className="size-4" /> {t('packageDetail.verifyBeforeInstallButton')}
+                  </button>
+                )}
+                {preInstallLoading && (
+                  <div className="flex items-center gap-2 text-base-content/60 py-4">
+                    <span className="loading loading-spinner loading-xs" /> {t('packageDetail.verifyingBeforeInstall')}
+                  </div>
+                )}
+                {preInstallError && <div className="alert alert-error alert-soft text-xs">{preInstallError}</div>}
+                {preInstallSecurity && !preInstallLoading && (
+                  <div className="space-y-2">
+                    {!preInstallSecurity.unsupported && (
+                      <div className="flex items-center gap-2">
+                        {preInstallSecurity.gatekeeperOk ? (
+                          <CheckIcon className="size-4 text-success" />
+                        ) : (
+                          <ShieldIcon className="size-4 text-error" />
+                        )}
+                        <span>
+                          {preInstallSecurity.gatekeeperOk
+                            ? t('packageDetail.gatekeeperPass')
+                            : t('packageDetail.gatekeeperFail')}
+                        </span>
+                      </div>
+                    )}
+                    <div className="text-xs text-base-content/60 space-y-1">
+                      {preInstallSecurity.downloadSizeHuman && (
+                        <div>{t('packageDetail.downloadSize', { size: preInstallSecurity.downloadSizeHuman })}</div>
+                      )}
+                      {!preInstallSecurity.unsupported && (
+                        <>
+                          <div>
+                            {t('packageDetail.signed', {
+                              value: preInstallSecurity.signed ? t('packageDetail.yes') : t('packageDetail.no'),
+                            })}
+                          </div>
+                          {preInstallSecurity.authority && (
+                            <div>{t('packageDetail.authority', { authority: preInstallSecurity.authority })}</div>
+                          )}
+                          {preInstallSecurity.teamId && (
+                            <div>{t('packageDetail.teamId', { teamId: preInstallSecurity.teamId })}</div>
+                          )}
+                          <div>
+                            {t('packageDetail.notarized', {
+                              value: preInstallSecurity.notarized ? t('packageDetail.yes') : t('packageDetail.no'),
+                            })}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                    {preInstallSecurity.note && (
+                      <div className="alert alert-warning alert-soft text-xs">{preInstallSecurity.note}</div>
+                    )}
+                    {preInstallSecurity.assessment && (
+                      <pre className="mockup-code text-xs overflow-x-auto max-h-40 mt-2">
+                        <code className="whitespace-pre px-4">{preInstallSecurity.assessment}</code>
+                      </pre>
+                    )}
+                    <button className="btn btn-xs" onClick={verifyBeforeInstall}>
+                      {t('packageDetail.verifyBeforeInstallAgain')}
+                    </button>
                   </div>
                 )}
               </div>
