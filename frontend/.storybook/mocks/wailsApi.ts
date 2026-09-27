@@ -65,4 +65,17 @@ export const defaultGoMocks: Record<string, (...args: unknown[]) => unknown> = {
   'app.App.MasAppIcon': () => '',
   'app.App.GistLogs': () => 'https://gist.github.com/example/story-fixture',
   'app.App.ExportDependencyGraphPNG': () => undefined,
+  // Matches this platform's real behavior today (see internal/platform's
+  // darwin.go) -- stories that want to demonstrate Linux's gated behavior
+  // seed the shared capabilitiesSignal directly instead (see
+  // Sidebar.stories.tsx), the same way CommandPalette.stories.tsx seeds
+  // installedPackagesSignal directly rather than overriding this mock.
+  'app.App.Capabilities': () => ({
+    hasGatekeeper: true,
+    hasAppStore: true,
+    hasTimeMachine: true,
+    hasTouchID: true,
+    hasAppAdoption: true,
+    hasFloatingTitleBar: true,
+  }),
 }

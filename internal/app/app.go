@@ -19,6 +19,7 @@ import (
 
 	"mead/internal/brew"
 	"mead/internal/jobs"
+	"mead/internal/platform"
 	"mead/internal/security"
 	"mead/internal/store"
 	"mead/internal/system"
@@ -81,6 +82,15 @@ func (a *App) record(action, name string, isCask bool) func(success bool) {
 
 func (a *App) GetSystemInfo() (*brew.SystemInfo, error) {
 	return brew.GetSystemInfo(a.ctx)
+}
+
+// Capabilities reports which OS-level features this platform actually
+// supports (Gatekeeper, the Mac App Store, Time Machine, Touch ID), so the
+// frontend can hide UI for features that have no meaning outside macOS
+// instead of assuming they're always available. See internal/platform and
+// docs/cross-platform-architecture.md.
+func (a *App) Capabilities() platform.Capabilities {
+	return platform.Current()
 }
 
 func (a *App) ListInstalled() ([]brew.BrewPackage, error) {

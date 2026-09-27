@@ -7,6 +7,7 @@ import { useInstalledPackages, startInstalledPackagesPolling } from './context/I
 import { useSystemInfo, startSystemInfoPolling } from './context/SystemInfoSignal'
 import { useOutdated, startOutdatedPolling } from './context/OutdatedSignal'
 import { useUpdateAvailable, startUpdateAvailablePolling } from './context/UpdateAvailableSignal'
+import { startCapabilitiesLoad, useCapabilities } from './context/CapabilitiesSignal'
 import { ensureServicesLoaded } from './context/ServicesSignal'
 import { ensureAppStoreLoaded } from './context/AppStoreSignal'
 import { RefreshIcon } from './components/Icons'
@@ -68,6 +69,7 @@ function AppShell() {
   const userData = useUserData()
   const outdated = useOutdated()
   const { version: updateAvailableVersion } = useUpdateAvailable()
+  const capabilities = useCapabilities()
   const [view, setView] = useState<ViewKey>('dashboard')
   const [refreshToken, setRefreshToken] = useState(0)
   const [installedInitialFilter, setInstalledInitialFilter] = useState<InstalledFilter | undefined>(undefined)
@@ -85,6 +87,7 @@ function AppShell() {
     startSystemInfoPolling()
     startOutdatedPolling()
     startUpdateAvailablePolling()
+    startCapabilitiesLoad()
   }, [])
 
   // Dashboard's Health tile and stat tiles need to land on Installed
@@ -227,8 +230,14 @@ function AppShell() {
           banner's own colored content at y=0 and paint it right under the lights.
           Keeping this strip here, unconditionally above RestartBanner, means
           something neutral always occupies y=0 regardless of whether the banner
-          is showing -- see Sidebar.tsx for the matching removal. */}
-      <div className="drag-region h-9 shrink-0" />
+          is showing -- see Sidebar.tsx for the matching removal.
+
+          Gated on hasFloatingTitleBar: only macOS's floating, hidden-inset
+          title bar needs this reserved strip at all. Wails' Linux backend
+          always draws the window manager's own native title bar above the
+          content instead, so this would just be dead space there. See
+          platform.Capabilities' HasFloatingTitleBar doc comment. */}
+      {capabilities.hasFloatingTitleBar && <div className="drag-region h-9 shrink-0" />}
       {updateAvailableVersion && <RestartBanner version={updateAvailableVersion} onRestart={handleRestart} />}
       <div className="flex flex-1 min-h-0">
         <Sidebar view={view} onSelect={changeView} onHover={handleNavHover} outdatedCount={outdatedCount} />

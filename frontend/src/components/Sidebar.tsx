@@ -1,5 +1,7 @@
 import type { VNode } from 'preact'
 import { useTranslation } from 'react-i18next'
+import { useCapabilities } from '../context/CapabilitiesSignal'
+import { visibleNavItems } from '../lib/navCapabilities'
 import {
   AppWindowIcon,
   ClockIcon,
@@ -90,43 +92,52 @@ interface Props {
 
 export default function Sidebar({ view, onSelect, onHover, outdatedCount }: Props) {
   const { t } = useTranslation()
+  const capabilities = useCapabilities()
   return (
     <div className="w-56 shrink-0 bg-base-200/70 backdrop-blur-xl border-r border-base-300/60 flex flex-col">
-      {/* The top drag-region strip (under the traffic lights) now lives in
+      {/* The top drag-region strip (under macOS's traffic lights) now lives in
           App.tsx, above this component, so it stays in place even when
           RestartBanner is rendered between the window's top edge and Sidebar.
-          See App.tsx for the full reasoning. */}
+          It's gated there on capabilities.hasFloatingTitleBar -- only macOS's
+          floating, hidden-inset title bar needs it; Wails' Linux backend always
+          draws the window manager's own native title bar above the content
+          instead, so it would just be dead space there. See App.tsx and
+          platform.Capabilities' HasFloatingTitleBar doc comment. */}
       <div className="shrink-0 flex items-center gap-2 px-4 pt-2 pb-3">
         <span className="text-xl">🍺</span>
         <span className="font-wordmark text-xl tracking-tight text-primary">{t('nav.brand')}</span>
       </div>
       <div className="flex-1 min-h-0 overflow-y-auto">
-        {groups.map((group, gi) => (
-          <ul key={gi} className="menu p-2 gap-0.5">
-            {group.titleKey && <li className="menu-title">{t(group.titleKey)}</li>}
-            {group.items.map((item) => {
-              const Icon = item.icon
-              return (
-                <li key={item.key}>
-                  <a
-                    className={view === item.key ? 'menu-active' : ''}
-                    onMouseEnter={() => onHover?.(item.key)}
-                    onClick={(e) => {
-                      e.preventDefault()
-                      onSelect(item.key)
-                    }}
-                  >
-                    <Icon className="size-4" />
-                    {t(item.labelKey)}
-                    {item.key === 'updates' && outdatedCount > 0 && (
-                      <span className="badge badge-sm badge-warning ml-auto">{outdatedCount}</span>
-                    )}
-                  </a>
-                </li>
-              )
-            })}
-          </ul>
-        ))}
+        {groups.map((group, gi) => {
+          const items = visibleNavItems(group.items, capabilities)
+          if (items.length === 0) return null
+          return (
+            <ul key={gi} className="menu p-2 gap-0.5">
+              {group.titleKey && <li className="menu-title">{t(group.titleKey)}</li>}
+              {items.map((item) => {
+                const Icon = item.icon
+                return (
+                  <li key={item.key}>
+                    <a
+                      className={view === item.key ? 'menu-active' : ''}
+                      onMouseEnter={() => onHover?.(item.key)}
+                      onClick={(e) => {
+                        e.preventDefault()
+                        onSelect(item.key)
+                      }}
+                    >
+                      <Icon className="size-4" />
+                      {t(item.labelKey)}
+                      {item.key === 'updates' && outdatedCount > 0 && (
+                        <span className="badge badge-sm badge-warning ml-auto">{outdatedCount}</span>
+                      )}
+                    </a>
+                  </li>
+                )
+              })}
+            </ul>
+          )
+        })}
       </div>
       <ul className="menu p-2 gap-0.5 shrink-0">
         <li>
