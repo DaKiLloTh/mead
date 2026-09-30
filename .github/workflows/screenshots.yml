@@ -1,0 +1,157 @@
+name: Screenshots
+
+# Regenerates mead-site's app screenshots (assets/screenshots/*.webp) from a
+# real, running build of the app, and opens a review PR against mead-site
+# with the result -- see issue #109. Screenshots were previously captured by
+# hand and went stale as the UI evolved (the Search page's screenshot on the
+# live site today still shows its pre-redesign grid-card layout).
+#
+# Triggers: every tagged release (release.yml's release-please job creates
+# the tag), and workflow_dispatch for an on-demand refresh against any ref
+# without cutting a new release.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Branch, tag or SHA to build and screenshot (defaults to the ref that triggered this run)'
+        required: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: screenshots
+  cancel-in-progress: false
+
+jobs:
+  capture:
+    runs-on: macos-14
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.ref || github.ref }}
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install Wails CLI
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.15.0
+
+      - name: Install cwebp
+        run: brew install webp
+
+      - name: Install screenshot script dependencies
+        working-directory: scripts/screenshots
+        run: |
+          npm install
+          npx playwright install --with-deps chromium
+
+      # A small, deterministic set of real formulae, installed so the
+      # Installed/Search/Dashboard views are never sparse regardless of what
+      # this runner image happens to ship with by default -- verified
+      # locally (see capture.mjs's doc comment) that `wails dev` reads the
+      # real, live Homebrew state, exactly as the packaged app does.
+      - name: Install a few packages so the screenshots have real data to show
+        run: brew install wget jq ripgrep fd bat htop
+
+      - name: Start wails dev in the background
+        run: |
+          nohup wails dev -browser=false > "$RUNNER_TEMP/wails-dev.log" 2>&1 &
+          echo $! > "$RUNNER_TEMP/wails-dev.pid"
+
+      # wails dev does its own `go mod tidy`, binding generation, frontend
+      # build and Go compile before the dev bridge comes up -- verified
+      # locally this needs no pre-seeded frontend/dist or wailsjs, unlike
+      # `wails generate module` in ci.yml. Empirically well under a minute;
+      # the loop is generous because a fresh runner's first Homebrew/Go
+      # module resolution can be slower than a warm local machine.
+      - name: Wait for the dev bridge on :34115
+        run: |
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost:34115 >/dev/null; then
+              echo "dev bridge is up"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "::error::wails dev never came up on :34115"
+          cat "$RUNNER_TEMP/wails-dev.log"
+          exit 1
+
+      - name: Capture screenshots
+        working-directory: scripts/screenshots
+        run: node capture.mjs http://localhost:34115 "$RUNNER_TEMP/screenshots-png"
+
+      - name: Stop wails dev
+        if: always()
+        run: kill "$(cat "$RUNNER_TEMP/wails-dev.pid")" 2>/dev/null || true
+
+      - name: Convert to webp
+        run: |
+          mkdir -p "$RUNNER_TEMP/screenshots-webp"
+          for f in "$RUNNER_TEMP"/screenshots-png/*.png; do
+            cwebp -q 90 "$f" -o "$RUNNER_TEMP/screenshots-webp/$(basename "$f" .png).webp"
+          done
+
+      - name: Upload the screenshots as a workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots
+          path: ${{ runner.temp }}/screenshots-webp/*.webp
+          retention-days: 14
+
+      # Same pattern as release.yml's update-tap job: skip cleanly (rather
+      # than failing the run) if the write-access token for mead-site hasn't
+      # been set up yet. The screenshots are still on the run as an artifact
+      # either way -- see scripts/screenshots/README.md for what the token
+      # needs.
+      - name: Check the mead-site token is configured
+        id: check
+        run: |
+          if [ -n "${{ secrets.MEAD_SITE_TOKEN }}" ]; then
+            echo "has_token=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_token=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::MEAD_SITE_TOKEN secret is not set -- skipping the mead-site PR. The refreshed screenshots are still attached to this run as an artifact. See scripts/screenshots/README.md for setup."
+          fi
+
+      - name: Open a review PR against mead-site with the refreshed screenshots
+        if: steps.check.outputs.has_token == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.MEAD_SITE_TOKEN }}
+        run: |
+          set -e
+          LABEL="${{ github.event.inputs.ref || github.ref_name }}"
+          git clone --depth 1 "https://x-access-token:${GH_TOKEN}@github.com/DaKiLloTh/mead-site.git" "$RUNNER_TEMP/mead-site"
+          cd "$RUNNER_TEMP/mead-site"
+          BRANCH="screenshots/${LABEL}-${{ github.run_id }}"
+          git checkout -q -b "$BRANCH"
+          cp "$RUNNER_TEMP"/screenshots-webp/*.webp assets/screenshots/
+
+          if git diff --quiet; then
+            echo "Screenshots are unchanged from what mead-site already has, nothing to open a PR for."
+            exit 0
+          fi
+
+          git config user.name "mead-screenshot-bot"
+          git config user.email "actions@github.com"
+          git add assets/screenshots
+          git commit -q -m "chore: refresh app screenshots for $LABEL"
+          git push -q origin "$BRANCH"
+          BODY="Automated screenshot refresh from [DaKiLloTh/mead@${LABEL}](https://github.com/DaKiLloTh/mead/tree/${LABEL}) (mead's \`.github/workflows/screenshots.yml\`, [issue #109](https://github.com/DaKiLloTh/mead/issues/109))."
+          BODY="$BODY"$'\n\n'"Captured against a real, running build of the app via its \`wails dev\` bridge, in both light and dark. Please look at the diff before merging -- this opens a PR for review, it does not merge itself."
+          gh pr create \
+            --repo DaKiLloTh/mead-site \
+            --title "chore: refresh app screenshots for $LABEL" \
+            --body "$BODY" \
+            --base main --head "$BRANCH"

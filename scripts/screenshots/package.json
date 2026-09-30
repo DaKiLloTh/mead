@@ -1,0 +1,9 @@
+{
+  "name": "mead-screenshots",
+  "private": true,
+  "type": "module",
+  "description": "Drives a running wails dev instance through Chromium (via its CDP dev bridge) to capture mead-site's app screenshots. See capture.mjs and .github/workflows/screenshots.yml. Its own package.json so Playwright is not a dependency of the app's own frontend/package.json.",
+  "devDependencies": {
+    "playwright": "1.63.0"
+  }
+}
