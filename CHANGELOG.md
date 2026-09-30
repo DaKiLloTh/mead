@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.12.0](https://github.com/DaKiLloTh/mead/compare/v0.11.1...v0.12.0) (2026-09-30)
+
+
+### Features
+
+* automate mead-site's app screenshot regeneration ([#187](https://github.com/DaKiLloTh/mead/issues/187)) ([f7580fc](https://github.com/DaKiLloTh/mead/commit/f7580fc115c36512ef550b55193b794ba5cc8fce))
+* Linux build, milestone 1 of [#105](https://github.com/DaKiLloTh/mead/issues/105) ([#194](https://github.com/DaKiLloTh/mead/issues/194)) ([a60a2d1](https://github.com/DaKiLloTh/mead/commit/a60a2d127ffadefe02c95ee547963690a53b0d86))
+* open an App Store app's page from its row ([#172](https://github.com/DaKiLloTh/mead/issues/172)) ([d4ae5de](https://github.com/DaKiLloTh/mead/commit/d4ae5de588ca1aca567962c68b70903f2d81cec3))
+* pre-install cask inspection ([#50](https://github.com/DaKiLloTh/mead/issues/50)) ([#189](https://github.com/DaKiLloTh/mead/issues/189)) ([6642980](https://github.com/DaKiLloTh/mead/commit/6642980940015648410bed07209493c10e12491c))
+* rank Installed search results by relevance ([#184](https://github.com/DaKiLloTh/mead/issues/184)) ([fc868d5](https://github.com/DaKiLloTh/mead/commit/fc868d5c3813b4730cf3fdbf1a5da53a83a5d915))
+* restart prompt when mead is updated on disk while running ([#188](https://github.com/DaKiLloTh/mead/issues/188)) ([583e41a](https://github.com/DaKiLloTh/mead/commit/583e41a9ed9732dc47fdac320ed7914b6054ab59)), closes [#152](https://github.com/DaKiLloTh/mead/issues/152)
+* take the release notes link from a package's caveats when it names one ([#185](https://github.com/DaKiLloTh/mead/issues/185)) ([fb48c21](https://github.com/DaKiLloTh/mead/commit/fb48c2102718180f8c618088d3f422659868488b))
+* use brew vulns for vulnerability scans and type Brewfile cleanup entries ([#193](https://github.com/DaKiLloTh/mead/issues/193)) ([8135ade](https://github.com/DaKiLloTh/mead/commit/8135ade0db45499f3c3c4060b321a399bf6ed963))
+
+
+### Bug Fixes
+
+* Adopt warns about App Store apps that have no receipt file ([#179](https://github.com/DaKiLloTh/mead/issues/179)) ([8604c51](https://github.com/DaKiLloTh/mead/commit/8604c513cdbb2909086a61150bd624373b06dcab))
+* bulk uninstall offers the administrator retry ([#183](https://github.com/DaKiLloTh/mead/issues/183)) ([2b112ed](https://github.com/DaKiLloTh/mead/commit/2b112edd4ce20409d1321e1159bcd95d3e2789f0))
+* one spinner while Maintenance scans ([#180](https://github.com/DaKiLloTh/mead/issues/180)) ([63b6884](https://github.com/DaKiLloTh/mead/commit/63b688487d901be87b4570584e15eaa8d8731a3f))
+* restore the design handoff icons removed as dead code ([#176](https://github.com/DaKiLloTh/mead/issues/176)) ([e5af8fe](https://github.com/DaKiLloTh/mead/commit/e5af8fec7356696c27f6f1bfa6a642d86a2674ab))
+* the administrator uninstall retry never runs brew as root ([#186](https://github.com/DaKiLloTh/mead/issues/186)) ([9e7bd68](https://github.com/DaKiLloTh/mead/commit/9e7bd68c53c5db4f199997a7d6dd38b576d51e01))
+
 ## [0.11.1](https://github.com/DaKiLloTh/mead/compare/v0.11.0...v0.11.1) (2026-09-21)
 
 
