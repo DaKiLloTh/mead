@@ -50,9 +50,10 @@ jobs:
             --prerelease \
             --title "Pre-Alpha ${{ needs.release-please.outputs.tag_name }}"
 
+      # go.mod's `go` line is the source of truth, see ci.yml.
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.25'
+          go-version-file: go.mod
 
       - uses: actions/setup-node@v4
         with:
@@ -66,8 +67,29 @@ jobs:
       - name: Install create-dmg
         run: brew install create-dmg
 
+      # Both builds below need this: internal/app.Version (compared at
+      # runtime against the on-disk bundle's own Info.plist, see
+      # internal/app/selfupdate.go) via -ldflags, and wails.json's
+      # info.productVersion, which Wails templates into the bundle's
+      # CFBundleShortVersionString separately from any Go ldflags -- so
+      # Finder/System Info and mead's own self-update check agree on the
+      # same version string. Without patching wails.json here, every
+      # release would keep shipping the placeholder version committed
+      # there for local/dev builds.
+      - name: Compute release version
+        id: version
+        run: |
+          VERSION="${{ needs.release-please.outputs.tag_name }}"
+          VERSION="${VERSION#v}"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Stamp version into wails.json
+        run: |
+          jq --arg v "${{ steps.version.outputs.version }}" '.info.productVersion = $v' wails.json > wails.json.tmp
+          mv wails.json.tmp wails.json
+
       - name: Build (arm64)
-        run: wails build
+        run: wails build -ldflags "-X mead/internal/app.Version=${{ steps.version.outputs.version }}"
 
       - name: Zip app bundle (arm64)
         working-directory: build/bin
@@ -100,7 +122,7 @@ jobs:
       # produce a correctly linked x86_64 binary with no extra C toolchain
       # flags needed, even though this is a Cgo/webview app.
       - name: Build (amd64)
-        run: wails build -platform darwin/amd64
+        run: wails build -platform darwin/amd64 -ldflags "-X mead/internal/app.Version=${{ steps.version.outputs.version }}"
 
       - name: Zip app bundle (amd64)
         working-directory: build/bin

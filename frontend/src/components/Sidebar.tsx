@@ -92,7 +92,10 @@ export default function Sidebar({ view, onSelect, onHover, outdatedCount }: Prop
   const { t } = useTranslation()
   return (
     <div className="w-56 shrink-0 bg-base-200/70 backdrop-blur-xl border-r border-base-300/60 flex flex-col">
-      <div className="drag-region h-9 shrink-0" />
+      {/* The top drag-region strip (under the traffic lights) now lives in
+          App.tsx, above this component, so it stays in place even when
+          RestartBanner is rendered between the window's top edge and Sidebar.
+          See App.tsx for the full reasoning. */}
       <div className="shrink-0 flex items-center gap-2 px-4 pt-2 pb-3">
         <span className="text-xl">🍺</span>
         <span className="font-wordmark text-xl tracking-tight text-primary">{t('nav.brand')}</span>

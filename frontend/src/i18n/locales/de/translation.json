@@ -77,6 +77,10 @@
       "maintenance": "Wartung",
       "history": "Verlauf",
       "settings": "Einstellungen"
+    },
+    "restartBanner": {
+      "message": "mead wurde auf Version {{version}} aktualisiert. Starte die App neu, um die neue Version zu verwenden.",
+      "restartButton": "Jetzt neu starten"
     }
   },
   "dashboard": {
