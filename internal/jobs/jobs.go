@@ -46,15 +46,23 @@ type Manager struct {
 	// masPath locates the mas binary. A field (defaulting to
 	// brew.ResolveMasPath) so tests can point it at a fake.
 	masPath func() (string, error)
+	// brewPath and osascriptPath locate brew and osascript for the
+	// elevated-uninstall flow (see StartElevatedUninstall). Fields so tests
+	// can point them at fake scripts instead of a real brew and a real
+	// authorization dialog.
+	brewPath      func() (string, error)
+	osascriptPath func() (string, error)
 }
 
 // NewManager creates an empty job Manager. Call setContext once the Wails
 // runtime context is available (see the app package's Startup hook).
 func NewManager() *Manager {
 	jm := &Manager{
-		cmd:     make(map[string]*exec.Cmd),
-		ptyIn:   make(map[string]*os.File),
-		masPath: brew.ResolveMasPath,
+		cmd:           make(map[string]*exec.Cmd),
+		ptyIn:         make(map[string]*os.File),
+		masPath:       brew.ResolveMasPath,
+		brewPath:      brew.ResolveBrewPath,
+		osascriptPath: resolveOsascript,
 	}
 	jm.emit = func(name string, data ...any) { runtime.EventsEmit(jm.ctx, name, data...) }
 	return jm
@@ -308,47 +316,14 @@ func (jm *Manager) SendInput(id string, text string) bool {
 	return err == nil
 }
 
-// osascriptTarget runs `osascript` for StartElevatedTracked below. It has no
-// use for brew's HOMEBREW_* overrides (those are embedded directly in the
-// shell command text StartElevatedTracked builds, since the elevated shell
-// doesn't inherit this process's environment), so it leaves defaultEnv nil.
-var osascriptTarget = binaryTarget{
-	resolve: func() (string, error) {
-		p, err := exec.LookPath("osascript")
-		if err != nil {
-			return "", errors.New("could not find the `osascript` executable on this system")
-		}
-		return p, nil
-	},
-}
-
-// StartElevatedTracked runs `brew <brewArgs...>` the same way StartTracked
-// does, except the brew invocation is wrapped in
-// `osascript -e 'do shell script "..." with administrator privileges'` so it
-// runs with a native Touch-ID-or-password authorization prompt -- for the
-// one case mead needs that: a cask uninstall whose Generic Artifact removal
-// step needs `sudo` to delete files outside Homebrew's own prefix, which
-// fails outright when brew runs as a plain background subprocess with no
-// attached terminal for sudo to prompt on. See BuildElevatedShellScript for
-// the escaping/wrapping approach and why wrapping the whole `brew uninstall`
-// call (rather than just its internal sudo step) is safe here.
-//
-// This trades away real-time output streaming. Start/StartTracked stream
-// job:output events line-by-line as brew runs; here, `do shell script`
-// buffers the whole command's combined stdout/stderr internally and only
-// hands it back once the privileged command has completely finished, so an
-// elevated job's job:output events all arrive in one burst immediately
-// before its job:done rather than progressively. That's an accepted
-// tradeoff for this one path, not a regression to fix -- there's no way to
-// stream through `do shell script`.
-func (jm *Manager) StartElevatedTracked(title string, onDone func(success bool), brewArgs ...string) string {
-	brewPath, err := brew.ResolveBrewPath()
+// resolveOsascript finds the osascript binary the elevated-uninstall flow
+// hands its authorization script to.
+func resolveOsascript() (string, error) {
+	p, err := exec.LookPath("osascript")
 	if err != nil {
-		return jm.Fail(title, err.Error())
+		return "", errors.New("could not find the `osascript` executable on this system")
 	}
-	argv := append([]string{brewPath}, brewArgs...)
-	script := BuildElevatedShellScript(brew.FixedEnvVars(), argv)
-	return jm.start(osascriptTarget, title, false, false, nil, onDone, "-e", script)
+	return p, nil
 }
 
 func (jm *Manager) start(target binaryTarget, title string, lenient bool, quiet bool, env []string, onDone func(success bool), args ...string) string {
@@ -431,6 +406,13 @@ func scanLines(data []byte, atEOF bool) (advance int, token []byte, err error) {
 }
 
 func (jm *Manager) pipe(wg *sync.WaitGroup, id, stream string, r io.Reader) {
+	jm.pipeCapturing(wg, id, stream, r, nil)
+}
+
+// pipeCapturing is pipe, plus appending every line to capture when it is not
+// nil, for a job phase whose output the caller needs to inspect afterwards
+// (see runPhase). The lines are still streamed to the frontend as usual.
+func (jm *Manager) pipeCapturing(wg *sync.WaitGroup, id, stream string, r io.Reader, capture *lineCapture) {
 	defer wg.Done()
 	scanner := bufio.NewScanner(r)
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
@@ -439,6 +421,9 @@ func (jm *Manager) pipe(wg *sync.WaitGroup, id, stream string, r io.Reader) {
 		line := scanner.Text()
 		if line == "" {
 			continue
+		}
+		if capture != nil {
+			capture.add(line)
 		}
 		jm.emit(eventJobOutput, OutputEvent{ID: id, Line: line, Stream: stream})
 	}

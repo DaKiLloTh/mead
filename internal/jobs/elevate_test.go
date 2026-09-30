@@ -50,43 +50,34 @@ func TestAppleScriptQuote(t *testing.T) {
 }
 
 func TestBuildElevatedShellScript(t *testing.T) {
-	script := BuildElevatedShellScript(
-		[]string{"HOMEBREW_NO_AUTO_UPDATE=1", "NONINTERACTIVE=1"},
-		[]string{"/opt/homebrew/bin/brew", "uninstall", "--cask", "temurin"},
-	)
-
-	want := `do shell script "HOMEBREW_NO_AUTO_UPDATE=1 NONINTERACTIVE=1 '/opt/homebrew/bin/brew' 'uninstall' '--cask' 'temurin' 2>&1" with administrator privileges`
+	script := BuildElevatedShellScript([]string{"/bin/rm", "-Rf", "--", "/Library/Java/x.jdk"}, "mead needs permission")
+	want := `do shell script "'/bin/rm' '-Rf' '--' '/Library/Java/x.jdk' 2>&1" with prompt "mead needs permission" with administrator privileges`
 	if script != want {
 		t.Errorf("BuildElevatedShellScript() = %q, want %q", script, want)
-	}
-}
-
-// TestBuildElevatedShellScriptEnvPairsAreNotShellQuoted guards the reason
-// envPairs and argv are handled by two different code paths: quoting a
-// "KEY=value" token as a single quoted word (as argv elements are) would
-// stop a POSIX shell from parsing it as a variable assignment.
-func TestBuildElevatedShellScriptEnvPairsAreNotShellQuoted(t *testing.T) {
-	script := BuildElevatedShellScript([]string{"FOO=1"}, []string{"true"})
-	if strings.Contains(script, `'FOO=1'`) {
-		t.Errorf("BuildElevatedShellScript() quoted an env pair, want it embedded literally: %q", script)
-	}
-	if !strings.Contains(script, "FOO=1 'true'") {
-		t.Errorf("BuildElevatedShellScript() = %q, want it to contain %q", script, "FOO=1 'true'")
 	}
 }
 
 // TestBuildElevatedShellScriptEscapesAdversarialArgv is the security-focused
-// case from the issue: a value that would break out of the single-quoted
-// shell word (and, after that, out of the AppleScript string literal it's
-// embedded in) must come through as one inert, literal shell argument, not
-// as injected shell syntax or extra AppleScript.
+// case: a value that would break out of the single-quoted shell word (and,
+// after that, out of the AppleScript string literal it's embedded in) must
+// come through as one inert, literal shell argument, not as injected shell
+// syntax or extra AppleScript.
 func TestBuildElevatedShellScriptEscapesAdversarialArgv(t *testing.T) {
 	adversarial := `foo'; rm -rf ~; echo '"pwned`
-	script := BuildElevatedShellScript(nil, []string{"echo", adversarial})
+	script := BuildElevatedShellScript([]string{"echo", adversarial}, "p")
 
-	want := `do shell script "'echo' 'foo'\\''; rm -rf ~; echo '\\''\"pwned' 2>&1" with administrator privileges`
+	want := `do shell script "'echo' 'foo'\\''; rm -rf ~; echo '\\''\"pwned' 2>&1" with prompt "p" with administrator privileges`
 	if script != want {
 		t.Errorf("BuildElevatedShellScript() = %q, want %q", script, want)
+	}
+}
+
+// The prompt is text the user reads, and paths in it can contain quotes; it
+// must not be able to end the AppleScript string early.
+func TestBuildElevatedShellScriptEscapesThePrompt(t *testing.T) {
+	script := BuildElevatedShellScript([]string{"true"}, `remove "x" \ y`)
+	if !strings.Contains(script, `with prompt "remove \"x\" \\ y" with administrator privileges`) {
+		t.Errorf("BuildElevatedShellScript() = %q, prompt not escaped", script)
 	}
 }
 
@@ -95,8 +86,8 @@ func TestBuildElevatedShellScriptEscapesAdversarialArgv(t *testing.T) {
 // script` only hands osascript back one string (its normal return value on
 // success, or an error message on failure) rather than separate streams.
 func TestBuildElevatedShellScriptRedirectsStderr(t *testing.T) {
-	script := BuildElevatedShellScript(nil, []string{"brew", "uninstall", "temurin"})
-	if !strings.HasSuffix(script, `2>&1" with administrator privileges`) {
-		t.Errorf("BuildElevatedShellScript() = %q, want it to redirect stderr into stdout before the closing quote", script)
+	script := BuildElevatedShellScript([]string{"rm", "x"}, "p")
+	if !strings.Contains(script, ` 2>&1" with prompt`) {
+		t.Errorf("BuildElevatedShellScript() = %q, want stderr redirected into stdout inside the quoted command", script)
 	}
 }
