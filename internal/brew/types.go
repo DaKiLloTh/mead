@@ -173,9 +173,39 @@ type CollectionPackage struct {
 	IsCask bool   `json:"isCask"`
 }
 
+// BundleEntryType classifies a Brewfile entry by the `brew bundle` DSL
+// type it declares. Homebrew 7 expanded `brew bundle` well past
+// formula/cask/tap: a Brewfile can now also declare mas/vscode/go/cargo/
+// uv/flatpak/winget/krew/npm entries (see `brew bundle --help`). Flatpak
+// entries only ever apply on Linux and WinGet only under WSL -- mead
+// still recognizes the type if it sees it in a Brewfile (so parsing a
+// Brewfile written on/for another platform doesn't misfire), it just
+// can't act on either from this macOS build.
+type BundleEntryType string
+
+const (
+	BundleEntryFormula BundleEntryType = "formula"
+	BundleEntryCask    BundleEntryType = "cask"
+	BundleEntryTap     BundleEntryType = "tap"
+	BundleEntryMas     BundleEntryType = "mas"
+	BundleEntryVSCode  BundleEntryType = "vscode"
+	BundleEntryGo      BundleEntryType = "go"
+	BundleEntryCargo   BundleEntryType = "cargo"
+	BundleEntryUv      BundleEntryType = "uv"
+	BundleEntryFlatpak BundleEntryType = "flatpak"
+	BundleEntryWinget  BundleEntryType = "winget"
+	BundleEntryKrew    BundleEntryType = "krew"
+	BundleEntryNpm     BundleEntryType = "npm"
+)
+
 // BundleCleanupItem is one entry from a `brew bundle cleanup` dry-run
-// preview -- something installed that isn't listed in the Brewfile.
+// preview -- something installed that isn't listed in the Brewfile. Type
+// covers every entry kind `brew bundle cleanup` can report on; IsCask is
+// kept alongside it (rather than replaced) for existing callers that only
+// ever cared about the formula/cask split -- it's always exactly
+// `Type == BundleEntryCask`.
 type BundleCleanupItem struct {
-	Name   string `json:"name"`
-	IsCask bool   `json:"isCask"`
+	Name   string          `json:"name"`
+	IsCask bool            `json:"isCask"`
+	Type   BundleEntryType `json:"type"`
 }

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'preact/hooks'
 import { useTranslation } from 'react-i18next'
-import { api, BundleCleanupItem, CacheInfo, LeftoverItem, LeftoverKind, PackageSize } from '../lib/api'
+import { api, BundleCleanupItem, BundleEntryType, CacheInfo, LeftoverItem, LeftoverKind, PackageSize } from '../lib/api'
 import { useJobs } from '../context/JobsContext'
 import { useConfirm } from '../context/ConfirmContext'
 import {
@@ -14,6 +14,7 @@ import {
   WrenchIcon,
 } from '../components/Icons'
 import TypeBadge from '../components/TypeBadge'
+import BundleEntryBadge from '../components/BundleEntryBadge'
 import TableShell from '../components/TableShell'
 import LoadingRow from '../components/LoadingRow'
 
@@ -619,13 +620,11 @@ export default function Maintenance() {
                     ) : (
                       <div className="space-y-2">
                         <div className="text-xs text-base-content/60">{t('maintenance.notInBrewfile')}</div>
-                        <div className="flex flex-wrap gap-1">
+                        <div className="flex flex-wrap gap-1.5">
                           {cleanupPreview.map((item) => (
-                            <span
-                              key={`${item.isCask ? 'c' : 'f'}:${item.name}`}
-                              className={`badge badge-sm badge-outline ${item.isCask ? 'badge-secondary' : 'badge-primary'}`}
-                            >
-                              {item.name}
+                            <span key={`${item.type}:${item.name}`} className="inline-flex items-center gap-1">
+                              <BundleEntryBadge type={item.type as BundleEntryType} size="xs" />
+                              <span className="text-xs font-mono">{item.name}</span>
                             </span>
                           ))}
                         </div>

@@ -200,6 +200,15 @@ func Update(ctx context.Context) error {
 	return err
 }
 
+// CommandNames returns every command name `brew commands --quiet` reports
+// -- every command this Homebrew installation currently recognizes,
+// including ones contributed by taps. Used for feature-detecting an
+// optional native command (see security.HasVulnsCommand) instead of
+// hardcoding a minimum Homebrew version to assume it from.
+func CommandNames(ctx context.Context) ([]string, error) {
+	return runBrewLines(ctx, "commands", "--quiet")
+}
+
 // runBrewLines runs brew and splits stdout into non-empty trimmed lines.
 func runBrewLines(ctx context.Context, args ...string) ([]string, error) {
 	out, err := RunBrew(ctx, args...)

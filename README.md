@@ -14,7 +14,7 @@ A native Homebrew GUI for macOS, built with Go + [Wails](https://wails.io) + Rea
 - **Taps** / **Services**: add/remove taps, start/stop/restart `brew services`
 - **Adopt Existing Apps**: scans `/Applications` for apps that match a cask and adopts them via `brew install --cask --adopt`
 - **App Store**: Mac App Store apps via the `mas` CLI, with a one-click `brew install mas` when it's missing
-- **Security**: CVE scanning for installed formulae via [OSV.dev](https://osv.dev), duplicate-install detection, and per-cask Gatekeeper/code-signing inspection with quarantine-flag removal
+- **Security**: CVE scanning for installed formulae via Homebrew's `brew vulns` (OSV.dev data, with severity and patch-aware results; falls back to a direct OSV.dev lookup on Homebrew older than 7), duplicate-install detection, and per-cask Gatekeeper/code-signing inspection with quarantine-flag removal
 - **Maintenance**: `brew doctor`, cleanup (with dry-run + cache size), orphaned-dependency removal (`brew autoremove`), Brewfile import/export via native dialogs, raw `brew config`
 - **History**: a local activity log of everything mead has done
 - Favorites, tags, and private notes per package, all persisted locally
@@ -22,7 +22,7 @@ A native Homebrew GUI for macOS, built with Go + [Wails](https://wails.io) + Rea
 
 Favorites, tags, notes, snoozes, and history are stored locally in
 `~/Library/Application Support/mead/store.json`. Nothing leaves your machine
-except the OSV.dev vulnerability lookups (formula name + version only).
+except the OSV.dev vulnerability lookups, made by `brew vulns` (or directly by mead on Homebrew older than 7).
 
 ## Requirements
 

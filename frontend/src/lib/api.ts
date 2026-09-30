@@ -10,6 +10,8 @@ export type SystemInfo = brew.SystemInfo
 export type UserData = store.UserData
 export type HistoryEntry = store.HistoryEntry
 export type VulnResult = security.VulnResult
+export type Vulnerability = security.Vulnerability
+export type VulnSeverity = 'critical' | 'high' | 'medium' | 'low' | 'unknown'
 export type SecurityInfo = security.SecurityInfo
 export type AdoptCandidate = brew.AdoptCandidate
 export type DuplicateApp = brew.DuplicateApp
@@ -17,6 +19,8 @@ export type MasApp = brew.MasApp
 export type Collection = brew.Collection
 export type TapDetail = brew.TapDetail
 export type BundleCleanupItem = brew.BundleCleanupItem
+export type BundleEntryType =
+  'formula' | 'cask' | 'tap' | 'mas' | 'vscode' | 'go' | 'cargo' | 'uv' | 'flatpak' | 'winget' | 'krew' | 'npm'
 export type PackageSize = brew.PackageSize
 export type TouchIDStatus = touchid.Status
 export type DependencyGraph = brew.DependencyGraph
