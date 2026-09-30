@@ -393,7 +393,6 @@ export default function Maintenance() {
                 {t('common.refresh')}
               </button>
             </div>
-            {largestLoading && largest === null && <LoadingRow>{t('maintenance.scanning')}</LoadingRow>}
             {largest && largest.length > 0 && (
               <TableShell colgroup={[<col />, <col className="w-24" />, <col className="w-28" />]}>
                 <thead>
@@ -474,8 +473,6 @@ export default function Maintenance() {
               </button>
             )}
           </div>
-
-          {leftoversLoading && leftovers === null && <LoadingRow>{t('maintenance.leftoversScanning')}</LoadingRow>}
 
           {leftovers && leftovers.length === 0 && (
             <div className="alert alert-success alert-soft text-sm">{t('maintenance.noLeftoversFound')}</div>
