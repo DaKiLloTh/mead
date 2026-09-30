@@ -2,7 +2,9 @@ import { useEffect, useMemo, useRef, useState } from 'preact/hooks'
 import type { VNode, TargetedKeyboardEvent } from 'preact'
 import { useTranslation } from 'react-i18next'
 import { filterNavItems, filterPackages } from '../lib/paletteFilter'
+import { visibleNavItems } from '../lib/navCapabilities'
 import { useInstalledPackages } from '../context/InstalledPackagesSignal'
+import { useCapabilities } from '../context/CapabilitiesSignal'
 import { navItems, type ViewKey } from './Sidebar'
 import PackageDetailModal, { type DetailTarget } from './PackageDetailModal'
 import TypeBadge from './TypeBadge'
@@ -47,6 +49,7 @@ export default function CommandPalette({ onNavigate, bump, defaultOpen = false }
   // and kept fresh in the background), so the palette's package search is
   // warm on first open instead of fetching lazily every session.
   const { packages, loading: packagesLoading } = useInstalledPackages()
+  const capabilities = useCapabilities()
   const [detail, setDetail] = useState<DetailTarget | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -82,9 +85,9 @@ export default function CommandPalette({ onNavigate, bump, defaultOpen = false }
   // `t` keeps a stable reference across language changes, so without this the
   // memo would never recompute when the user switches language.
   const translatedNavItems = useMemo(
-    () => navItems.map((item) => ({ ...item, label: t(item.labelKey) })),
+    () => visibleNavItems(navItems, capabilities).map((item) => ({ ...item, label: t(item.labelKey) })),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [t, i18n.language]
+    [t, i18n.language, capabilities]
   )
 
   const results = useMemo<ResultRow[]>(() => {

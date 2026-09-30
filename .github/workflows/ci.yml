@@ -116,3 +116,60 @@ jobs:
 
       - name: Wails build
         run: wails build
+
+  # Milestone 1 of issue #105: proves mead keeps compiling for Linux. A Wails
+  # Linux build is cgo against GTK3 and webkit2gtk, so it needs a real Linux
+  # runner. See docker/linux-build/ for the same build run locally. This job
+  # does not launch the GUI.
+  build-linux:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      # Same package list as docker/linux-build/Dockerfile.
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential pkg-config libgtk-3-dev libwebkit2gtk-4.1-dev
+
+      - name: Install Wails CLI
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.15.0
+
+      - name: Seed frontend/dist placeholder
+        run: mkdir -p frontend/dist && touch frontend/dist/.gitkeep
+
+      - name: Generate Wails bindings
+        run: wails generate module
+
+      - name: Frontend install
+        working-directory: frontend
+        run: npm ci
+
+      # Runs the Linux half of internal/platform's build-tagged tests.
+      # ./internal/... only: cmd/mead-mon's tray icon needs
+      # libayatana-appindicator and has no Linux port yet (deferred by
+      # docs/cross-platform-architecture.md).
+      - name: Go test
+        run: go test -tags webkit2_41 ./internal/...
+
+      # -tags webkit2_41: Wails v2.15.0 links webkit2gtk-4.0 by default, and
+      # Ubuntu ships only the 4.1 pkg-config file.
+      - name: Wails build (linux/amd64)
+        run: wails build -platform linux/amd64 -tags webkit2_41
+
+      - name: Confirm the binary is a Linux ELF executable
+        run: |
+          file build/bin/mead
+          file build/bin/mead | grep -q 'ELF 64-bit LSB.*x86-64'

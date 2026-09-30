@@ -1,5 +1,5 @@
 import * as App from '../../wailsjs/go/app/App'
-import { brew, security, store, touchid } from '../../wailsjs/go/models'
+import { brew, platform, security, store, touchid } from '../../wailsjs/go/models'
 
 export type BrewPackage = brew.BrewPackage
 export type CacheInfo = brew.CacheInfo
@@ -23,6 +23,7 @@ export type BundleEntryType =
   'formula' | 'cask' | 'tap' | 'mas' | 'vscode' | 'go' | 'cargo' | 'uv' | 'flatpak' | 'winget' | 'krew' | 'npm'
 export type PackageSize = brew.PackageSize
 export type TouchIDStatus = touchid.Status
+export type Capabilities = platform.Capabilities
 export type DependencyGraph = brew.DependencyGraph
 export type DependencyNode = brew.DependencyNode
 export type DependencyEdge = brew.DependencyEdge
@@ -33,6 +34,7 @@ export type ContainerKind = 'dmg' | 'pkg' | 'zip' | 'unknown'
 
 export const api = {
   getSystemInfo: () => App.GetSystemInfo(),
+  capabilities: () => App.Capabilities(),
   listInstalled: () => App.ListInstalled(),
   getInfo: (name: string, isCask: boolean) => App.GetInfo(name, isCask),
   search: (query: string, desc = false) => App.Search(query, desc),
