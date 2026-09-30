@@ -62,3 +62,40 @@ export async function uninstallWithElevationRetry(
   await deps.runAction(() => deps.uninstallElevated(name, isCask, zap, force))
   return true
 }
+
+export interface BulkUninstallResult {
+  /** Names whose uninstall failed for lack of a terminal for sudo. */
+  needElevation: string[]
+  /** Names that were retried with administrator privileges. */
+  retried: string[]
+}
+
+/**
+ * The bulk version of uninstallWithElevationRetry: runs every uninstall in
+ * order, collects the ones that failed with the sudo-needs-a-terminal error,
+ * then asks once (naming them all) and retries just those with administrator
+ * privileges on a yes. One question rather than one per package, since a bulk
+ * uninstall of several casks that all need sudo would otherwise prompt for each.
+ * A package that fails for any other reason is left alone, as before.
+ */
+export async function uninstallManyWithElevationRetry(
+  deps: UninstallDeps,
+  targets: UninstallTarget[],
+  promptFor: (names: string[]) => ElevationPrompt
+): Promise<BulkUninstallResult> {
+  const failed: UninstallTarget[] = []
+  for (const target of targets) {
+    const { name, isCask, zap, force } = target
+    const job = await deps.runAction(() => deps.uninstall(name, isCask, zap, force))
+    if (job.status === 'error' && isSudoTerminalRequiredFailure(job.lines)) failed.push(target)
+  }
+  const needElevation = failed.map((t) => t.name)
+  if (failed.length === 0) return { needElevation, retried: [] }
+
+  const retry = await deps.confirm(promptFor(needElevation))
+  if (!retry.ok) return { needElevation, retried: [] }
+  for (const { name, isCask, zap, force } of failed) {
+    await deps.runAction(() => deps.uninstallElevated(name, isCask, zap, force))
+  }
+  return { needElevation, retried: needElevation }
+}

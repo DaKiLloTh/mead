@@ -12,7 +12,7 @@ import TableShell from '../components/TableShell'
 import LoadingRow from '../components/LoadingRow'
 import { ArrowUpCircleIcon, BadgeOutdatedIcon, PinIcon, SearchIcon, StarIcon, TrashIcon } from '../components/Icons'
 import ErrorAlert from '../components/ErrorAlert'
-import { useUninstall } from '../lib/useUninstall'
+import { useUninstall, useUninstallMany } from '../lib/useUninstall'
 
 export type Filter = 'all' | 'formula' | 'cask' | 'outdated' | 'favorites' | 'deprecated' | 'disabled' | 'pinned'
 
@@ -31,6 +31,7 @@ export default function Installed({ refreshToken, bump, initialFilter }: Props) 
   const { runAction } = useJobs()
   const confirm = useConfirm()
   const uninstallWithElevation = useUninstall()
+  const uninstallMany = useUninstallMany()
   const userData = useUserData()
   const { packages: cachedPkgs, loading, error, refresh: refreshPackages } = useInstalledPackages()
   const pkgs = cachedPkgs ?? []
@@ -155,9 +156,14 @@ export default function Installed({ refreshToken, bump, initialFilter }: Props) 
     if (!ok) return
     const zap = checked[0] ?? false
     setBulkBusy(true)
-    for (const p of selectedPkgs) {
-      await runAction(() => api.uninstall(p.name, p.isCask, zap))
-    }
+    await uninstallMany(
+      selectedPkgs.map((p) => ({ name: p.name, isCask: p.isCask, zap })),
+      (names) => ({
+        title: t('installed.elevateUninstallTitle'),
+        body: t('installed.elevateBulkUninstallBody', { names: names.join(', ') }),
+        confirmLabel: t('installed.elevateUninstallConfirmLabel'),
+      })
+    )
     setBulkBusy(false)
     setSelected(new Set())
     loadLeaves()

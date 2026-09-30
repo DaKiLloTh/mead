@@ -136,6 +136,7 @@
     "checkboxRemoveAppDataCasks": "Also remove app data for any casks (preferences, caches, support files)",
     "elevateUninstallTitle": "Administrator permission needed",
     "elevateUninstallBody": "This needs administrator permission to remove some files. Retry with permission?",
+    "elevateBulkUninstallBody": "These need administrator permission to remove some files: {{names}}. Retry them with permission?",
     "elevateUninstallConfirmLabel": "Retry with permission"
   },
   "search": {
