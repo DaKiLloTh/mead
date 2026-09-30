@@ -11,6 +11,8 @@ import (
 	"unicode"
 
 	"golang.org/x/text/unicode/norm"
+
+	"mead/internal/system"
 )
 
 var slugNonAlnum = regexp.MustCompile(`[^a-z0-9]+`)
@@ -278,14 +280,50 @@ func buildMatchConfidence(tokenExact bool, appDirName string, info BrewPackage) 
 	return "possible", strings.Join(reasons, "; ")
 }
 
-// isAppStoreApp reports whether the app bundle at appPath was installed
-// from the Mac App Store, detected via the receipt every MAS-distributed
-// app carries at Contents/_MASReceipt/receipt. This is the same signal
-// macOS itself uses to tell a Store install apart from a direct download,
-// so it doesn't depend on the `mas` CLI being installed at all.
+// isAppStoreApp reports whether the app bundle at appPath carries the Mac
+// App Store receipt every MAS-distributed app normally has at
+// Contents/_MASReceipt/receipt. This is the same signal macOS itself uses to
+// tell a Store install apart from a direct download, so it doesn't depend on
+// the `mas` CLI being installed at all. It is not sufficient on its own, see
+// detectAppStoreApp.
 func isAppStoreApp(appPath string) bool {
 	_, err := os.Stat(filepath.Join(appPath, "Contents", "_MASReceipt", "receipt"))
 	return err == nil
+}
+
+// macAppStoreAuthority is the code-signing authority line `codesign -dvv`
+// prints for a build distributed through the Mac App Store. Apple re-signs
+// every MAS app with it, whereas a direct download carries its developer's own
+// "Developer ID Application: ..." authority instead.
+const macAppStoreAuthority = "Authority=Apple Mac OS Application Signing"
+
+// signedForMacAppStore reports whether codesign's output names the Mac App
+// Store signing authority. Pure so it can be tested against real codesign
+// output without running codesign.
+func signedForMacAppStore(codesignOutput string) bool {
+	for line := range strings.SplitSeq(codesignOutput, "\n") {
+		if strings.TrimSpace(line) == macAppStoreAuthority {
+			return true
+		}
+	}
+	return false
+}
+
+// detectAppStoreApp reports whether the app at appPath came from the Mac App
+// Store. It checks the receipt first, since that is a cheap file stat, and
+// falls back to the code signature. The receipt alone missed real App Store
+// apps: Windows App (com.microsoft.rdc.macos) is signed by Apple's Mac App
+// Store authority but has no _MASReceipt in its bundle, so Adopt showed no
+// "installed from the App Store" warning for it.
+func detectAppStoreApp(ctx context.Context, appPath string) bool {
+	if isAppStoreApp(appPath) {
+		return true
+	}
+	// codesign writes to stderr and exits non-zero for a bundle it can't read;
+	// RunCmd returns both streams, and an unreadable bundle has no authority
+	// line, so the error itself doesn't need separate handling.
+	out, _ := system.RunCmd(ctx, "codesign", "-dvv", appPath)
+	return signedForMacAppStore(out)
 }
 
 // batchSlugs partitions slugs into consecutive chunks of at most size,
@@ -438,7 +476,7 @@ func ScanAdoptableApps(ctx context.Context) ([]AdoptCandidate, error) {
 			MatchConfidence:   confidence,
 			MatchReason:       reason,
 			PossibleDowngrade: PossibleDowngrade(installedVersion, info.Version),
-			IsAppStoreApp:     isAppStoreApp(c.appPath),
+			IsAppStoreApp:     detectAppStoreApp(ctx, c.appPath),
 		})
 	}
 

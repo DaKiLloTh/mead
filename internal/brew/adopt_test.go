@@ -1,6 +1,7 @@
 package brew
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -415,6 +416,77 @@ func TestKnownCasks(t *testing.T) {
 		_, err, _, _ := run([]listResult{{stub, nil}, {nil, boom}}, nil)
 		if err != boom {
 			t.Fatalf("err %v", err)
+		}
+	})
+}
+
+// Real `codesign -dvv` output, trimmed to the lines that matter, from an App
+// Store build with no _MASReceipt in its bundle (Windows App 11.4.2) and from
+// a direct download (Discord).
+const codesignMacAppStoreOutput = `Executable=/Applications/Windows App.app/Contents/MacOS/Windows App
+Identifier=com.microsoft.rdc.macos
+Signature size=4710
+Authority=Apple Mac OS Application Signing
+Authority=Apple Worldwide Developer Relations Certification Authority
+Authority=Apple Root CA
+TeamIdentifier=UBF8T346G9
+`
+
+const codesignDeveloperIDOutput = `Executable=/Applications/Discord.app/Contents/MacOS/Discord
+Identifier=com.hnc.Discord
+Signature size=8977
+Authority=Developer ID Application: Discord, Inc. (53Q6R32WPB)
+Authority=Developer ID Certification Authority
+Authority=Apple Root CA
+TeamIdentifier=53Q6R32WPB
+`
+
+func TestSignedForMacAppStore(t *testing.T) {
+	tests := []struct {
+		name string
+		out  string
+		want bool
+	}{
+		{"Mac App Store build", codesignMacAppStoreOutput, true},
+		{"Developer ID build", codesignDeveloperIDOutput, false},
+		{"empty output", "", false},
+		{"unreadable bundle", "/tmp/x.app: bundle format unrecognized, invalid, or unsuitable\n", false},
+		{"authority text inside another line is not enough", "Note=Authority=Apple Mac OS Application Signing\n", false},
+		{"surrounding whitespace and CRLF", "  Authority=Apple Mac OS Application Signing\r\n", true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := signedForMacAppStore(tt.out); got != tt.want {
+				t.Errorf("signedForMacAppStore() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestDetectAppStoreApp(t *testing.T) {
+	withReceipt := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(withReceipt, "Contents", "_MASReceipt"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(withReceipt, "Contents", "_MASReceipt", "receipt"), []byte("r"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Run("a receipt is enough, without consulting codesign", func(t *testing.T) {
+		if !detectAppStoreApp(context.Background(), withReceipt) {
+			t.Error("detectAppStoreApp() = false for a bundle with a receipt")
+		}
+	})
+
+	t.Run("no receipt and nothing codesign can read is not an App Store app", func(t *testing.T) {
+		if detectAppStoreApp(context.Background(), t.TempDir()) {
+			t.Error("detectAppStoreApp() = true for an empty directory")
+		}
+	})
+
+	t.Run("a path that does not exist is not an App Store app", func(t *testing.T) {
+		if detectAppStoreApp(context.Background(), filepath.Join(t.TempDir(), "Nope.app")) {
+			t.Error("detectAppStoreApp() = true for a missing path")
 		}
 	})
 }
