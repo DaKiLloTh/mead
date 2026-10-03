@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.12.1](https://github.com/DaKiLloTh/mead/compare/v0.12.0...v0.12.1) (2026-10-03)
+
+
+### Bug Fixes
+
+* Cmd+K command palette shortcut and hint on Linux ([#195](https://github.com/DaKiLloTh/mead/issues/195)) ([a65a1d2](https://github.com/DaKiLloTh/mead/commit/a65a1d23d3f64075a508fcf1caf7d9c3df369672))
+
 ## [0.12.0](https://github.com/DaKiLloTh/mead/compare/v0.11.1...v0.12.0) (2026-09-30)
 
 
