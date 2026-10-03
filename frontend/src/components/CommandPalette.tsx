@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'preact/hooks'
 import type { VNode, TargetedKeyboardEvent } from 'preact'
 import { useTranslation } from 'react-i18next'
 import { filterNavItems, filterPackages } from '../lib/paletteFilter'
-import { visibleNavItems } from '../lib/navCapabilities'
+import { isPrimaryShortcutModifierPressed, visibleNavItems } from '../lib/navCapabilities'
 import { useInstalledPackages } from '../context/InstalledPackagesSignal'
 import { useCapabilities } from '../context/CapabilitiesSignal'
 import { navItems, type ViewKey } from './Sidebar'
@@ -53,10 +53,12 @@ export default function CommandPalette({ onNavigate, bump, defaultOpen = false }
   const [detail, setDetail] = useState<DetailTarget | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  // Global Cmd+K toggles the palette from anywhere; Escape closes it.
+  // Global Cmd+K (or Ctrl+K where the platform has no Cmd key, see
+  // Capabilities.hasCmdModifierKey) toggles the palette from anywhere;
+  // Escape closes it.
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
-      if (e.metaKey && e.key.toLowerCase() === 'k') {
+      if (isPrimaryShortcutModifierPressed(e, capabilities) && e.key.toLowerCase() === 'k') {
         e.preventDefault()
         setOpen((o) => !o)
         return
@@ -68,7 +70,7 @@ export default function CommandPalette({ onNavigate, bump, defaultOpen = false }
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [open])
+  }, [open, capabilities])
 
   // Reset transient state and (re)focus the input every time the palette
   // opens. The package list itself comes from the shared cache, which is

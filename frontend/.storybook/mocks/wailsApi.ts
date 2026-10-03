@@ -77,5 +77,6 @@ export const defaultGoMocks: Record<string, (...args: unknown[]) => unknown> = {
     hasTouchID: true,
     hasAppAdoption: true,
     hasFloatingTitleBar: true,
+    hasCmdModifierKey: true,
   }),
 }

@@ -13,6 +13,7 @@ func TestCurrent_Linux(t *testing.T) {
 		HasTouchID:          false,
 		HasAppAdoption:      false,
 		HasFloatingTitleBar: false,
+		HasCmdModifierKey:   false,
 	}
 	if got != want {
 		t.Errorf("Current() = %+v, want %+v", got, want)
