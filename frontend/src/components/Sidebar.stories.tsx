@@ -18,6 +18,7 @@ const linuxCapabilities: Capabilities = {
   hasTouchID: false,
   hasAppAdoption: false,
   hasFloatingTitleBar: false,
+  hasCmdModifierKey: false,
 }
 
 type PlatformArg = 'macOS' | 'Linux'

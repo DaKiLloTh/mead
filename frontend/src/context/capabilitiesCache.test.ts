@@ -16,6 +16,7 @@ function linuxCaps(): Capabilities {
     hasTouchID: false,
     hasAppAdoption: false,
     hasFloatingTitleBar: false,
+    hasCmdModifierKey: false,
   }
 }
 

@@ -13,6 +13,7 @@ func TestCurrent_Darwin(t *testing.T) {
 		HasTouchID:          true,
 		HasAppAdoption:      true,
 		HasFloatingTitleBar: true,
+		HasCmdModifierKey:   true,
 	}
 	if got != want {
 		t.Errorf("Current() = %+v, want %+v", got, want)

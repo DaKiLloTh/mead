@@ -15,5 +15,6 @@ func Current() Capabilities {
 		HasTouchID:          true,
 		HasAppAdoption:      true,
 		HasFloatingTitleBar: true,
+		HasCmdModifierKey:   true,
 	}
 }

@@ -8,6 +8,7 @@ import { useSystemInfo, startSystemInfoPolling } from './context/SystemInfoSigna
 import { useOutdated, startOutdatedPolling } from './context/OutdatedSignal'
 import { useUpdateAvailable, startUpdateAvailablePolling } from './context/UpdateAvailableSignal'
 import { startCapabilitiesLoad, useCapabilities } from './context/CapabilitiesSignal'
+import { primaryShortcutModifierLabel } from './lib/navCapabilities'
 import { ensureServicesLoaded } from './context/ServicesSignal'
 import { ensureAppStoreLoaded } from './context/AppStoreSignal'
 import { RefreshIcon } from './components/Icons'
@@ -262,7 +263,7 @@ function AppShell() {
                 {t('common.updateHomebrew')}
               </button>
               <span className="flex items-center gap-1 text-base-content/40">
-                <kbd className="kbd kbd-xs">⌘</kbd>
+                <kbd className="kbd kbd-xs">{primaryShortcutModifierLabel(capabilities)}</kbd>
                 <kbd className="kbd kbd-xs">K</kbd>
               </span>
             </div>

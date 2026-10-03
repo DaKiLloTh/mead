@@ -31,3 +31,26 @@ export function isNavItemVisible(key: ViewKey, capabilities: Capabilities): bool
 export function visibleNavItems<T extends { key: ViewKey }>(items: T[], capabilities: Capabilities): T[] {
   return items.filter((item) => isNavItemVisible(item.key, capabilities))
 }
+
+// --- Command palette shortcut (Cmd+K / Ctrl+K), issue #192 ---
+//
+// CommandPalette.tsx's keydown handler and App.tsx's keycap hint both
+// assumed e.metaKey/"⌘" unconditionally, so the shortcut didn't exist on
+// Linux at all (there's no Cmd key) and the hint shown was simply wrong.
+// Pulled out as pure functions, same reasoning as the rest of this file:
+// testable without rendering either component, and App.tsx/CommandPalette.tsx
+// can't disagree about what the modifier is since they both call the same
+// function.
+
+/** True when e carries this platform's primary shortcut modifier: Cmd on macOS, Ctrl elsewhere. */
+export function isPrimaryShortcutModifierPressed(
+  e: { metaKey: boolean; ctrlKey: boolean },
+  capabilities: Capabilities
+): boolean {
+  return capabilities.hasCmdModifierKey ? e.metaKey : e.ctrlKey
+}
+
+/** The keycap label for the primary shortcut modifier, for a hint like "⌘ K" / "Ctrl K". */
+export function primaryShortcutModifierLabel(capabilities: Capabilities): string {
+  return capabilities.hasCmdModifierKey ? '⌘' : 'Ctrl'
+}

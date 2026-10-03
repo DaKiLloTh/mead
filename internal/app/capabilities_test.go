@@ -28,7 +28,10 @@ func TestCapabilitiesJSONKeys(t *testing.T) {
 	if err := json.Unmarshal(b, &m); err != nil {
 		t.Fatal(err)
 	}
-	keys := []string{"hasGatekeeper", "hasAppStore", "hasTimeMachine", "hasTouchID", "hasAppAdoption", "hasFloatingTitleBar"}
+	keys := []string{
+		"hasGatekeeper", "hasAppStore", "hasTimeMachine", "hasTouchID",
+		"hasAppAdoption", "hasFloatingTitleBar", "hasCmdModifierKey",
+	}
 	for _, k := range keys {
 		if _, ok := m[k]; !ok {
 			t.Errorf("Capabilities JSON is missing key %q", k)

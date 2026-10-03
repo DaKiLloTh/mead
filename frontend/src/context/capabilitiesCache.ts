@@ -32,6 +32,7 @@ export const defaultCapabilities: Capabilities = {
   hasTouchID: true,
   hasAppAdoption: true,
   hasFloatingTitleBar: true,
+  hasCmdModifierKey: true,
 }
 
 export const initialCapabilitiesState: CapabilitiesState = {

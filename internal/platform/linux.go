@@ -16,5 +16,6 @@ func Current() Capabilities {
 		HasTouchID:          false,
 		HasAppAdoption:      false,
 		HasFloatingTitleBar: false,
+		HasCmdModifierKey:   false,
 	}
 }

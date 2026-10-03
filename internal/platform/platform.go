@@ -56,4 +56,14 @@ type Capabilities struct {
 	// traffic-light buttons have somewhere to sit that isn't real content)
 	// is dead space on Linux, not a smaller version of the same problem.
 	HasFloatingTitleBar bool `json:"hasFloatingTitleBar"`
+
+	// HasCmdModifierKey is true when the platform's primary keyboard
+	// shortcut modifier is Cmd (macOS). Where it's false, the convention is
+	// Ctrl instead (Linux, matching GTK/most window managers' own
+	// shortcuts) -- found via issue #192, filed during the Linux milestone
+	// 1 build: the command palette's keydown handler and its keycap hint
+	// both assumed e.metaKey/"⌘" unconditionally, so the shortcut simply
+	// did not exist on Linux (there is no Cmd key to press) and the hint
+	// shown was wrong.
+	HasCmdModifierKey bool `json:"hasCmdModifierKey"`
 }
