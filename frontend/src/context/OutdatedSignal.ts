@@ -64,10 +64,9 @@ let pollingStarted = false
  * one can run without competing with it.
  *
  * effect() auto-tracks whatever signals its callback reads -- here, just
- * installedPackagesSignal -- and re-runs the callback on every change to it,
- * the same way a useEffect body re-runs on every change listed in its
- * dependency array, except inferred from the read itself rather than
- * hand-written, so it can't drift out of sync with what's actually read.
+ * installedPackagesSignal -- and re-runs the callback on every change to it.
+ * The dependency is inferred from the read itself, so it can't drift out of
+ * sync with what's actually read.
  *
  * The "already fired" guard inside the effect is read directly off
  * outdatedSignal itself (reference equality against the untouched

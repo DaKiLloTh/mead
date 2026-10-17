@@ -1,6 +1,6 @@
-// Framework-independent decision logic for OutdatedContext, extracted so the
+// Framework-independent decision logic for OutdatedSignal, extracted so the
 // "what happens to the cache when a fetch resolves" behavior can be unit
-// tested without rendering React or mocking timers.
+// tested without rendering Preact or mocking timers.
 //
 // Mirrors systemInfoCache.ts/installedPackagesCache.ts: a failure should only
 // ever surface as a user-visible error when there is no previously-good

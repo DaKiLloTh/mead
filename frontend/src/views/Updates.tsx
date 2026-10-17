@@ -1,10 +1,10 @@
-import { useSignal } from '@preact/signals'
-import { useEffect, useMemo } from 'preact/hooks'
+import { untracked, useComputed, useSignal, useSignalEffect } from '@preact/signals'
 import { useTranslation } from 'react-i18next'
 import { api, OutdatedPackage } from '../lib/api'
 import { useJobs } from '../context/JobsContext'
 import { useUserData } from '../context/UserDataContext'
-import { useOutdated } from '../context/OutdatedSignal'
+import { outdatedSignal, useOutdated } from '../context/OutdatedSignal'
+import { bump, refreshSignal } from '../context/RefreshSignal'
 import PackageDetailModal, { DetailTarget } from '../components/PackageDetailModal'
 import TypeBadge from '../components/TypeBadge'
 import TableShell from '../components/TableShell'
@@ -13,22 +13,17 @@ import EmptyState from '../components/EmptyState'
 import { ArrowUpCircleIcon, CheckIcon, ClockIcon } from '../components/Icons'
 import ErrorAlert from '../components/ErrorAlert'
 
-interface Props {
-  refreshToken: number
-  bump: () => void
-}
-
 const SNOOZE_OPTIONS = [
   { labelKey: 'updates.snoozeOneDay', days: 1 },
   { labelKey: 'updates.snoozeOneWeek', days: 7 },
   { labelKey: 'updates.snoozeOneMonth', days: 30 },
 ]
 
-export default function Updates({ refreshToken, bump }: Props) {
+export default function Updates() {
   const { t } = useTranslation()
   const { runAction } = useJobs()
   const userData = useUserData()
-  // Non-greedy reads from the shared OutdatedContext cache (same source the
+  // Non-greedy reads from the shared outdated cache (same source the
   // sidebar badge uses), rather than this view running its own independent
   // `api.outdated()` fetch -- two separate fetches racing to resolve is
   // exactly what made the sidebar badge and this page's own count disagree
@@ -47,7 +42,7 @@ export default function Updates({ refreshToken, bump }: Props) {
   const greedy = useSignal(false)
   const detail = useSignal<DetailTarget | null>(null)
 
-  const items = greedy.value ? greedyItems.value : (outdated.items ?? [])
+  const items = useComputed(() => (greedy.value ? greedyItems.value : (outdatedSignal.value.items ?? [])))
   const loading = greedy.value ? greedyLoading.value : outdated.loading
   const error = greedy.value ? greedyError.value : outdated.error
 
@@ -61,16 +56,19 @@ export default function Updates({ refreshToken, bump }: Props) {
       .finally(() => (greedyLoading.value = false))
   }
 
-  useEffect(() => {
-    if (greedy.value) loadGreedy()
-    // Only reads and writes signals, which never change identity.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [greedy.value, refreshToken])
+  // Re-fetches the greedy list when the toggle turns on and on every bump()
+  // while it's on.
+  useSignalEffect(() => {
+    void refreshSignal.value
+    if (greedy.value) untracked(loadGreedy)
+  })
 
-  const { visible, snoozed } = useMemo(() => {
+  // snoozedUntil reads the user data signal, so this recomputes when a
+  // package is snoozed or unsnoozed.
+  const split = useComputed(() => {
     const visible: OutdatedPackage[] = []
     const snoozed: OutdatedPackage[] = []
-    for (const p of items) {
+    for (const p of items.value) {
       if (userData.snoozedUntil(p.name, p.isCask)) {
         snoozed.push(p)
       } else {
@@ -78,8 +76,8 @@ export default function Updates({ refreshToken, bump }: Props) {
       }
     }
     return { visible, snoozed }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [items, userData.data])
+  })
+  const { visible, snoozed } = split.value
 
   // bump() already covers the non-greedy refresh via the shared cache's
   // refresh(); only the greedy-specific fetch needs an explicit call here,
@@ -147,7 +145,7 @@ export default function Updates({ refreshToken, bump }: Props) {
 
       {error ? (
         <ErrorAlert title={t('updates.errorTitle')} message={error} />
-      ) : loading && items.length === 0 ? (
+      ) : loading && items.value.length === 0 ? (
         <LoadingRow>{t('updates.checking')}</LoadingRow>
       ) : list.length === 0 ? (
         <EmptyState icon={CheckIcon}>

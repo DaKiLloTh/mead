@@ -1,20 +1,16 @@
-import { useSignal } from '@preact/signals'
-import { useEffect, useMemo, useRef } from 'preact/hooks'
+import { untracked, useComputed, useSignal, useSignalEffect } from '@preact/signals'
+import { useRef } from 'preact/hooks'
 import { useTranslation } from 'react-i18next'
 import { api, SearchResult } from '../lib/api'
 import { useJobs } from '../context/JobsContext'
+import { bump, useRefreshEffect } from '../context/RefreshSignal'
 import PackageDetailModal, { DetailTarget } from '../components/PackageDetailModal'
 import SearchResultCard from '../components/SearchResultCard'
 import { SearchIcon } from '../components/Icons'
 
 type Filter = 'all' | 'formula' | 'cask'
 
-interface Props {
-  refreshToken: number
-  bump: () => void
-}
-
-export default function Search({ refreshToken, bump }: Props) {
+export default function Search() {
   const { t } = useTranslation()
   const { runAction } = useJobs()
   const query = useSignal('')
@@ -38,65 +34,70 @@ export default function Search({ refreshToken, bump }: Props) {
   const issuedSeqRef = useRef(0)
   const appliedSeqRef = useRef(0)
 
-  useEffect(() => {
+  useRefreshEffect(() => {
     api
       .listInstalled()
       .then((pkgs) => (installedKeys.value = new Set(pkgs.map((p) => `${p.isCask ? 'c' : 'f'}:${p.name}`))))
       .catch(() => {})
-  }, [installedKeys, refreshToken])
+  })
 
-  useEffect(() => {
+  // Tracks only the query and the descriptions toggle; the rest runs
+  // untracked so writing results/loading doesn't re-trigger it.
+  useSignalEffect(() => {
     const q = query.value.trim()
-    if (!q) {
-      results.value = null
-      loading.value = false
-      return
-    }
-    loading.value = true
-    // Debounced so fast, continuous typing doesn't fire a real search on
-    // every keystroke -- but once a request does fire, it's left to run
-    // and its response is allowed to render (not aborted) purely because
-    // a newer request has since started. Only an out-of-order response --
-    // one that resolves after something issued later has already been
-    // applied -- gets dropped. That's the actual bug: a broader query
-    // (e.g. "ard", which matches far more packages than "arduino" and so
-    // takes longer to enrich/rank) arriving after a narrower one and
-    // clobbering its more relevant results, not merely that two requests
-    // overlapped.
-    const handle = setTimeout(() => {
-      const seq = ++issuedSeqRef.current
-      api
-        .search(q, searchDesc.value)
-        .then((r) => {
-          if (seq > appliedSeqRef.current) {
-            appliedSeqRef.current = seq
-            results.value = r
-          }
-        })
-        .catch(() => {
-          if (seq > appliedSeqRef.current) {
-            appliedSeqRef.current = seq
-            results.value = []
-          }
-        })
-        .finally(() => {
-          // Only the most recently *issued* request controls the spinner
-          // -- an older one settling after a newer one has already started
-          // shouldn't flip loading back off.
-          if (seq === issuedSeqRef.current) loading.value = false
-        })
-    }, 300)
-    return () => clearTimeout(handle)
-  }, [loading, query.value, results, searchDesc.value])
+    const desc = searchDesc.value
+    return untracked(() => {
+      if (!q) {
+        results.value = null
+        loading.value = false
+        return
+      }
+      loading.value = true
+      // Debounced so fast, continuous typing doesn't fire a real search on
+      // every keystroke -- but once a request does fire, it's left to run
+      // and its response is allowed to render (not aborted) purely because
+      // a newer request has since started. Only an out-of-order response --
+      // one that resolves after something issued later has already been
+      // applied -- gets dropped. That's the actual bug: a broader query
+      // (e.g. "ard", which matches far more packages than "arduino" and so
+      // takes longer to enrich/rank) arriving after a narrower one and
+      // clobbering its more relevant results, not merely that two requests
+      // overlapped.
+      const handle = setTimeout(() => {
+        const seq = ++issuedSeqRef.current
+        api
+          .search(q, desc)
+          .then((r) => {
+            if (seq > appliedSeqRef.current) {
+              appliedSeqRef.current = seq
+              results.value = r
+            }
+          })
+          .catch(() => {
+            if (seq > appliedSeqRef.current) {
+              appliedSeqRef.current = seq
+              results.value = []
+            }
+          })
+          .finally(() => {
+            // Only the most recently *issued* request controls the spinner
+            // -- an older one settling after a newer one has already started
+            // shouldn't flip loading back off.
+            if (seq === issuedSeqRef.current) loading.value = false
+          })
+      }, 300)
+      return () => clearTimeout(handle)
+    })
+  })
 
-  const filtered = useMemo(() => {
+  const filtered = useComputed(() => {
     if (!results.value) return []
     return results.value.filter((r) => {
       if (filter.value === 'formula') return !r.isCask
       if (filter.value === 'cask') return r.isCask
       return true
     })
-  }, [results.value, filter.value])
+  })
 
   async function quickInstall(r: SearchResult) {
     const key = `${r.isCask ? 'c' : 'f'}:${r.name}`
@@ -173,7 +174,7 @@ export default function Search({ refreshToken, bump }: Props) {
         // of letting a stale, possibly-irrelevant list sit there looking
         // current until the new one lands.
         <div className={`flex flex-col gap-3 transition-opacity ${loading.value ? 'opacity-50' : ''}`}>
-          {filtered.map((r) => {
+          {filtered.value.map((r) => {
             const key = `${r.isCask ? 'c' : 'f'}:${r.name}`
             return (
               <SearchResultCard
@@ -186,7 +187,7 @@ export default function Search({ refreshToken, bump }: Props) {
               />
             )
           })}
-          {filtered.length === 0 && !loading.value && (
+          {filtered.value.length === 0 && !loading.value && (
             <div className="text-base-content/50 text-sm py-8 text-center">{t('search.noResults')}</div>
           )}
         </div>

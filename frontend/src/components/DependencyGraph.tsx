@@ -1,5 +1,5 @@
-import { useSignal } from '@preact/signals'
-import { useEffect, useMemo, useRef } from 'preact/hooks'
+import { untracked, useComputed, useSignal, useSignalEffect } from '@preact/signals'
+import { useRef } from 'preact/hooks'
 import { useTranslation } from 'react-i18next'
 import cytoscape from 'cytoscape'
 import CytoscapeComponent from 'react-cytoscapejs'
@@ -11,8 +11,8 @@ import CytoscapeComponent from 'react-cytoscapejs'
 // vite.config.ts, this cast only works around the type mismatch.
 const CytoscapeGraph = CytoscapeComponent as unknown as (props: Record<string, unknown>) => import('preact').VNode
 import { api, DependencyGraph as DependencyGraphData, pkgKey } from '../lib/api'
-import { useInstalledPackages } from '../context/InstalledPackagesSignal'
-import { useLazySignal } from '../lib/useLazySignal'
+import { installedPackagesSignal } from '../context/InstalledPackagesSignal'
+import { themeColorsSignal } from '../context/ThemeColorsSignal'
 import { useJobs } from '../context/JobsContext'
 import type { DetailTarget } from './PackageDetailModal'
 import { DownloadIcon, MaximizeIcon } from './Icons'
@@ -22,29 +22,6 @@ type LayoutMode = 'hierarchical' | 'force'
 interface Props {
   target: DetailTarget
   onSelectPackage: (target: DetailTarget) => void
-}
-
-// Reads the app's current daisyUI theme colors straight from the resolved
-// CSS custom properties on <html> (see style.css: only a light/dark pair,
-// switched automatically by prefers-color-scheme -- there's no in-app theme
-// toggle to hook into) so the graph's node/edge colors always match the rest
-// of the UI instead of a hardcoded palette that would look wrong in dark
-// mode.
-function readThemeColors() {
-  const style = getComputedStyle(document.documentElement)
-  const get = (name: string, fallback: string) => {
-    const v = style.getPropertyValue(name).trim()
-    return v || fallback
-  }
-  return {
-    base100: get('--color-base-100', '#ffffff'),
-    base300: get('--color-base-300', '#d4d4d4'),
-    baseContent: get('--color-base-content', '#1f2937'),
-    primary: get('--color-primary', '#4f46e5'),
-    primaryContent: get('--color-primary-content', '#ffffff'),
-    success: get('--color-success', '#22c55e'),
-    successContent: get('--color-success-content', '#052e12'),
-  }
 }
 
 function layoutOptionsFor(mode: LayoutMode, root: string): cytoscape.LayoutOptions {
@@ -84,51 +61,47 @@ function layoutOptionsFor(mode: LayoutMode, root: string): cytoscape.LayoutOptio
 export default function DependencyGraph({ target, onSelectPackage }: Props) {
   const { t } = useTranslation()
   const { notify } = useJobs()
-  const installed = useInstalledPackages()
   const graph = useSignal<DependencyGraphData | null>(null)
   const loading = useSignal(false)
   const error = useSignal<string | null>(null)
   const layoutMode = useSignal<LayoutMode>('hierarchical')
   const exporting = useSignal(false)
   const cy = useSignal<cytoscape.Core | null>(null)
-  const colors = useLazySignal(readThemeColors)
+  const colors = themeColorsSignal()
   const containerRef = useRef<HTMLDivElement | null>(null)
 
-  useEffect(() => {
-    let cancelled = false
-    loading.value = true
-    error.value = null
-    graph.value = null
-    api
-      .depsGraph(target.name, target.isCask)
-      .then((g) => {
-        if (!cancelled) graph.value = g
-      })
-      .catch((e) => {
-        if (!cancelled) error.value = String(e)
-      })
-      .finally(() => {
-        if (!cancelled) loading.value = false
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [target.name, target.isCask, loading, error, graph])
+  // Fetches once per mount. PackageDetailModal keys this component on the
+  // package, so a different target is a fresh mount.
+  useSignalEffect(() =>
+    untracked(() => {
+      let cancelled = false
+      loading.value = true
+      error.value = null
+      graph.value = null
+      api
+        .depsGraph(target.name, target.isCask)
+        .then((g) => {
+          if (!cancelled) graph.value = g
+        })
+        .catch((e) => {
+          if (!cancelled) error.value = String(e)
+        })
+        .finally(() => {
+          if (!cancelled) loading.value = false
+        })
+      return () => {
+        cancelled = true
+      }
+    })
+  )
 
-  useEffect(() => {
-    const mq = window.matchMedia('(prefers-color-scheme: dark)')
-    const update = () => (colors.value = readThemeColors())
-    mq.addEventListener('change', update)
-    return () => mq.removeEventListener('change', update)
-  }, [colors])
-
-  const installedKeys = useMemo(() => {
+  const installedKeys = useComputed(() => {
     const set = new Set<string>()
-    for (const p of installed.packages ?? []) set.add(pkgKey(p.name, p.isCask))
+    for (const p of installedPackagesSignal.value.packages ?? []) set.add(pkgKey(p.name, p.isCask))
     return set
-  }, [installed.packages])
+  })
 
-  const elements = useMemo(() => {
+  const elements = useComputed(() => {
     const g = graph.value
     if (!g) return []
     const nodes = g.nodes.map((n) => ({
@@ -137,80 +110,80 @@ export default function DependencyGraph({ target, onSelectPackage }: Props) {
         label: n.name,
         isRoot: n.name === g.root,
         isCask: n.isCask,
-        installed: installedKeys.has(pkgKey(n.name, n.isCask)),
+        installed: installedKeys.value.has(pkgKey(n.name, n.isCask)),
       },
     }))
     const edges = g.edges.map((e, i) => ({
       data: { id: `e${i}:${e.from}->${e.to}`, source: e.from, target: e.to },
     }))
     return [...nodes, ...edges]
-  }, [graph.value, installedKeys])
+  })
 
-  const stylesheet = useMemo<cytoscape.StylesheetJson>(
-    () => [
-      {
-        selector: 'node',
-        style: {
-          label: 'data(label)',
-          width: 34,
-          height: 34,
-          'font-size': 10,
-          color: colors.value.baseContent,
-          'text-valign': 'bottom',
-          'text-margin-y': 6,
-          'text-wrap': 'ellipsis',
-          'text-max-width': '90px',
-          'background-color': colors.value.base300,
-          'border-width': 2,
-          'border-color': colors.value.base300,
-          'text-outline-width': 0,
-        },
+  const stylesheet = useComputed<cytoscape.StylesheetJson>(() => [
+    {
+      selector: 'node',
+      style: {
+        label: 'data(label)',
+        width: 34,
+        height: 34,
+        'font-size': 10,
+        color: colors.value.baseContent,
+        'text-valign': 'bottom',
+        'text-margin-y': 6,
+        'text-wrap': 'ellipsis',
+        'text-max-width': '90px',
+        'background-color': colors.value.base300,
+        'border-width': 2,
+        'border-color': colors.value.base300,
+        'text-outline-width': 0,
       },
-      {
-        selector: 'node[?installed]',
-        style: {
-          'background-color': colors.value.success,
-          'border-color': colors.value.success,
-          color: colors.value.baseContent,
-        },
+    },
+    {
+      selector: 'node[?installed]',
+      style: {
+        'background-color': colors.value.success,
+        'border-color': colors.value.success,
+        color: colors.value.baseContent,
       },
-      {
-        selector: 'node[?isRoot]',
-        style: {
-          'background-color': colors.value.primary,
-          'border-color': colors.value.primaryContent,
-          'border-width': 3,
-          width: 46,
-          height: 46,
-          'font-weight': 'bold',
-        },
+    },
+    {
+      selector: 'node[?isRoot]',
+      style: {
+        'background-color': colors.value.primary,
+        'border-color': colors.value.primaryContent,
+        'border-width': 3,
+        width: 46,
+        height: 46,
+        'font-weight': 'bold',
       },
-      {
-        selector: 'edge',
-        style: {
-          width: 1.5,
-          'line-color': colors.value.base300,
-          'target-arrow-color': colors.value.base300,
-          'target-arrow-shape': 'triangle',
-          'arrow-scale': 0.8,
-          'curve-style': 'bezier',
-        },
+    },
+    {
+      selector: 'edge',
+      style: {
+        width: 1.5,
+        'line-color': colors.value.base300,
+        'target-arrow-color': colors.value.base300,
+        'target-arrow-shape': 'triangle',
+        'arrow-scale': 0.8,
+        'curve-style': 'bezier',
       },
-    ],
-    [colors.value]
-  )
+    },
+  ])
 
   // The `layout` prop passed to CytoscapeComponent is intentionally a fixed
   // no-op ('preset') -- see below -- so layout runs are entirely driven from
   // here instead of relying on react-cytoscapejs's shallow prop diffing
   // (which wouldn't reliably detect "same layout name, but the underlying
   // element set changed" as something worth re-laying-out for).
-  useEffect(() => {
-    if (!cy.value || !graph.value) return
-    cy.value.layout(layoutOptionsFor(layoutMode.value, graph.value.root)).run()
-  }, [cy.value, graph.value, layoutMode.value])
+  useSignalEffect(() => {
+    const c = cy.value
+    const g = graph.value
+    const mode = layoutMode.value
+    if (!c || !g) return
+    untracked(() => c.layout(layoutOptionsFor(mode, g.root)).run())
+  })
 
-  useEffect(() => {
+  useSignalEffect(() => {
     const c = cy.value
     if (!c) return
     const handler = (evt: cytoscape.EventObject) => {
@@ -221,7 +194,7 @@ export default function DependencyGraph({ target, onSelectPackage }: Props) {
     return () => {
       c.off('tap', 'node', handler)
     }
-  }, [cy.value, onSelectPackage])
+  })
 
   function fitToView() {
     cy.value?.fit(undefined, 30)
@@ -319,8 +292,8 @@ export default function DependencyGraph({ target, onSelectPackage }: Props) {
         )}
         {!loading.value && !error.value && graph.value && graph.value.nodes.length > 1 && (
           <CytoscapeGraph
-            elements={elements}
-            stylesheet={stylesheet}
+            elements={elements.value}
+            stylesheet={stylesheet.value}
             layout={{ name: 'preset' }}
             cy={(v: cytoscape.Core) => (cy.value = v)}
             style={{ width: '100%', height: '100%' }}

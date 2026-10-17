@@ -1,7 +1,7 @@
-import { useSignal } from '@preact/signals'
-import { useEffect, useRef } from 'preact/hooks'
+import { useComputed, useSignal, useSignalEffect } from '@preact/signals'
+import { useRef } from 'preact/hooks'
 import { useTranslation } from 'react-i18next'
-import { useJobs } from '../context/JobsContext'
+import { jobsSignal, selectedJobIdSignal, useJobs } from '../context/JobsContext'
 import { duration } from '../lib/format'
 import { api } from '../lib/api'
 import ExternalLink from './ExternalLink'
@@ -58,40 +58,39 @@ function GistLogsButton({ title }: { title: string }) {
 
 export default function JobConsole() {
   const { t } = useTranslation()
-  const {
-    jobs,
-    activeCount,
-    consoleOpen,
-    setConsoleOpen,
-    selectedJobId,
-    setSelectedJobId,
-    cancelJob,
-    clearFinishedJobs,
-  } = useJobs()
+  const { jobs, activeCount, consoleOpen, setConsoleOpen, setSelectedJobId, cancelJob, clearFinishedJobs } = useJobs()
   const bodyRef = useRef<HTMLDivElement>(null)
-  const inputValue = useSignal('')
 
-  const selected = jobs.find((j) => j.id === selectedJobId) ?? jobs[jobs.length - 1]
+  const selectedSignal = useComputed(() => {
+    const all = jobsSignal.value
+    return all.find((j) => j.id === selectedJobIdSignal.value) ?? all[all.length - 1]
+  })
+  const selected = selectedSignal.value
 
   // Only a pty-backed job (currently mas upgrade -- see App.SendJobInput)
-  // can actually receive this; reset whenever the selected job changes so a
-  // half-typed password from a previous job never lingers into the next
-  // one's input box.
-  useEffect(() => {
-    inputValue.value = ''
-  }, [inputValue, selected?.id])
+  // can actually receive this. The draft is tagged with the job it was
+  // typed for, so a half-typed password from a previous job never shows up
+  // in the next one's input box.
+  const draft = useSignal<{ jobId: string; text: string } | null>(null)
+  const inputValue = useComputed(() =>
+    draft.value && draft.value.jobId === selectedSignal.value?.id ? draft.value.text : ''
+  )
 
   function sendInput() {
     if (!selected || !inputValue.value) return
     void api.sendJobInput(selected.id, inputValue.value)
-    inputValue.value = ''
+    draft.value = null
   }
 
-  useEffect(() => {
+  // Keeps the output scrolled to the bottom as lines arrive or the
+  // selected job changes. Runs after the render, so scrollHeight is current.
+  useSignalEffect(() => {
+    void selectedSignal.value?.lines.length
+    void selectedSignal.value?.id
     if (bodyRef.current) {
       bodyRef.current.scrollTop = bodyRef.current.scrollHeight
     }
-  }, [selected?.lines.length, selected?.id])
+  })
 
   if (jobs.length === 0) {
     return null
@@ -186,7 +185,7 @@ export default function JobConsole() {
                   className="input input-sm w-full font-mono"
                   placeholder={t('jobConsole.inputPlaceholder')}
                   value={inputValue.value}
-                  onChange={(e) => (inputValue.value = e.currentTarget.value)}
+                  onChange={(e) => selected && (draft.value = { jobId: selected.id, text: e.currentTarget.value })}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') sendInput()
                   }}

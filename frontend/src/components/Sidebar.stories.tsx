@@ -1,5 +1,4 @@
 import type { Meta, StoryObj } from '@storybook/preact-vite'
-import { useEffect } from 'preact/hooks'
 import { useArgs } from 'storybook/preview-api'
 import Sidebar, { navItems, type ViewKey } from './Sidebar'
 import { capabilitiesSignal } from '../context/CapabilitiesSignal'
@@ -39,19 +38,13 @@ interface StoryArgs {
 
 function Render(args: StoryArgs) {
   const [, updateArgs] = useArgs<StoryArgs>()
-  // A plain render-time assignment here trips the react-hooks
-  // immutability rule (Render calls useArgs, so eslint treats it as a
-  // component and flags mutating an external signal during render) --
-  // an effect, same as the rule's own suggestion, is what CommandPalette
-  // and JobConsole's stories get away without only because their render
-  // functions don't call any hooks themselves.
-  useEffect(() => {
-    capabilitiesSignal.value = {
-      caps: args.platform === 'Linux' ? linuxCapabilities : defaultCapabilities,
-      loading: false,
-      error: null,
-    }
-  }, [args.platform])
+  // Render doesn't read capabilitiesSignal, so writing it here only
+  // re-renders Sidebar, which does.
+  capabilitiesSignal.value = {
+    caps: args.platform === 'Linux' ? linuxCapabilities : defaultCapabilities,
+    loading: false,
+    error: null,
+  }
   return <Sidebar view={args.view} outdatedCount={args.outdatedCount} onSelect={(v) => updateArgs({ view: v })} />
 }
 

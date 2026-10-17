@@ -1,5 +1,4 @@
-import { useSignal } from '@preact/signals'
-import { useEffect } from 'preact/hooks'
+import { untracked, useSignal, useSignalEffect } from '@preact/signals'
 import { Trans, useTranslation } from 'react-i18next'
 import { api, type TouchIDStatus } from '../lib/api'
 import { useJobs } from '../context/JobsContext'
@@ -39,12 +38,12 @@ export default function AppStore() {
   // Idempotent: a no-op if Sidebar's onMouseEnter already started this
   // fetch before the view mounted. mas is the slowest CLI this app shells
   // out to, so the hover head-start matters more here than most views.
-  useEffect(() => {
-    ensureAppStoreLoaded()
-    loadTouchIdStatus()
-    // Only reads and writes signals, which never change identity.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  useSignalEffect(() =>
+    untracked(() => {
+      ensureAppStoreLoaded()
+      loadTouchIdStatus()
+    })
+  )
 
   async function installMas() {
     installingMas.value = true
@@ -73,7 +72,9 @@ export default function AppStore() {
     }
   }
 
-  useEffect(() => {
+  // Polls while waiting for Touch ID setup to land. Only awaitingTouchId is
+  // tracked; the interval's own reads and writes happen outside the run.
+  useSignalEffect(() => {
     if (!awaitingTouchId.value) return
     const started = Date.now()
     const timer = setInterval(async () => {
@@ -90,8 +91,7 @@ export default function AppStore() {
       if (Date.now() - started > TOUCH_ID_WAIT_MS) awaitingTouchId.value = false
     }, TOUCH_ID_POLL_MS)
     return () => clearInterval(timer)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [awaitingTouchId.value])
+  })
 
   // If mas needs sudo partway through (Xcode's App Store delivery pipeline
   // is the known case), the backend job runs with a controlling pty, so sudo

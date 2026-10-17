@@ -25,11 +25,27 @@ export default tseslint.config(
       'no-restricted-imports': [
         'error',
         {
-          paths: ['preact/hooks', 'preact/compat', 'react'].map((name) => ({
-            name,
-            importNames: ['useState', 'useReducer'],
-            message: 'Use useSignal from @preact/signals (or useLazySignal from lib/useLazySignal) for component state.',
-          })),
+          paths: [
+            {
+              name: 'preact',
+              importNames: ['createContext'],
+              message: 'Shared state lives in module-level signal stores (see src/context/), not Context.',
+            },
+            ...['preact/hooks', 'preact/compat', 'react'].map((name) => ({
+              name,
+              importNames: [
+                'useState',
+                'useReducer',
+                'useEffect',
+                'useLayoutEffect',
+                'useMemo',
+                'useCallback',
+                'useContext',
+              ],
+              message:
+                'Use @preact/signals: useSignal for state, useComputed for derived values, useSignalEffect for side effects, module-level signal stores for shared state.',
+            })),
+          ],
         },
       ],
       '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],

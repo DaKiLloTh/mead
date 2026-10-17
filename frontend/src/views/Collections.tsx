@@ -1,23 +1,21 @@
-import { useSignal } from '@preact/signals'
-import { useEffect } from 'preact/hooks'
+import { untracked, useSignal, useSignalEffect } from '@preact/signals'
 import { useTranslation } from 'react-i18next'
 import { api, Collection } from '../lib/api'
 import { useJobs } from '../context/JobsContext'
+import { bump } from '../context/RefreshSignal'
 import { DownloadIcon, GridIcon } from '../components/Icons'
 
-interface Props {
-  bump: () => void
-}
-
-export default function Collections({ bump }: Props) {
+export default function Collections() {
   const { t } = useTranslation()
   const { runAction } = useJobs()
   const collections = useSignal<Collection[]>([])
   const installing = useSignal<string | null>(null)
 
-  useEffect(() => {
-    api.getCollections().then((v) => (collections.value = v))
-  }, [collections])
+  useSignalEffect(() =>
+    untracked(() => {
+      api.getCollections().then((v) => (collections.value = v))
+    })
+  )
 
   async function install(c: Collection) {
     installing.value = c.name

@@ -3,14 +3,11 @@ import { Trans, useTranslation } from 'react-i18next'
 import { api, AdoptCandidate } from '../lib/api'
 import { useJobs } from '../context/JobsContext'
 import { useConfirm } from '../context/ConfirmContext'
+import { bump } from '../context/RefreshSignal'
 import { DownloadIcon, ImportIcon, AlertIcon, CheckIcon } from '../components/Icons'
 import PackageDetailModal, { DetailTarget } from '../components/PackageDetailModal'
 import ErrorAlert from '../components/ErrorAlert'
 import ResultCard from '../components/ResultCard'
-
-interface Props {
-  bump: () => void
-}
 
 // Whether the installed app's version differs from the cask's, meaning
 // brew's --adopt (which only succeeds for an identical on-disk version)
@@ -23,7 +20,7 @@ function needsForceAdopt(c: AdoptCandidate): boolean {
   return !!c.installedVersion && !!c.caskVersion && c.installedVersion !== c.caskVersion
 }
 
-export default function Adopt({ bump }: Props) {
+export default function Adopt() {
   const { t } = useTranslation()
   const { runAction } = useJobs()
   const confirm = useConfirm()

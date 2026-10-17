@@ -15,8 +15,7 @@ const POLL_INTERVAL_MS = 60_000
  * Dashboard itself so navigating away and back doesn't reset to a loading
  * spinner (see issue #76).
  *
- * See InstalledPackagesSignal.ts for why this is a plain module-level signal
- * rather than a Context/Provider.
+ * See InstalledPackagesSignal.ts for how module-level signal stores work.
  *
  * A failed background poll never clears or masks previously-good data, see
  * systemInfoCache.ts for the decision logic and why. Only the initial load

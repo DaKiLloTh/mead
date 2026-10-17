@@ -48,6 +48,10 @@ vi.mock('../context/UserDataContext', () => ({
 const searchMock = vi.fn()
 const listInstalledMock = vi.fn()
 
+vi.mock('../context/RefreshSignal', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../context/RefreshSignal')>()),
+  bump: vi.fn(),
+}))
 vi.mock('../lib/api', () => ({
   api: {
     search: (...args: unknown[]) => searchMock(...args),
@@ -105,7 +109,7 @@ describe('Search: out-of-order response guard', () => {
     const d3 = deferred<SearchResult[]>()
     searchMock.mockReturnValueOnce(d1.promise).mockReturnValueOnce(d2.promise).mockReturnValueOnce(d3.promise)
 
-    render(<Search refreshToken={0} bump={vi.fn()} />)
+    render(<Search />)
     const input = screen.getByPlaceholderText('search.placeholder') as HTMLInputElement
 
     // Issue query 1, let its debounce elapse so the request actually fires.
@@ -156,7 +160,7 @@ describe('Search: out-of-order response guard', () => {
     const d1 = deferred<SearchResult[]>()
     searchMock.mockReturnValueOnce(d1.promise)
 
-    render(<Search refreshToken={0} bump={vi.fn()} />)
+    render(<Search />)
     const input = screen.getByPlaceholderText('search.placeholder') as HTMLInputElement
 
     await typeQuery(input, 'arduino')

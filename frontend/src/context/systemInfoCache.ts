@@ -1,12 +1,12 @@
-// Framework-independent decision logic for SystemInfoContext, extracted so
+// Framework-independent decision logic for SystemInfoSignal, extracted so
 // the "what happens to the cache when a fetch resolves" behavior can be unit
-// tested without rendering React or mocking timers.
+// tested without rendering Preact or mocking timers.
 //
 // This mirrors installedPackagesCache.ts: the shared system-info cache is
 // refreshed from three places, the initial load on app start, a background
 // poll every POLL_INTERVAL_MS, and an explicit refresh() after the user does
 // something that changes system state (update/upgrade/doctor, or the app's
-// shared refreshToken signal). All three funnel through the same "apply a
+// shared bump(), see RefreshSignal.ts). All three funnel through the same "apply a
 // fetch outcome to the current state" decision, and that decision has a rule
 // worth getting right and testing directly: a failure should only ever
 // surface as a user-visible error when there is no previously-good cache to

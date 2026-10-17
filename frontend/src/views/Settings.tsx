@@ -1,22 +1,12 @@
-import { useSignal } from '@preact/signals'
-import { useEffect } from 'preact/hooks'
+import { untracked, useComputed, useSignal, useSignalEffect } from '@preact/signals'
 import { Trans, useTranslation } from 'react-i18next'
 import { api } from '../lib/api'
-import { useLazySignal } from '../lib/useLazySignal'
+import { SIZES, textSizeSignal } from '../context/TextSizeSignal'
 import { useJobs } from '../context/JobsContext'
 import { useConfirm } from '../context/ConfirmContext'
-import { useUserData } from '../context/UserDataContext'
+import { userDataSignal, useUserData } from '../context/UserDataContext'
 import { supportedLngs } from '../i18n'
 import { DownloadIcon, ImportIcon } from '../components/Icons'
-
-const SIZES = [
-  { key: 'sm', labelKey: 'settings.sizeSmall', scale: '14px' },
-  { key: 'md', labelKey: 'settings.sizeDefault', scale: '16px' },
-  { key: 'lg', labelKey: 'settings.sizeLarge', scale: '18px' },
-  { key: 'xl', labelKey: 'settings.sizeExtraLarge', scale: '20px' },
-] as const
-
-type SizeKey = (typeof SIZES)[number]['key']
 
 // Language names in a language picker are conventionally shown in their own
 // endonym (a French speaker sees "Français" whether the UI is currently in
@@ -26,11 +16,6 @@ type SizeKey = (typeof SIZES)[number]['key']
 const LANGUAGE_NAMES: Record<string, string> = {
   en: 'English',
   de: 'Deutsch',
-}
-
-function getInitialSize(): SizeKey {
-  const stored = localStorage.getItem('textSize') as SizeKey | null
-  return stored && SIZES.some((s) => s.key === stored) ? stored : 'md'
 }
 
 export default function Settings() {
@@ -43,10 +28,11 @@ export default function Settings() {
   const analyticsLoading = useSignal(false)
   const analyticsBusy = useSignal<string | null>(null)
 
-  const appDir = useSignal('')
+  // What the user has typed, if anything; until then the field shows the
+  // saved value from user data.
+  const appDirDraft = useSignal<string | null>(null)
+  const appDir = useComputed(() => appDirDraft.value ?? userDataSignal.value?.settings?.caskAppDir ?? '')
   const appDirSaved = useSignal(false)
-
-  const size = useLazySignal<SizeKey>(getInitialSize)
 
   const exportingData = useSignal(false)
   const importingData = useSignal(false)
@@ -60,17 +46,7 @@ export default function Settings() {
       .finally(() => (analyticsLoading.value = false))
   }
 
-  useEffect(loadAnalytics, [analytics, analyticsLoading])
-
-  useEffect(() => {
-    appDir.value = userData.data?.settings?.caskAppDir ?? ''
-  }, [appDir, userData.data])
-
-  useEffect(() => {
-    const found = SIZES.find((s) => s.key === size.value) ?? SIZES[1]
-    document.documentElement.style.fontSize = found.scale
-    localStorage.setItem('textSize', size.value)
-  }, [size.value])
+  useSignalEffect(() => untracked(loadAnalytics))
 
   async function analyticsToggle(enabled: boolean) {
     analyticsBusy.value = enabled ? 'on' : 'off'
@@ -202,7 +178,7 @@ export default function Settings() {
               className="input input-sm flex-1"
               placeholder={t('settings.appDirPlaceholder')}
               value={appDir.value}
-              onChange={(e) => (appDir.value = e.currentTarget.value)}
+              onChange={(e) => (appDirDraft.value = e.currentTarget.value)}
             />
             <button className="btn btn-sm btn-primary" onClick={saveAppDir}>
               {appDirSaved.value ? t('common.saved') : t('common.save')}
@@ -241,8 +217,8 @@ export default function Settings() {
             {SIZES.map((s) => (
               <button
                 key={s.key}
-                className={`btn btn-sm join-item ${size.value === s.key ? 'btn-primary' : ''}`}
-                onClick={() => (size.value = s.key)}
+                className={`btn btn-sm join-item ${textSizeSignal.value === s.key ? 'btn-primary' : ''}`}
+                onClick={() => (textSizeSignal.value = s.key)}
               >
                 {t(s.labelKey)}
               </button>

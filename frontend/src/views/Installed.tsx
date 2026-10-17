@@ -1,11 +1,11 @@
-import { useSignal } from '@preact/signals'
-import { useEffect, useMemo } from 'preact/hooks'
+import { useComputed, useSignal } from '@preact/signals'
 import { useTranslation } from 'react-i18next'
 import { api, BrewPackage } from '../lib/api'
 import { useJobs } from '../context/JobsContext'
 import { useConfirm } from '../context/ConfirmContext'
 import { useUserData } from '../context/UserDataContext'
-import { useInstalledPackages } from '../context/InstalledPackagesSignal'
+import { installedPackagesSignal, useInstalledPackages } from '../context/InstalledPackagesSignal'
+import { bump, useRefreshEffect } from '../context/RefreshSignal'
 import PackageDetailModal, { DetailTarget } from '../components/PackageDetailModal'
 import PackageIcon from '../components/PackageIcon'
 import TypeBadge from '../components/TypeBadge'
@@ -19,8 +19,6 @@ import { rankBySearch } from '../lib/searchRelevance'
 export type Filter = 'all' | 'formula' | 'cask' | 'outdated' | 'favorites' | 'deprecated' | 'disabled' | 'pinned'
 
 interface Props {
-  refreshToken: number
-  bump: () => void
   initialFilter?: Filter
 }
 
@@ -28,7 +26,7 @@ function rowKey(p: BrewPackage) {
   return `${p.isCask ? 'c' : 'f'}:${p.name}`
 }
 
-export default function Installed({ refreshToken, bump, initialFilter }: Props) {
+export default function Installed({ initialFilter }: Props) {
   const { t } = useTranslation()
   const { runAction } = useJobs()
   const confirm = useConfirm()
@@ -40,13 +38,6 @@ export default function Installed({ refreshToken, bump, initialFilter }: Props) 
   const leaves = useSignal<Set<string>>(new Set())
   const filter = useSignal<Filter>(initialFilter ?? 'all')
 
-  // Installed is unmounted/remounted on every view switch (App.tsx renders
-  // it conditionally), so the useSignal initializer above covers the normal
-  // navigation case. This effect is a cheap safety net in case that ever
-  // changes and the component stays mounted across an initialFilter update.
-  useEffect(() => {
-    if (initialFilter) filter.value = initialFilter
-  }, [filter, initialFilter])
   const query = useSignal('')
   const detail = useSignal<DetailTarget | null>(null)
   const rowBusy = useSignal<string | null>(null)
@@ -60,7 +51,7 @@ export default function Installed({ refreshToken, bump, initialFilter }: Props) 
       .catch(() => {})
   }
 
-  useEffect(loadLeaves, [leaves, refreshToken])
+  useRefreshEffect(loadLeaves)
 
   // Full reload of both the shared package cache and this view's own leaves
   // lookup — used by the error-retry button and by actions (pin/unpin) that
@@ -72,8 +63,8 @@ export default function Installed({ refreshToken, bump, initialFilter }: Props) 
     loadLeaves()
   }
 
-  const filtered = useMemo(() => {
-    const inTab = pkgs.filter((p) => {
+  const filtered = useComputed(() => {
+    const inTab = (installedPackagesSignal.value.packages ?? []).filter((p) => {
       if (filter.value === 'formula' && p.isCask) return false
       if (filter.value === 'cask' && !p.isCask) return false
       if (filter.value === 'outdated' && !p.outdated) return false
@@ -86,8 +77,7 @@ export default function Installed({ refreshToken, bump, initialFilter }: Props) 
     // With a query, matches are ordered by relevance (an exact name first)
     // instead of the list's own order.
     return rankBySearch(inTab, query.value)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pkgs, filter.value, query.value, userData.data])
+  })
 
   function toggleSelected(p: BrewPackage) {
     const key = rowKey(p)
@@ -98,14 +88,14 @@ export default function Installed({ refreshToken, bump, initialFilter }: Props) 
   }
 
   function toggleSelectAll() {
-    if (selected.value.size === filtered.length) {
+    if (selected.value.size === filtered.value.length) {
       selected.value = new Set()
     } else {
-      selected.value = new Set(filtered.map(rowKey))
+      selected.value = new Set(filtered.value.map(rowKey))
     }
   }
 
-  const selectedPkgs = filtered.filter((p) => selected.value.has(rowKey(p)))
+  const selectedPkgs = filtered.value.filter((p) => selected.value.has(rowKey(p)))
 
   async function quickUninstall(p: BrewPackage) {
     const { ok, checked } = await confirm({
@@ -311,7 +301,7 @@ export default function Installed({ refreshToken, bump, initialFilter }: Props) 
                 <input
                   type="checkbox"
                   className="checkbox checkbox-xs"
-                  checked={filtered.length > 0 && selected.value.size === filtered.length}
+                  checked={filtered.value.length > 0 && selected.value.size === filtered.value.length}
                   onChange={toggleSelectAll}
                 />
               </th>
@@ -323,7 +313,7 @@ export default function Installed({ refreshToken, bump, initialFilter }: Props) 
             </tr>
           </thead>
           <tbody>
-            {filtered.map((p) => {
+            {filtered.value.map((p) => {
               const key = rowKey(p)
               const favorite = userData.isFavorite(p.name, p.isCask)
               return (
@@ -410,7 +400,7 @@ export default function Installed({ refreshToken, bump, initialFilter }: Props) 
                 </tr>
               )
             })}
-            {filtered.length === 0 && (
+            {filtered.value.length === 0 && (
               <tr>
                 <td colSpan={6} className="text-center text-base-content/50 py-8">
                   {t('installed.noMatches')}

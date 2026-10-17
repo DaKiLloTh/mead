@@ -1,12 +1,13 @@
-import { useSignal } from '@preact/signals'
-import { useEffect, useMemo } from 'preact/hooks'
+import { untracked, useComputed, useSignal, useSignalEffect } from '@preact/signals'
 import { useTranslation } from 'react-i18next'
-import { JobsProvider, useJobs } from './context/JobsContext'
-import { ConfirmProvider } from './context/ConfirmContext'
-import { UserDataProvider, useUserData } from './context/UserDataContext'
-import { useInstalledPackages, startInstalledPackagesPolling } from './context/InstalledPackagesSignal'
+import { startJobEvents, useJobs } from './context/JobsContext'
+import { ConfirmDialog } from './context/ConfirmContext'
+import { startUserDataLoad, snoozedUntil } from './context/UserDataContext'
+import { bump } from './context/RefreshSignal'
+import { startTextSize } from './context/TextSizeSignal'
+import { startInstalledPackagesPolling } from './context/InstalledPackagesSignal'
 import { useSystemInfo, startSystemInfoPolling } from './context/SystemInfoSignal'
-import { useOutdated, startOutdatedPolling } from './context/OutdatedSignal'
+import { outdatedSignal, startOutdatedPolling } from './context/OutdatedSignal'
 import { useUpdateAvailable, startUpdateAvailablePolling } from './context/UpdateAvailableSignal'
 import { startCapabilitiesLoad, useCapabilities } from './context/CapabilitiesSignal'
 import { primaryShortcutModifierLabel } from './lib/navCapabilities'
@@ -37,7 +38,7 @@ import { api } from './lib/api'
 
 // How often to refresh Homebrew's own local update index in the background
 // (`brew update`, a real network call against Homebrew's taps -- not to be
-// confused with InstalledPackagesContext/SystemInfoContext's own 60-second
+// confused with InstalledPackagesSignal/SystemInfoSignal's own 60-second
 // polls, which are cheap local checks). `brew outdated` only ever compares
 // against whatever this index already has cached, so without a periodic
 // refresh a long-running session never sees genuinely new releases unless
@@ -67,30 +68,30 @@ const viewTitleKeys: Record<ViewKey, string> = {
 function AppShell() {
   const { t } = useTranslation()
   const { runAction } = useJobs()
-  const { info: systemInfo, refresh: refreshSystemInfo } = useSystemInfo()
-  const userData = useUserData()
-  const outdated = useOutdated()
+  const { info: systemInfo } = useSystemInfo()
   const { version: updateAvailableVersion } = useUpdateAvailable()
   const capabilities = useCapabilities()
   const view = useSignal<ViewKey>('dashboard')
-  const refreshToken = useSignal(0)
   const installedInitialFilter = useSignal<InstalledFilter | undefined>(undefined)
   const headerUpdateBusy = useSignal(false)
-  const installedPackages = useInstalledPackages()
 
-  // Starts the three signal-backed caches exactly once, for the life of the
-  // app. There's no Provider mount position for this to hook into anymore
-  // (see InstalledPackagesSignal.ts), so it's kicked off explicitly here
-  // instead. startOutdatedPolling() internally defers its first fetch until
+  // Starts the app's signal stores exactly once, for the life of the app.
+  // startOutdatedPolling() internally defers its first fetch until
   // InstalledPackages' first fetch resolves -- callers don't need to know or
-  // care about that ordering.
-  useEffect(() => {
-    startInstalledPackagesPolling()
-    startSystemInfoPolling()
-    startOutdatedPolling()
-    startUpdateAvailablePolling()
-    startCapabilitiesLoad()
-  }, [])
+  // care about that ordering. untracked so the stores' own signal reads
+  // don't subscribe this effect to them.
+  useSignalEffect(() =>
+    untracked(() => {
+      startJobEvents()
+      startTextSize()
+      startUserDataLoad()
+      startInstalledPackagesPolling()
+      startSystemInfoPolling()
+      startOutdatedPolling()
+      startUpdateAvailablePolling()
+      startCapabilitiesLoad()
+    })
+  )
 
   // Dashboard's Health tile and stat tiles need to land on Installed
   // pre-filtered (e.g. to the deprecated/disabled/pinned subset), while
@@ -126,26 +127,8 @@ function AppShell() {
     else if (v === 'appstore') ensureAppStoreLoaded()
   }
 
-  // The single "something changed, refresh now" signal for the whole app.
-  // Views still on the per-view fetch-on-refreshToken pattern pick this up
-  // via the `refreshToken` prop; the shared installed-packages and
-  // system-info caches hook into the same call rather than exposing a
-  // second, parallel signal each.
-  //
-  // SystemInfoContext's own refresh() was previously only reached
-  // indirectly, via Dashboard.tsx's local effect on refreshToken -- which
-  // meant clicking the global header's Update Homebrew button (or the
-  // background quiet-update tick) while on any view other than Dashboard
-  // left the outdated count / last-updated text stale until the context's
-  // own 60-second poll caught up. Calling it here directly means bump()
-  // actually refreshes everything it's documented to, regardless of which
-  // view is currently mounted.
-  const bump = () => {
-    refreshToken.value = refreshToken.value + 1
-    installedPackages.refresh()
-    refreshSystemInfo()
-    outdated.refresh()
-  }
+  // bump() (see context/RefreshSignal.ts) is the app's single "something
+  // changed, refresh now" call.
 
   // Global "Update Homebrew" trigger for the top bar (see issue #89), so the
   // action is reachable from every view, not just Dashboard's own Quick
@@ -178,16 +161,14 @@ function AppShell() {
     })
   }
 
-  // Derived from the shared OutdatedContext cache (see OutdatedContext.tsx),
+  // Derived from the shared outdated cache (see OutdatedSignal.ts),
   // not a separate fetch -- App.tsx and Updates.tsx used to each run their
   // own independent `api.outdated()` call, which raced on every refresh and
   // could disagree for a moment even with nothing snoozed (issue #124).
   // Matches Updates.tsx's own "N update(s)" headline, which is
   // visible.length (snoozed packages excluded), not the raw outdated count.
-  const outdatedCount = useMemo(
-    () => (outdated.items ?? []).filter((p) => !userData.snoozedUntil(p.name, p.isCask)).length,
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [outdated.items, userData.data]
+  const outdatedCount = useComputed(
+    () => (outdatedSignal.value.items ?? []).filter((p) => !snoozedUntil(p.name, p.isCask)).length
   )
 
   // Periodically refresh Homebrew's own update index in the background (see
@@ -206,7 +187,7 @@ function AppShell() {
   // update itself failed (e.g. offline). A failure is only logged, mirroring
   // how systemInfoCache.ts/installedPackagesCache.ts already keep background
   // fetch failures silent.
-  useEffect(() => {
+  useSignalEffect(() => {
     const interval = setInterval(() => {
       runAction(() => api.updateQuiet())
         .catch((e) => {
@@ -217,8 +198,7 @@ function AppShell() {
         })
     }, BACKGROUND_HOMEBREW_UPDATE_INTERVAL_MS)
     return () => clearInterval(interval)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  })
 
   return (
     <div className="h-full flex flex-col bg-base-100 text-base-content">
@@ -242,7 +222,7 @@ function AppShell() {
       {capabilities.hasFloatingTitleBar && <div className="drag-region h-9 shrink-0" />}
       {updateAvailableVersion && <RestartBanner version={updateAvailableVersion} onRestart={handleRestart} />}
       <div className="flex flex-1 min-h-0">
-        <Sidebar view={view.value} onSelect={changeView} onHover={handleNavHover} outdatedCount={outdatedCount} />
+        <Sidebar view={view.value} onSelect={changeView} onHover={handleNavHover} outdatedCount={outdatedCount.value} />
         <div className="flex-1 min-w-0 flex flex-col">
           <div className="drag-region h-14 shrink-0 flex items-center px-6 border-b border-base-300">
             <span className="text-sm font-medium text-base-content/60">{t(viewTitleKeys[view.value])}</span>
@@ -275,22 +255,18 @@ function AppShell() {
           </div>
           <div className="flex-1 min-h-0 overflow-y-auto">
             {view.value === 'dashboard' && (
-              <Dashboard
-                onNavigate={changeView}
-                onNavigateInstalled={navigateToInstalled}
-                refreshToken={refreshToken.value}
-              />
+              <Dashboard onNavigate={changeView} onNavigateInstalled={navigateToInstalled} />
             )}
             {view.value === 'installed' && (
-              <Installed refreshToken={refreshToken.value} bump={bump} initialFilter={installedInitialFilter.value} />
+              <Installed key={installedInitialFilter.value ?? 'all'} initialFilter={installedInitialFilter.value} />
             )}
-            {view.value === 'search' && <Search refreshToken={refreshToken.value} bump={bump} />}
-            {view.value === 'collections' && <Collections bump={bump} />}
-            {view.value === 'updates' && <Updates refreshToken={refreshToken.value} bump={bump} />}
-            {view.value === 'applications' && <Applications bump={bump} />}
-            {view.value === 'taps' && <Taps refreshToken={refreshToken.value} bump={bump} />}
-            {view.value === 'services' && <Services refreshToken={refreshToken.value} bump={bump} />}
-            {view.value === 'adopt' && <Adopt bump={bump} />}
+            {view.value === 'search' && <Search />}
+            {view.value === 'collections' && <Collections />}
+            {view.value === 'updates' && <Updates />}
+            {view.value === 'applications' && <Applications />}
+            {view.value === 'taps' && <Taps />}
+            {view.value === 'services' && <Services />}
+            {view.value === 'adopt' && <Adopt />}
             {view.value === 'appstore' && <AppStore />}
             {view.value === 'security' && <Security />}
             {view.value === 'maintenance' && <Maintenance />}
@@ -301,24 +277,18 @@ function AppShell() {
       </div>
       <JobConsole />
       <Toasts />
-      <CommandPalette onNavigate={changeView} bump={bump} />
+      <CommandPalette onNavigate={changeView} />
     </div>
   )
 }
 
-// InstalledPackages/SystemInfo/Outdated no longer need Provider positions --
-// their state lives in module-level signals (see *Signal.ts) that are
-// reachable from anywhere. JobsProvider/ConfirmProvider/UserDataProvider stay
-// as ordinary Context; see each context file for why converting it to a
-// signal wouldn't be a real improvement.
+// All shared state lives in module-level signal stores (see context/), so
+// there are no providers to wrap the tree in.
 export default function App() {
   return (
-    <JobsProvider>
-      <ConfirmProvider>
-        <UserDataProvider>
-          <AppShell />
-        </UserDataProvider>
-      </ConfirmProvider>
-    </JobsProvider>
+    <>
+      <AppShell />
+      <ConfirmDialog />
+    </>
   )
 }

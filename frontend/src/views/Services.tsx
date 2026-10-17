@@ -1,18 +1,13 @@
-import { useSignal } from '@preact/signals'
-import { useEffect, useRef } from 'preact/hooks'
+import { untracked, useSignal, useSignalEffect } from '@preact/signals'
 import { useTranslation } from 'react-i18next'
 import { api } from '../lib/api'
 import { useJobs } from '../context/JobsContext'
 import { servicesSignal, ensureServicesLoaded, loadServices } from '../context/ServicesSignal'
+import { bump, refreshSignal } from '../context/RefreshSignal'
 import { PlayIcon, RefreshIcon, SquareIcon } from '../components/Icons'
 import TableShell from '../components/TableShell'
 import LoadingRow from '../components/LoadingRow'
 import EmptyState from '../components/EmptyState'
-
-interface Props {
-  refreshToken: number
-  bump: () => void
-}
 
 function statusBadge(status: string) {
   const s = status.toLowerCase()
@@ -22,7 +17,7 @@ function statusBadge(status: string) {
   return 'badge-info'
 }
 
-export default function Services({ refreshToken, bump }: Props) {
+export default function Services() {
   const { t } = useTranslation()
   const { runAction } = useJobs()
   const { services, loading, error } = servicesSignal.value
@@ -32,21 +27,14 @@ export default function Services({ refreshToken, bump }: Props) {
   // ensureServicesLoaded() is idempotent: if Sidebar's onMouseEnter already
   // kicked off a fetch before this view even mounted, this is a no-op and
   // the data that comes back is whatever that fetch returns. loadServices()
-  // below is the separate, always-real-fetch path for refreshToken changes
-  // after the initial mount, since those mean something else in the app
-  // changed and this view genuinely needs fresh data, not whatever's cached.
-  useEffect(() => {
-    ensureServicesLoaded()
-  }, [])
-
-  const skipFirstRefreshRef = useRef(true)
-  useEffect(() => {
-    if (skipFirstRefreshRef.current) {
-      skipFirstRefreshRef.current = false
-      return
-    }
-    loadServices()
-  }, [refreshToken])
+  // is the separate, always-real-fetch path for a bump() after the initial
+  // mount, since that means something else in the app changed and this
+  // view genuinely needs fresh data, not whatever's cached.
+  const mountedAtRefresh = useSignal(refreshSignal.peek())
+  useSignalEffect(() => {
+    const token = refreshSignal.value
+    untracked(() => (token === mountedAtRefresh.peek() ? ensureServicesLoaded() : loadServices()))
+  })
 
   async function act(name: string, action: () => Promise<string>) {
     rowBusy.value = name

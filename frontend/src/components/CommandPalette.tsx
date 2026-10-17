@@ -1,11 +1,14 @@
-import { useSignal } from '@preact/signals'
-import { useEffect, useMemo, useRef } from 'preact/hooks'
+import { useComputed, useSignal, useSignalEffect } from '@preact/signals'
+import { useRef } from 'preact/hooks'
 import type { VNode, TargetedKeyboardEvent } from 'preact'
 import { useTranslation } from 'react-i18next'
 import { filterNavItems, filterPackages } from '../lib/paletteFilter'
 import { isPrimaryShortcutModifierPressed, visibleNavItems } from '../lib/navCapabilities'
-import { useInstalledPackages } from '../context/InstalledPackagesSignal'
-import { useCapabilities } from '../context/CapabilitiesSignal'
+import { installedPackagesSignal } from '../context/InstalledPackagesSignal'
+import { capabilitiesSignal } from '../context/CapabilitiesSignal'
+import { resolveCapabilities } from '../context/capabilitiesCache'
+import { bump } from '../context/RefreshSignal'
+import { languageSignal } from '../i18n'
 import { navItems, type ViewKey } from './Sidebar'
 import PackageDetailModal, { type DetailTarget } from './PackageDetailModal'
 import TypeBadge from './TypeBadge'
@@ -13,7 +16,6 @@ import { PackageIcon, SearchIcon } from './Icons'
 
 interface Props {
   onNavigate: (view: ViewKey) => void
-  bump?: () => void
   /**
    * Initial value of the internal `open` state. App.tsx never passes this
    * (real usage is always Cmd+K-driven), so it exists purely so a Storybook
@@ -41,67 +43,73 @@ type ResultRow =
  * own open/query/detail state — it doesn't need to live in a shared context
  * since nothing else in the app needs to read or drive it.
  */
-export default function CommandPalette({ onNavigate, bump, defaultOpen = false }: Props) {
-  const { t, i18n } = useTranslation()
+export default function CommandPalette({ onNavigate, defaultOpen = false }: Props) {
+  const { t } = useTranslation()
   const open = useSignal(defaultOpen)
   const query = useSignal('')
   const activeIndex = useSignal(0)
   // Backed by the shared installed-packages cache (populated at app start
   // and kept fresh in the background), so the palette's package search is
   // warm on first open instead of fetching lazily every session.
-  const { packages, loading: packagesLoading } = useInstalledPackages()
-  const capabilities = useCapabilities()
+  const packagesLoading = installedPackagesSignal.value.loading
   const detail = useSignal<DetailTarget | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
+  // Opening resets the transient state; the input is focused by the effect
+  // below once the dialog is actually visible.
+  function setOpen(next: boolean) {
+    if (next && !open.peek()) {
+      query.value = ''
+      activeIndex.value = 0
+    }
+    open.value = next
+  }
+
   // Global Cmd+K (or Ctrl+K where the platform has no Cmd key, see
   // Capabilities.hasCmdModifierKey) toggles the palette from anywhere;
-  // Escape closes it.
-  useEffect(() => {
+  // Escape closes it. Reads open and capabilities at keypress time, so the
+  // listener is attached once for the life of the component.
+  useSignalEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
+      const capabilities = resolveCapabilities(capabilitiesSignal.peek())
       if (isPrimaryShortcutModifierPressed(e, capabilities) && e.key.toLowerCase() === 'k') {
         e.preventDefault()
-        open.value = !open.value
+        setOpen(!open.peek())
         return
       }
-      if (e.key === 'Escape' && open.value) {
+      if (e.key === 'Escape' && open.peek()) {
         e.preventDefault()
-        open.value = false
+        setOpen(false)
       }
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [open.value, capabilities, open])
+  })
 
-  // Reset transient state and (re)focus the input every time the palette
-  // opens. The package list itself comes from the shared cache, which is
-  // already fetched (or in flight) by the time the app renders at all.
-  useEffect(() => {
-    if (!open.value) return
-    query.value = ''
-    activeIndex.value = 0
-    inputRef.current?.focus()
-  }, [activeIndex, open.value, query])
+  useSignalEffect(() => {
+    if (open.value) inputRef.current?.focus()
+  })
 
-  // Translated nav labels, recomputed whenever the active language changes.
-  // i18n.language is a real dependency despite the lint warning: react-i18next's
-  // `t` keeps a stable reference across language changes, so without this the
-  // memo would never recompute when the user switches language.
-  const translatedNavItems = useMemo(
-    () => visibleNavItems(navItems, capabilities).map((item) => ({ ...item, label: t(item.labelKey) })),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [t, i18n.language, capabilities]
-  )
+  // Translated nav labels. Reads languageSignal so it recomputes on a
+  // language switch: react-i18next's `t` keeps a stable reference across
+  // switches, so it isn't a trigger on its own.
+  const translatedNavItems = useComputed(() => {
+    void languageSignal.value
+    return visibleNavItems(navItems, resolveCapabilities(capabilitiesSignal.value)).map((item) => ({
+      ...item,
+      label: t(item.labelKey),
+    }))
+  })
 
-  const results = useMemo<ResultRow[]>(() => {
-    const navRows: ResultRow[] = filterNavItems(translatedNavItems, query.value).map((item) => ({
+  const results = useComputed<ResultRow[]>(() => {
+    const navRows: ResultRow[] = filterNavItems(translatedNavItems.value, query.value).map((item) => ({
       kind: 'nav',
       rowKey: `nav:${item.key}`,
       label: item.label,
       icon: item.icon,
       view: item.key,
     }))
-    const pkgRows: ResultRow[] = filterPackages(packages ?? [], query.value).map((p) => ({
+    const pkgRows: ResultRow[] = filterPackages(installedPackagesSignal.value.packages ?? [], query.value).map((p) => ({
       kind: 'package',
       rowKey: `pkg:${p.isCask ? 'cask' : 'formula'}:${p.name}`,
       label: p.name,
@@ -109,11 +117,7 @@ export default function CommandPalette({ onNavigate, bump, defaultOpen = false }
       isCask: p.isCask,
     }))
     return [...navRows, ...pkgRows]
-  }, [query.value, packages, translatedNavItems])
-
-  useEffect(() => {
-    activeIndex.value = 0
-  }, [activeIndex, query.value])
+  })
 
   function selectRow(row: ResultRow) {
     if (row.kind === 'nav') {
@@ -121,19 +125,19 @@ export default function CommandPalette({ onNavigate, bump, defaultOpen = false }
     } else {
       detail.value = { name: row.name, isCask: row.isCask }
     }
-    open.value = false
+    setOpen(false)
   }
 
   function handleInputKeyDown(e: TargetedKeyboardEvent<HTMLInputElement>) {
     if (e.key === 'ArrowDown') {
       e.preventDefault()
-      activeIndex.value = Math.min(activeIndex.value + 1, results.length - 1)
+      activeIndex.value = Math.min(activeIndex.value + 1, results.value.length - 1)
     } else if (e.key === 'ArrowUp') {
       e.preventDefault()
       activeIndex.value = Math.max(activeIndex.value - 1, 0)
     } else if (e.key === 'Enter') {
       e.preventDefault()
-      const row = results[activeIndex.value]
+      const row = results.value[activeIndex.value]
       if (row) selectRow(row)
     }
   }
@@ -149,17 +153,20 @@ export default function CommandPalette({ onNavigate, bump, defaultOpen = false }
               type="text"
               placeholder={t('commandPalette.placeholder')}
               value={query.value}
-              onChange={(e) => (query.value = e.currentTarget.value)}
+              onChange={(e) => {
+                query.value = e.currentTarget.value
+                activeIndex.value = 0
+              }}
               onKeyDown={handleInputKeyDown}
             />
           </label>
           <ul className="max-h-80 overflow-y-auto py-2">
-            {results.length === 0 && (
+            {results.value.length === 0 && (
               <li className="px-4 py-6 text-center text-sm text-base-content/50">
                 {packagesLoading ? t('commandPalette.loadingPackages') : t('commandPalette.noMatches')}
               </li>
             )}
-            {results.map((row, i) => (
+            {results.value.map((row, i) => (
               <li key={row.rowKey}>
                 <button
                   type="button"
@@ -186,7 +193,7 @@ export default function CommandPalette({ onNavigate, bump, defaultOpen = false }
         </form>
       </dialog>
 
-      <PackageDetailModal target={detail.value} onClose={() => (detail.value = null)} onChanged={() => bump?.()} />
+      <PackageDetailModal target={detail.value} onClose={() => (detail.value = null)} onChanged={bump} />
     </>
   )
 }

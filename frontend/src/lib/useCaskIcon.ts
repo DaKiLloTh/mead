@@ -1,5 +1,4 @@
-import { useSignal } from '@preact/signals'
-import { useEffect } from 'preact/hooks'
+import { signal, type Signal } from '@preact/signals'
 import { api } from './api'
 
 // Frontend-side mirror of the backend's in-memory icon cache (App.icons in
@@ -62,7 +61,7 @@ function fetchIcon(cacheKey: string, run: () => Promise<string>): Promise<string
  * only starts fetching once a `PackageIcon` using it mounts, e.g. the
  * moment you open Installed or Applications, so every icon visibly pops in
  * a beat after the rest of the row/tile. Calling this as soon as the
- * installed-packages list is known (see InstalledPackagesContext) means
+ * installed-packages list is known (see InstalledPackagesSignal) means
  * the cache is already warm by the time the user actually navigates to a
  * view that renders icons.
  *
@@ -108,31 +107,28 @@ export function useMasAppIcon(name: string | undefined, available: boolean): str
   return useIcon(available ? name : undefined, `mas:${name ?? ''}`, () => api.masAppIcon(name ?? ''))
 }
 
-function useIcon(name: string | undefined, cacheKey: string, run: () => Promise<string>): string | null {
-  const icon = useSignal<string | null>(name ? cache.get(cacheKey) || null : null)
+// One signal per cache key, shared by every component showing that icon.
+// Created on first use, which is also what starts the fetch, so there's no
+// effect: a component just reads the signal and re-renders when it lands.
+const iconSignals = new Map<string, Signal<string | null>>()
 
-  useEffect(() => {
-    if (!name) {
-      icon.value = null
-      return
-    }
-    const cached = cache.get(cacheKey)
-    if (cached !== undefined) {
-      icon.value = cached || null
-      return
-    }
-
-    icon.value = null
-    let cancelled = false
+function iconSignalFor(cacheKey: string, run: () => Promise<string>): Signal<string | null> {
+  let icon = iconSignals.get(cacheKey)
+  if (icon) return icon
+  const cached = cache.get(cacheKey)
+  const created = signal<string | null>(cached || null)
+  iconSignals.set(cacheKey, created)
+  if (cached === undefined) {
     fetchIcon(cacheKey, run).then((uri) => {
       cache.set(cacheKey, uri)
-      if (!cancelled) icon.value = uri || null
+      created.value = uri || null
     })
-    return () => {
-      cancelled = true
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [name, cacheKey])
+  }
+  icon = created
+  return icon
+}
 
-  return icon.value
+function useIcon(name: string | undefined, cacheKey: string, run: () => Promise<string>): string | null {
+  if (!name) return null
+  return iconSignalFor(cacheKey, run).value
 }

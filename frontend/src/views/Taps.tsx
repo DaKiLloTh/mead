@@ -1,21 +1,16 @@
 import { useSignal } from '@preact/signals'
-import { useEffect } from 'preact/hooks'
 import type { TargetedSubmitEvent } from 'preact'
 import { useTranslation } from 'react-i18next'
 import { api, TapDetail } from '../lib/api'
 import { useJobs } from '../context/JobsContext'
 import { useConfirm } from '../context/ConfirmContext'
+import { bump, useRefreshEffect } from '../context/RefreshSignal'
 import { ChevronDownIcon, ExternalLinkIcon, TapIcon, TrashIcon } from '../components/Icons'
 import ExternalLink from '../components/ExternalLink'
 import LoadingRow from '../components/LoadingRow'
 import ErrorAlert from '../components/ErrorAlert'
 
-interface Props {
-  refreshToken: number
-  bump: () => void
-}
-
-export default function Taps({ refreshToken, bump }: Props) {
+export default function Taps() {
   const { t } = useTranslation()
   const { runAction } = useJobs()
   const confirm = useConfirm()
@@ -40,7 +35,7 @@ export default function Taps({ refreshToken, bump }: Props) {
       .finally(() => (loading.value = false))
   }
 
-  useEffect(load, [error, loading, refreshToken, taps])
+  useRefreshEffect(load)
 
   async function addTap(e: TargetedSubmitEvent<HTMLFormElement>) {
     e.preventDefault()

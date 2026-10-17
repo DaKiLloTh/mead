@@ -1,5 +1,4 @@
-import { useSignal } from '@preact/signals'
-import { useEffect } from 'preact/hooks'
+import { untracked, useSignal, useSignalEffect } from '@preact/signals'
 import { useTranslation } from 'react-i18next'
 import { api, BrewPackage, PreInstallSecurityInfo, SecurityInfo } from '../lib/api'
 import { useJobs } from '../context/JobsContext'
@@ -85,27 +84,32 @@ function PackageDetail({ target, onClose, onChanged }: Props & { target: DetailT
   const loading = loaded.value?.key !== viewKey
   const pkg = !loading && loaded.value ? loaded.value.pkg : null
 
-  useEffect(() => {
-    tab.value = 'overview'
-    uses.value = null
-    tree.value = null
-    security.value = null
-    securityError.value = null
-    preInstallSecurity.value = null
-    preInstallError.value = null
-    note.value = userData.noteFor(viewTarget.value.name, viewTarget.value.isCask)
-    api
-      .getInfo(viewTarget.value.name, viewTarget.value.isCask)
-      .then((p) => (loaded.value = { key: viewKey, pkg: p }))
-      .catch(() => (loaded.value = { key: viewKey, pkg: null }))
-    if (!viewTarget.value.isCask) {
+  // Re-runs whenever viewTarget changes (a dependency graph click). Only
+  // viewTarget is tracked; the resets and fetches run untracked.
+  useSignalEffect(() => {
+    const target = viewTarget.value
+    const key = `${target.name}:${target.isCask}`
+    untracked(() => {
+      tab.value = 'overview'
+      uses.value = null
+      tree.value = null
+      security.value = null
+      securityError.value = null
+      preInstallSecurity.value = null
+      preInstallError.value = null
+      note.value = userData.noteFor(target.name, target.isCask)
       api
-        .uses(viewTarget.value.name)
-        .then((v) => (uses.value = v))
-        .catch(() => (uses.value = []))
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [viewKey])
+        .getInfo(target.name, target.isCask)
+        .then((p) => (loaded.value = { key, pkg: p }))
+        .catch(() => (loaded.value = { key, pkg: null }))
+      if (!target.isCask) {
+        api
+          .uses(target.name)
+          .then((v) => (uses.value = v))
+          .catch(() => (uses.value = []))
+      }
+    })
+  })
 
   function refresh() {
     api
@@ -543,7 +547,11 @@ function PackageDetail({ target, onClose, onChanged }: Props & { target: DetailT
             )}
 
             {tab.value === 'graph' && (
-              <DependencyGraph target={viewTarget.value} onSelectPackage={(t) => (viewTarget.value = t)} />
+              <DependencyGraph
+                key={viewKey}
+                target={viewTarget.value}
+                onSelectPackage={(t) => (viewTarget.value = t)}
+              />
             )}
 
             {tab.value === 'security' && pkg.installed && (

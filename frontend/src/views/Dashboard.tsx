@@ -1,9 +1,9 @@
 import { useSignal } from '@preact/signals'
-import { useEffect } from 'preact/hooks'
 import { useTranslation } from 'react-i18next'
 import { api } from '../lib/api'
 import { useJobs } from '../context/JobsContext'
 import { useSystemInfo } from '../context/SystemInfoSignal'
+import { useRefreshEffect } from '../context/RefreshSignal'
 import { ArrowUpCircleIcon, ExternalLinkIcon, RefreshIcon, WrenchIcon } from '../components/Icons'
 import ExternalLink from '../components/ExternalLink'
 import LoadingRow from '../components/LoadingRow'
@@ -14,23 +14,17 @@ import type { Filter as InstalledFilter } from './Installed'
 interface Props {
   onNavigate: (v: ViewKey) => void
   onNavigateInstalled: (filter?: InstalledFilter) => void
-  refreshToken: number
 }
 
-export default function Dashboard({ onNavigate, onNavigateInstalled, refreshToken }: Props) {
+export default function Dashboard({ onNavigate, onNavigateInstalled }: Props) {
   const { t } = useTranslation()
   const { runAction } = useJobs()
   const { info, loading, error, refresh } = useSystemInfo()
   const busy = useSignal<string | null>(null)
 
-  // refreshToken is the app's shared "something changed" signal (see
-  // App.tsx's bump()). Dashboard used to refetch its own local copy of
-  // system info on this signal; now it just forces the shared cache to
-  // re-fetch, same as InstalledPackagesProvider is refreshed from bump().
-  useEffect(() => {
-    refresh()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [refreshToken])
+  // Forces the shared system info cache to re-fetch on mount and on every
+  // bump(), so Dashboard never shows a stale cached copy.
+  useRefreshEffect(refresh)
 
   async function run(key: string, action: () => Promise<string>) {
     busy.value = key

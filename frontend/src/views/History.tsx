@@ -1,5 +1,4 @@
-import { useSignal } from '@preact/signals'
-import { useEffect } from 'preact/hooks'
+import { untracked, useSignal, useSignalEffect } from '@preact/signals'
 import { useTranslation } from 'react-i18next'
 import { api, HistoryEntry } from '../lib/api'
 import { useConfirm } from '../context/ConfirmContext'
@@ -16,7 +15,7 @@ export default function History() {
     api.getUserData().then((d) => (entries.value = d.history ?? []))
   }
 
-  useEffect(load, [entries])
+  useSignalEffect(() => untracked(load))
 
   async function clear() {
     const { ok } = await confirm({

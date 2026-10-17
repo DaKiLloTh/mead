@@ -14,15 +14,13 @@ const POLL_INTERVAL_MS = 60_000
  * Shared cache for the installed-packages list (`api.listInstalled()`),
  * fetched once at app start and kept fresh by a background poll plus an
  * explicit `refresh()` that call sites invoke after they change installed
- * state (wired into the app's existing `bump()`/`refreshToken` "something
- * changed" signal in App.tsx, rather than introducing a second one).
+ * state (wired into the app's `bump()` "something changed" call in
+ * RefreshSignal.ts, rather than introducing a second one).
  *
- * This is a plain module-level signal rather than a Context/Provider: any
- * component that reads `installedPackagesSignal.value` (directly, or through
- * useInstalledPackages below) during its own render is automatically
- * subscribed to updates, the same way a hook call is detected, so there's no
- * Provider position needed for it to be reachable and no dependency array to
- * keep in sync.
+ * This is a plain module-level signal: any component that reads
+ * `installedPackagesSignal.value` (directly, or through useInstalledPackages
+ * below) during its own render is automatically subscribed to updates, and a
+ * useComputed or useSignalEffect that reads it re-runs when it changes.
  *
  * A failed background poll never clears or masks previously-good data, see
  * installedPackagesCache.ts for the decision logic and why. Only the

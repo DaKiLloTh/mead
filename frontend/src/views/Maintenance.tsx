@@ -1,5 +1,4 @@
-import { useSignal } from '@preact/signals'
-import { useEffect } from 'preact/hooks'
+import { untracked, useSignal, useSignalEffect } from '@preact/signals'
 import { useTranslation } from 'react-i18next'
 import { api, BundleCleanupItem, BundleEntryType, CacheInfo, LeftoverItem, LeftoverKind, PackageSize } from '../lib/api'
 import { useJobs } from '../context/JobsContext'
@@ -66,15 +65,15 @@ export default function Maintenance() {
   const cleanupPreviewLoading = useSignal(false)
   const cleanupRunningReal = useSignal(false)
 
-  useEffect(() => {
-    api
-      .cacheInfo()
-      .then((v) => (cache.value = v))
-      .catch(() => {})
-    loadLargest()
-    // Only reads and writes signals, which never change identity.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  useSignalEffect(() =>
+    untracked(() => {
+      api
+        .cacheInfo()
+        .then((v) => (cache.value = v))
+        .catch(() => {})
+      loadLargest()
+    })
+  )
 
   async function loadLargest() {
     largestLoading.value = true
