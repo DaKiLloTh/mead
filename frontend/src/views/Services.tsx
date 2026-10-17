@@ -1,17 +1,13 @@
-import { useEffect, useRef, useState } from 'preact/hooks'
+import { untracked, useSignal, useSignalEffect } from '@preact/signals'
 import { useTranslation } from 'react-i18next'
 import { api } from '../lib/api'
 import { useJobs } from '../context/JobsContext'
 import { servicesSignal, ensureServicesLoaded, loadServices } from '../context/ServicesSignal'
+import { bump, refreshSignal } from '../context/RefreshSignal'
 import { PlayIcon, RefreshIcon, SquareIcon } from '../components/Icons'
 import TableShell from '../components/TableShell'
 import LoadingRow from '../components/LoadingRow'
 import EmptyState from '../components/EmptyState'
-
-interface Props {
-  refreshToken: number
-  bump: () => void
-}
 
 function statusBadge(status: string) {
   const s = status.toLowerCase()
@@ -21,44 +17,37 @@ function statusBadge(status: string) {
   return 'badge-info'
 }
 
-export default function Services({ refreshToken, bump }: Props) {
+export default function Services() {
   const { t } = useTranslation()
   const { runAction } = useJobs()
   const { services, loading, error } = servicesSignal.value
-  const [rowBusy, setRowBusy] = useState<string | null>(null)
-  const [cleaningUp, setCleaningUp] = useState(false)
+  const rowBusy = useSignal<string | null>(null)
+  const cleaningUp = useSignal(false)
 
   // ensureServicesLoaded() is idempotent: if Sidebar's onMouseEnter already
   // kicked off a fetch before this view even mounted, this is a no-op and
   // the data that comes back is whatever that fetch returns. loadServices()
-  // below is the separate, always-real-fetch path for refreshToken changes
-  // after the initial mount, since those mean something else in the app
-  // changed and this view genuinely needs fresh data, not whatever's cached.
-  useEffect(() => {
-    ensureServicesLoaded()
-  }, [])
-
-  const skipFirstRefreshRef = useRef(true)
-  useEffect(() => {
-    if (skipFirstRefreshRef.current) {
-      skipFirstRefreshRef.current = false
-      return
-    }
-    loadServices()
-  }, [refreshToken])
+  // is the separate, always-real-fetch path for a bump() after the initial
+  // mount, since that means something else in the app changed and this
+  // view genuinely needs fresh data, not whatever's cached.
+  const mountedAtRefresh = useSignal(refreshSignal.peek())
+  useSignalEffect(() => {
+    const token = refreshSignal.value
+    untracked(() => (token === mountedAtRefresh.peek() ? ensureServicesLoaded() : loadServices()))
+  })
 
   async function act(name: string, action: () => Promise<string>) {
-    setRowBusy(name)
+    rowBusy.value = name
     await runAction(action)
-    setRowBusy(null)
+    rowBusy.value = null
     loadServices()
     bump()
   }
 
   async function cleanup() {
-    setCleaningUp(true)
+    cleaningUp.value = true
     await runAction(() => api.servicesCleanup())
-    setCleaningUp(false)
+    cleaningUp.value = false
     loadServices()
   }
 
@@ -70,8 +59,8 @@ export default function Services({ refreshToken, bump }: Props) {
           <p className="text-base-content/60 text-sm">{t('services.subtitle')}</p>
         </div>
         <div className="flex gap-2">
-          <button className="btn btn-sm" disabled={cleaningUp} onClick={cleanup}>
-            {cleaningUp && <span className="loading loading-spinner loading-xs" />} {t('services.cleanUpUnused')}
+          <button className="btn btn-sm" disabled={cleaningUp.value} onClick={cleanup}>
+            {cleaningUp.value && <span className="loading loading-spinner loading-xs" />} {t('services.cleanUpUnused')}
           </button>
           <button className="btn btn-sm" disabled={loading} onClick={loadServices}>
             <RefreshIcon className="size-4" /> {t('common.refresh')}
@@ -120,7 +109,7 @@ export default function Services({ refreshToken, bump }: Props) {
                     {s.running ? (
                       <button
                         className="btn btn-xs btn-ghost"
-                        disabled={rowBusy === s.name}
+                        disabled={rowBusy.value === s.name}
                         onClick={() => act(s.name, () => api.serviceStop(s.name))}
                         title={t('services.stopTooltip')}
                       >
@@ -129,7 +118,7 @@ export default function Services({ refreshToken, bump }: Props) {
                     ) : (
                       <button
                         className="btn btn-xs btn-ghost text-success"
-                        disabled={rowBusy === s.name}
+                        disabled={rowBusy.value === s.name}
                         onClick={() => act(s.name, () => api.serviceStart(s.name))}
                         title={t('services.startTooltip')}
                       >
@@ -138,7 +127,7 @@ export default function Services({ refreshToken, bump }: Props) {
                     )}
                     <button
                       className="btn btn-xs btn-ghost"
-                      disabled={rowBusy === s.name}
+                      disabled={rowBusy.value === s.name}
                       onClick={() => act(s.name, () => api.serviceRestart(s.name))}
                       title={t('services.restartTooltip')}
                     >

@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from 'preact/hooks'
+import { untracked, useComputed, useSignal, useSignalEffect } from '@preact/signals'
 import { useTranslation } from 'react-i18next'
 import { api, OutdatedPackage } from '../lib/api'
 import { useJobs } from '../context/JobsContext'
 import { useUserData } from '../context/UserDataContext'
-import { useOutdated } from '../context/OutdatedSignal'
+import { outdatedSignal, useOutdated } from '../context/OutdatedSignal'
+import { bump, refreshSignal } from '../context/RefreshSignal'
 import PackageDetailModal, { DetailTarget } from '../components/PackageDetailModal'
 import TypeBadge from '../components/TypeBadge'
 import TableShell from '../components/TableShell'
@@ -12,22 +13,17 @@ import EmptyState from '../components/EmptyState'
 import { ArrowUpCircleIcon, CheckIcon, ClockIcon } from '../components/Icons'
 import ErrorAlert from '../components/ErrorAlert'
 
-interface Props {
-  refreshToken: number
-  bump: () => void
-}
-
 const SNOOZE_OPTIONS = [
   { labelKey: 'updates.snoozeOneDay', days: 1 },
   { labelKey: 'updates.snoozeOneWeek', days: 7 },
   { labelKey: 'updates.snoozeOneMonth', days: 30 },
 ]
 
-export default function Updates({ refreshToken, bump }: Props) {
+export default function Updates() {
   const { t } = useTranslation()
   const { runAction } = useJobs()
   const userData = useUserData()
-  // Non-greedy reads from the shared OutdatedContext cache (same source the
+  // Non-greedy reads from the shared outdated cache (same source the
   // sidebar badge uses), rather than this view running its own independent
   // `api.outdated()` fetch -- two separate fetches racing to resolve is
   // exactly what made the sidebar badge and this page's own count disagree
@@ -37,37 +33,42 @@ export default function Updates({ refreshToken, bump }: Props) {
   // isn't served by the shared cache and still runs its own fetch, only
   // while active.
   const outdated = useOutdated()
-  const [greedyItems, setGreedyItems] = useState<OutdatedPackage[]>([])
-  const [greedyLoading, setGreedyLoading] = useState(false)
-  const [greedyError, setGreedyError] = useState<string | null>(null)
-  const [rowBusy, setRowBusy] = useState<string | null>(null)
-  const [upgradingAll, setUpgradingAll] = useState(false)
-  const [showSnoozed, setShowSnoozed] = useState(false)
-  const [greedy, setGreedy] = useState(false)
-  const [detail, setDetail] = useState<DetailTarget | null>(null)
+  const greedyItems = useSignal<OutdatedPackage[]>([])
+  const greedyLoading = useSignal(false)
+  const greedyError = useSignal<string | null>(null)
+  const rowBusy = useSignal<string | null>(null)
+  const upgradingAll = useSignal(false)
+  const showSnoozed = useSignal(false)
+  const greedy = useSignal(false)
+  const detail = useSignal<DetailTarget | null>(null)
 
-  const items = greedy ? greedyItems : (outdated.items ?? [])
-  const loading = greedy ? greedyLoading : outdated.loading
-  const error = greedy ? greedyError : outdated.error
+  const items = useComputed(() => (greedy.value ? greedyItems.value : (outdatedSignal.value.items ?? [])))
+  const loading = greedy.value ? greedyLoading.value : outdated.loading
+  const error = greedy.value ? greedyError.value : outdated.error
 
   function loadGreedy() {
-    setGreedyLoading(true)
-    setGreedyError(null)
+    greedyLoading.value = true
+    greedyError.value = null
     api
       .outdated(true)
-      .then(setGreedyItems)
-      .catch((e) => setGreedyError(String(e)))
-      .finally(() => setGreedyLoading(false))
+      .then((v) => (greedyItems.value = v))
+      .catch((e) => (greedyError.value = String(e)))
+      .finally(() => (greedyLoading.value = false))
   }
 
-  useEffect(() => {
-    if (greedy) loadGreedy()
-  }, [greedy, refreshToken])
+  // Re-fetches the greedy list when the toggle turns on and on every bump()
+  // while it's on.
+  useSignalEffect(() => {
+    void refreshSignal.value
+    if (greedy.value) untracked(loadGreedy)
+  })
 
-  const { visible, snoozed } = useMemo(() => {
+  // snoozedUntil reads the user data signal, so this recomputes when a
+  // package is snoozed or unsnoozed.
+  const split = useComputed(() => {
     const visible: OutdatedPackage[] = []
     const snoozed: OutdatedPackage[] = []
-    for (const p of items) {
+    for (const p of items.value) {
       if (userData.snoozedUntil(p.name, p.isCask)) {
         snoozed.push(p)
       } else {
@@ -75,29 +76,29 @@ export default function Updates({ refreshToken, bump }: Props) {
       }
     }
     return { visible, snoozed }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [items, userData.data])
+  })
+  const { visible, snoozed } = split.value
 
   // bump() already covers the non-greedy refresh via the shared cache's
   // refresh(); only the greedy-specific fetch needs an explicit call here,
   // to avoid firing two outdated fetches back to back in the common case.
   async function upgradeOne(p: OutdatedPackage) {
-    setRowBusy(p.name)
+    rowBusy.value = p.name
     await runAction(() => api.upgrade(p.name, p.isCask))
-    setRowBusy(null)
-    if (greedy) loadGreedy()
+    rowBusy.value = null
+    if (greedy.value) loadGreedy()
     bump()
   }
 
   async function upgradeAll() {
-    setUpgradingAll(true)
-    await runAction(() => api.upgradeAll(greedy))
-    setUpgradingAll(false)
-    if (greedy) loadGreedy()
+    upgradingAll.value = true
+    await runAction(() => api.upgradeAll(greedy.value))
+    upgradingAll.value = false
+    if (greedy.value) loadGreedy()
     bump()
   }
 
-  const list = showSnoozed ? snoozed : visible
+  const list = showSnoozed.value ? snoozed : visible
 
   return (
     <div className="p-6">
@@ -118,20 +119,20 @@ export default function Updates({ refreshToken, bump }: Props) {
             <input
               type="checkbox"
               className="checkbox checkbox-sm"
-              checked={greedy}
-              onChange={(e) => setGreedy(e.currentTarget.checked)}
+              checked={greedy.value}
+              onChange={(e) => (greedy.value = e.currentTarget.checked)}
             />
             <span className="label-text">{t('updates.includeAutoUpdatingCasks')}</span>
           </label>
           {snoozed.length > 0 && (
-            <button className="btn btn-sm btn-ghost" onClick={() => setShowSnoozed((s) => !s)}>
+            <button className="btn btn-sm btn-ghost" onClick={() => (showSnoozed.value = !showSnoozed.value)}>
               <ClockIcon className="size-4" />{' '}
-              {showSnoozed ? t('updates.showActive') : t('updates.showSnoozed', { count: snoozed.length })}
+              {showSnoozed.value ? t('updates.showActive') : t('updates.showSnoozed', { count: snoozed.length })}
             </button>
           )}
-          {!showSnoozed && visible.length > 0 && (
-            <button className="btn btn-sm btn-primary" disabled={upgradingAll} onClick={upgradeAll}>
-              {upgradingAll ? (
+          {!showSnoozed.value && visible.length > 0 && (
+            <button className="btn btn-sm btn-primary" disabled={upgradingAll.value} onClick={upgradeAll}>
+              {upgradingAll.value ? (
                 <span className="loading loading-spinner loading-xs" />
               ) : (
                 <ArrowUpCircleIcon className="size-4" />
@@ -144,11 +145,11 @@ export default function Updates({ refreshToken, bump }: Props) {
 
       {error ? (
         <ErrorAlert title={t('updates.errorTitle')} message={error} />
-      ) : loading && items.length === 0 ? (
+      ) : loading && items.value.length === 0 ? (
         <LoadingRow>{t('updates.checking')}</LoadingRow>
       ) : list.length === 0 ? (
         <EmptyState icon={CheckIcon}>
-          {showSnoozed ? t('updates.nothingSnoozed') : t('updates.nothingToUpdate')}
+          {showSnoozed.value ? t('updates.nothingSnoozed') : t('updates.nothingToUpdate')}
         </EmptyState>
       ) : (
         <TableShell
@@ -174,7 +175,7 @@ export default function Updates({ refreshToken, bump }: Props) {
               <tr key={`${p.isCask ? 'c' : 'f'}:${p.name}`} className="hover:bg-base-200">
                 <td
                   className="font-medium truncate cursor-pointer"
-                  onClick={() => setDetail({ name: p.name, isCask: p.isCask })}
+                  onClick={() => (detail.value = { name: p.name, isCask: p.isCask })}
                 >
                   {p.name}
                 </td>
@@ -189,7 +190,7 @@ export default function Updates({ refreshToken, bump }: Props) {
                 </td>
                 <td className="text-right">
                   <div className="flex justify-end gap-1">
-                    {showSnoozed ? (
+                    {showSnoozed.value ? (
                       <button
                         className="btn btn-xs btn-ghost"
                         onClick={(e) => {
@@ -233,13 +234,13 @@ export default function Updates({ refreshToken, bump }: Props) {
                         </div>
                         <button
                           className="btn btn-xs btn-primary"
-                          disabled={rowBusy === p.name}
+                          disabled={rowBusy.value === p.name}
                           onClick={(e) => {
                             e.stopPropagation()
                             upgradeOne(p)
                           }}
                         >
-                          {rowBusy === p.name ? (
+                          {rowBusy.value === p.name ? (
                             <span className="loading loading-spinner loading-xs" />
                           ) : (
                             t('common.upgrade')
@@ -256,10 +257,10 @@ export default function Updates({ refreshToken, bump }: Props) {
       )}
 
       <PackageDetailModal
-        target={detail}
-        onClose={() => setDetail(null)}
+        target={detail.value}
+        onClose={() => (detail.value = null)}
         onChanged={() => {
-          if (greedy) loadGreedy()
+          if (greedy.value) loadGreedy()
           bump()
         }}
       />

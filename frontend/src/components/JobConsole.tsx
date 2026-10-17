@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from 'preact/hooks'
+import { useComputed, useSignal, useSignalEffect } from '@preact/signals'
+import { useSignalRef } from '@preact/signals/utils'
 import { useTranslation } from 'react-i18next'
-import { useJobs } from '../context/JobsContext'
+import { jobsSignal, selectedJobIdSignal, useJobs } from '../context/JobsContext'
 import { duration } from '../lib/format'
 import { api } from '../lib/api'
 import ExternalLink from './ExternalLink'
@@ -16,81 +17,79 @@ const gistableTitleRe = /^(?:Install|Upgrade|Reinstall) (\S+)/
 function GistLogsButton({ title }: { title: string }) {
   const { t } = useTranslation()
   const m = gistableTitleRe.exec(title)
-  const [state, setState] = useState<'idle' | 'loading' | { url: string } | { error: string }>('idle')
+  const state = useSignal<'idle' | 'loading' | { url: string } | { error: string }>('idle')
 
   if (!m) return null
   const name = m[1]
 
   async function create() {
-    setState('loading')
+    state.value = 'loading'
     try {
       const url = await api.gistLogs(name)
-      setState({ url })
+      state.value = { url }
     } catch (e) {
-      setState({ error: String(e) })
+      state.value = { error: String(e) }
     }
   }
 
-  if (state === 'idle') {
+  if (state.value === 'idle') {
     return (
       <button className="btn btn-ghost btn-xs" onClick={create}>
         {t('jobConsole.createGist')}
       </button>
     )
   }
-  if (state === 'loading') {
+  if (state.value === 'loading') {
     return (
       <span className="btn btn-ghost btn-xs" aria-disabled>
         <span className="loading loading-spinner loading-xs" /> {t('jobConsole.uploading')}
       </span>
     )
   }
-  if ('url' in state) {
+  if ('url' in state.value) {
     return (
-      <ExternalLink className="link link-primary text-xs" href={state.url}>
-        {state.url}
+      <ExternalLink className="link link-primary text-xs" href={state.value.url}>
+        {state.value.url}
       </ExternalLink>
     )
   }
-  return <span className="text-error text-xs">{state.error}</span>
+  return <span className="text-error text-xs">{state.value.error}</span>
 }
 
 export default function JobConsole() {
   const { t } = useTranslation()
-  const {
-    jobs,
-    activeCount,
-    consoleOpen,
-    setConsoleOpen,
-    selectedJobId,
-    setSelectedJobId,
-    cancelJob,
-    clearFinishedJobs,
-  } = useJobs()
-  const bodyRef = useRef<HTMLDivElement>(null)
-  const [inputValue, setInputValue] = useState('')
+  const { jobs, activeCount, consoleOpen, setConsoleOpen, setSelectedJobId, cancelJob, clearFinishedJobs } = useJobs()
+  const bodyEl = useSignalRef<HTMLDivElement | null>(null)
 
-  const selected = jobs.find((j) => j.id === selectedJobId) ?? jobs[jobs.length - 1]
+  const selectedSignal = useComputed(() => {
+    const all = jobsSignal.value
+    return all.find((j) => j.id === selectedJobIdSignal.value) ?? all[all.length - 1]
+  })
+  const selected = selectedSignal.value
 
   // Only a pty-backed job (currently mas upgrade -- see App.SendJobInput)
-  // can actually receive this; reset whenever the selected job changes so a
-  // half-typed password from a previous job never lingers into the next
-  // one's input box.
-  useEffect(() => {
-    setInputValue('')
-  }, [selected?.id])
+  // can actually receive this. The draft is tagged with the job it was
+  // typed for, so a half-typed password from a previous job never shows up
+  // in the next one's input box.
+  const draft = useSignal<{ jobId: string; text: string } | null>(null)
+  const inputValue = useComputed(() =>
+    draft.value && draft.value.jobId === selectedSignal.value?.id ? draft.value.text : ''
+  )
 
   function sendInput() {
-    if (!selected || !inputValue) return
-    void api.sendJobInput(selected.id, inputValue)
-    setInputValue('')
+    if (!selected || !inputValue.value) return
+    void api.sendJobInput(selected.id, inputValue.value)
+    draft.value = null
   }
 
-  useEffect(() => {
-    if (bodyRef.current) {
-      bodyRef.current.scrollTop = bodyRef.current.scrollHeight
-    }
-  }, [selected?.lines.length, selected?.id])
+  // Keeps the output scrolled to the bottom as lines arrive or the
+  // selected job changes. Runs after the render, so scrollHeight is current.
+  useSignalEffect(() => {
+    void selectedSignal.value?.lines.length
+    void selectedSignal.value?.id
+    const body = bodyEl.peek()
+    if (body) body.scrollTop = body.scrollHeight
+  })
 
   if (jobs.length === 0) {
     return null
@@ -165,7 +164,7 @@ export default function JobConsole() {
                 {selected.status === 'error' && <GistLogsButton title={selected.title} />}
               </div>
             )}
-            <div ref={bodyRef} className="flex-1 overflow-y-auto bg-neutral text-neutral-content font-mono text-xs p-3">
+            <div ref={bodyEl} className="flex-1 overflow-y-auto bg-neutral text-neutral-content font-mono text-xs p-3">
               {selected?.lines.length ? (
                 selected.lines.map((l, i) => (
                   <div key={i} className={l.stream === 'stderr' ? 'text-error-content/90' : ''}>
@@ -184,8 +183,8 @@ export default function JobConsole() {
                   autoFocus
                   className="input input-sm w-full font-mono"
                   placeholder={t('jobConsole.inputPlaceholder')}
-                  value={inputValue}
-                  onChange={(e) => setInputValue(e.currentTarget.value)}
+                  value={inputValue.value}
+                  onChange={(e) => selected && (draft.value = { jobId: selected.id, text: e.currentTarget.value })}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') sendInput()
                   }}

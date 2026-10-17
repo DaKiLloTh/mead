@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'preact/hooks'
+import { untracked, useSignal, useSignalEffect } from '@preact/signals'
 import { Trans, useTranslation } from 'react-i18next'
 import { api, type TouchIDStatus } from '../lib/api'
 import { useJobs } from '../context/JobsContext'
@@ -22,31 +22,33 @@ export default function AppStore() {
   const { runAction, notify } = useJobs()
   const confirm = useConfirm()
   const { available, apps, outdated, loading, error } = appStoreSignal.value
-  const [rowBusy, setRowBusy] = useState<string | null>(null)
-  const [installingMas, setInstallingMas] = useState(false)
-  const [upgradingAll, setUpgradingAll] = useState(false)
-  const [touchId, setTouchId] = useState<TouchIDStatus | null>(null)
-  const [awaitingTouchId, setAwaitingTouchId] = useState(false)
+  const rowBusy = useSignal<string | null>(null)
+  const installingMas = useSignal(false)
+  const upgradingAll = useSignal(false)
+  const touchId = useSignal<TouchIDStatus | null>(null)
+  const awaitingTouchId = useSignal(false)
 
   function loadTouchIdStatus() {
     api
       .touchIDSudoStatus()
-      .then(setTouchId)
+      .then((v) => (touchId.value = v))
       .catch(() => {})
   }
 
   // Idempotent: a no-op if Sidebar's onMouseEnter already started this
   // fetch before the view mounted. mas is the slowest CLI this app shells
   // out to, so the hover head-start matters more here than most views.
-  useEffect(() => {
-    ensureAppStoreLoaded()
-    loadTouchIdStatus()
-  }, [])
+  useSignalEffect(() =>
+    untracked(() => {
+      ensureAppStoreLoaded()
+      loadTouchIdStatus()
+    })
+  )
 
   async function installMas() {
-    setInstallingMas(true)
+    installingMas.value = true
     await runAction(() => api.install('mas', false))
-    setInstallingMas(false)
+    installingMas.value = false
     loadAppStore()
   }
 
@@ -64,31 +66,32 @@ export default function AppStore() {
     if (!ok) return
     try {
       await api.startTouchIDSudoSetup()
-      setAwaitingTouchId(true)
+      awaitingTouchId.value = true
     } catch (e) {
       notify('error', String(e))
     }
   }
 
-  useEffect(() => {
-    if (!awaitingTouchId) return
+  // Polls while waiting for Touch ID setup to land. Only awaitingTouchId is
+  // tracked; the interval's own reads and writes happen outside the run.
+  useSignalEffect(() => {
+    if (!awaitingTouchId.value) return
     const started = Date.now()
     const timer = setInterval(async () => {
       try {
         const status = await api.touchIDSudoStatus()
-        setTouchId(status)
+        touchId.value = status
         if (status.enabled) {
-          setAwaitingTouchId(false)
+          awaitingTouchId.value = false
           notify('success', t('appstore.touchIdEnabledToast'))
         }
       } catch {
         // keep polling; a transient failure shouldn't end the wait early
       }
-      if (Date.now() - started > TOUCH_ID_WAIT_MS) setAwaitingTouchId(false)
+      if (Date.now() - started > TOUCH_ID_WAIT_MS) awaitingTouchId.value = false
     }, TOUCH_ID_POLL_MS)
     return () => clearInterval(timer)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [awaitingTouchId])
+  })
 
   // If mas needs sudo partway through (Xcode's App Store delivery pipeline
   // is the known case), the backend job runs with a controlling pty, so sudo
@@ -96,16 +99,16 @@ export default function AppStore() {
   // otherwise a "Password:" line in the job console with an input box.
   // Nothing for this view to catch or retry.
   async function upgrade(id: string) {
-    setRowBusy(id)
+    rowBusy.value = id
     await runAction(() => api.masUpgrade(id))
-    setRowBusy(null)
+    rowBusy.value = null
     loadAppStore()
   }
 
   async function upgradeAll() {
-    setUpgradingAll(true)
+    upgradingAll.value = true
     await runAction(() => api.masUpgradeAll())
-    setUpgradingAll(false)
+    upgradingAll.value = false
     loadAppStore()
   }
 
@@ -148,8 +151,8 @@ export default function AppStore() {
               />
             </p>
             <div className="card-actions mt-2">
-              <button className="btn btn-sm btn-primary" disabled={installingMas} onClick={installMas}>
-                {installingMas ? (
+              <button className="btn btn-sm btn-primary" disabled={installingMas.value} onClick={installMas}>
+                {installingMas.value ? (
                   <span className="loading loading-spinner loading-xs" />
                 ) : (
                   <DownloadIcon className="size-4" />
@@ -163,16 +166,16 @@ export default function AppStore() {
 
       {!loading && !error && available && (
         <>
-          {touchId?.available && !touchId.enabled && (
-            <TouchIdBanner waiting={awaitingTouchId} onEnable={enableTouchId} />
+          {touchId.value?.available && !touchId.value.enabled && (
+            <TouchIdBanner waiting={awaitingTouchId.value} onEnable={enableTouchId} />
           )}
           <div className="flex items-center justify-between mb-3">
             <p className="text-sm text-base-content/60">
               {t('appstore.countsSummary', { appCount: apps.length, outdatedCount: outdated.length })}
             </p>
             {outdated.length > 0 && (
-              <button className="btn btn-sm btn-primary" disabled={upgradingAll} onClick={upgradeAll}>
-                {upgradingAll ? (
+              <button className="btn btn-sm btn-primary" disabled={upgradingAll.value} onClick={upgradeAll}>
+                {upgradingAll.value ? (
                   <span className="loading loading-spinner loading-xs" />
                 ) : (
                   <ArrowUpCircleIcon className="size-4" />
@@ -222,10 +225,10 @@ export default function AppStore() {
                       {outdatedIds.has(app.id) && (
                         <button
                           className="btn btn-xs btn-primary"
-                          disabled={rowBusy === app.id}
+                          disabled={rowBusy.value === app.id}
                           onClick={() => upgrade(app.id)}
                         >
-                          {rowBusy === app.id ? (
+                          {rowBusy.value === app.id ? (
                             <span className="loading loading-spinner loading-xs" />
                           ) : (
                             t('common.upgrade')

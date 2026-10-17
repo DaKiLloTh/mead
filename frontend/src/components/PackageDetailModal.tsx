@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'preact/hooks'
+import { untracked, useSignal, useSignalEffect } from '@preact/signals'
 import { useTranslation } from 'react-i18next'
 import { api, BrewPackage, PreInstallSecurityInfo, SecurityInfo } from '../lib/api'
 import { useJobs } from '../context/JobsContext'
@@ -41,169 +41,172 @@ interface Props {
 type Tab = 'overview' | 'deps' | 'graph' | 'security'
 
 export default function PackageDetailModal({ target, onClose, onChanged }: Props) {
+  if (!target) return null
+  // Keyed on the target so every open, and every switch to a different
+  // package from outside, starts with fresh state. Nothing from a previous
+  // package can render while the new one loads.
+  return (
+    <PackageDetail key={`${target.name}:${target.isCask}`} target={target} onClose={onClose} onChanged={onChanged} />
+  )
+}
+
+function PackageDetail({ target, onClose, onChanged }: Props & { target: DetailTarget }) {
   const { t } = useTranslation()
   const { runAction, notify } = useJobs()
   const confirm = useConfirm()
   const uninstallWithElevation = useUninstall()
   const userData = useUserData()
-  const [pkg, setPkg] = useState<BrewPackage | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [tab, setTab] = useState<Tab>('overview')
-  const [uses, setUses] = useState<string[] | null>(null)
-  const [tree, setTree] = useState<string | null>(null)
-  const [treeLoading, setTreeLoading] = useState(false)
-  const [busy, setBusy] = useState(false)
-  const [tagInput, setTagInput] = useState('')
-  const [note, setNote] = useState('')
-  const [security, setSecurity] = useState<SecurityInfo | null>(null)
-  const [securityLoading, setSecurityLoading] = useState(false)
-  const [securityError, setSecurityError] = useState<string | null>(null)
-  const [preInstallSecurity, setPreInstallSecurity] = useState<PreInstallSecurityInfo | null>(null)
-  const [preInstallLoading, setPreInstallLoading] = useState(false)
-  const [preInstallError, setPreInstallError] = useState<string | null>(null)
+  // The fetched package, tagged with the key it was fetched for. pkg and
+  // loading are derived from it so a result from a previous target (the
+  // modal stays mounted while closed) or a late response for a package the
+  // user has since moved away from never renders against the current one.
+  const loaded = useSignal<{ key: string; pkg: BrewPackage | null } | null>(null)
+  const tab = useSignal<Tab>('overview')
+  const uses = useSignal<string[] | null>(null)
+  const tree = useSignal<string | null>(null)
+  const treeLoading = useSignal(false)
+  const busy = useSignal(false)
+  const tagInput = useSignal('')
+  const note = useSignal('')
+  const security = useSignal<SecurityInfo | null>(null)
+  const securityLoading = useSignal(false)
+  const securityError = useSignal<string | null>(null)
+  const preInstallSecurity = useSignal<PreInstallSecurityInfo | null>(null)
+  const preInstallLoading = useSignal(false)
+  const preInstallError = useSignal<string | null>(null)
 
-  // The currently-displayed package. Usually just `target` (the prop), but
-  // clicking a node in the dependency graph swaps this to view a different
-  // package's detail *within the same modal* rather than stacking a second
-  // one -- see the 'graph' tab below and DependencyGraph's onSelectPackage.
-  // Reset to `target` whenever the prop's own identity changes (a new
-  // target key means the modal was pointed at a different package from
-  // outside) using the "adjust state during render" pattern, so there's
-  // never a render with a stale viewTarget in between.
-  const [viewTarget, setViewTarget] = useState<DetailTarget | null>(target)
-  const targetKey = target ? `${target.name}:${target.isCask}` : null
-  const [syncedTargetKey, setSyncedTargetKey] = useState(targetKey)
-  if (targetKey !== syncedTargetKey) {
-    setSyncedTargetKey(targetKey)
-    setViewTarget(target)
-  }
+  // The currently-displayed package. Starts as `target`, but clicking a
+  // node in the dependency graph swaps this to view a different package's
+  // detail *within the same modal* rather than stacking a second one -- see
+  // the 'graph' tab below and DependencyGraph's onSelectPackage.
+  const viewTarget = useSignal<DetailTarget>(target)
+  const viewKey = `${viewTarget.value.name}:${viewTarget.value.isCask}`
+  const loading = loaded.value?.key !== viewKey
+  const pkg = !loading && loaded.value ? loaded.value.pkg : null
 
-  useEffect(() => {
-    if (!viewTarget) return
-    setLoading(true)
-    setTab('overview')
-    setUses(null)
-    setTree(null)
-    setPkg(null)
-    setSecurity(null)
-    setSecurityError(null)
-    setPreInstallSecurity(null)
-    setPreInstallError(null)
-    setNote(userData.noteFor(viewTarget.name, viewTarget.isCask))
-    api
-      .getInfo(viewTarget.name, viewTarget.isCask)
-      .then(setPkg)
-      .catch(() => setPkg(null))
-      .finally(() => setLoading(false))
-    if (!viewTarget.isCask) {
+  // Re-runs whenever viewTarget changes (a dependency graph click). Only
+  // viewTarget is tracked; the resets and fetches run untracked.
+  useSignalEffect(() => {
+    const target = viewTarget.value
+    const key = `${target.name}:${target.isCask}`
+    untracked(() => {
+      tab.value = 'overview'
+      uses.value = null
+      tree.value = null
+      security.value = null
+      securityError.value = null
+      preInstallSecurity.value = null
+      preInstallError.value = null
+      note.value = userData.noteFor(target.name, target.isCask)
       api
-        .uses(viewTarget.name)
-        .then(setUses)
-        .catch(() => setUses([]))
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [viewTarget?.name, viewTarget?.isCask])
-
-  if (!target || !viewTarget) return null
+        .getInfo(target.name, target.isCask)
+        .then((p) => (loaded.value = { key, pkg: p }))
+        .catch(() => (loaded.value = { key, pkg: null }))
+      if (!target.isCask) {
+        api
+          .uses(target.name)
+          .then((v) => (uses.value = v))
+          .catch(() => (uses.value = []))
+      }
+    })
+  })
 
   function refresh() {
-    if (!viewTarget) return
     api
-      .getInfo(viewTarget.name, viewTarget.isCask)
-      .then(setPkg)
+      .getInfo(viewTarget.value.name, viewTarget.value.isCask)
+      .then((p) => (loaded.value = { key: viewKey, pkg: p }))
       .catch(() => {})
     onChanged?.()
   }
 
   async function loadTree() {
-    if (!viewTarget || tree !== null) return
-    setTreeLoading(true)
+    if (tree.value !== null) return
+    treeLoading.value = true
     try {
-      const out = await api.deps(viewTarget.name, viewTarget.isCask)
-      setTree(out)
+      const out = await api.deps(viewTarget.value.name, viewTarget.value.isCask)
+      tree.value = out
     } catch (e) {
-      setTree(String(e))
+      tree.value = String(e)
     } finally {
-      setTreeLoading(false)
+      treeLoading.value = false
     }
   }
 
   async function loadSecurity() {
-    if (!viewTarget || security || securityLoading) return
-    setSecurityLoading(true)
-    setSecurityError(null)
+    if (security.value || securityLoading.value) return
+    securityLoading.value = true
+    securityError.value = null
     try {
-      const info = await api.inspectCaskSecurity(viewTarget.name)
-      setSecurity(info)
+      const info = await api.inspectCaskSecurity(viewTarget.value.name)
+      security.value = info
     } catch (e) {
-      setSecurityError(String(e))
+      securityError.value = String(e)
     } finally {
-      setSecurityLoading(false)
+      securityLoading.value = false
     }
   }
 
   async function verifyBeforeInstall() {
-    if (!viewTarget) return
     const { ok } = await confirm({
       title: t('packageDetail.verifyBeforeInstallConfirmTitle'),
       body: t('packageDetail.verifyBeforeInstallConfirmBody'),
       confirmLabel: t('packageDetail.verifyBeforeInstallConfirmLabel'),
     })
     if (!ok) return
-    setPreInstallLoading(true)
-    setPreInstallError(null)
+    preInstallLoading.value = true
+    preInstallError.value = null
     try {
-      const info = await api.inspectCaskBeforeInstall(viewTarget.name)
-      setPreInstallSecurity(info)
+      const info = await api.inspectCaskBeforeInstall(viewTarget.value.name)
+      preInstallSecurity.value = info
     } catch (e) {
-      setPreInstallError(String(e))
+      preInstallError.value = String(e)
     } finally {
-      setPreInstallLoading(false)
+      preInstallLoading.value = false
     }
   }
 
   async function doRemoveQuarantine() {
-    if (!security || !viewTarget) return
+    if (!security.value) return
     try {
-      await api.removeQuarantine(viewTarget.name)
-      setSecurity(null)
+      await api.removeQuarantine(viewTarget.value.name)
+      security.value = null
       void loadSecurity()
     } catch (e) {
-      setSecurityError(String(e))
+      securityError.value = String(e)
     }
   }
 
   async function doInstall() {
-    if (!viewTarget) return
-    setBusy(true)
-    await runAction(() => api.install(viewTarget.name, viewTarget.isCask))
-    setBusy(false)
+    busy.value = true
+    await runAction(() => api.install(viewTarget.value.name, viewTarget.value.isCask))
+    busy.value = false
     refresh()
   }
 
   async function doUpgrade() {
-    if (!viewTarget) return
-    setBusy(true)
-    await runAction(() => api.upgrade(viewTarget.name, viewTarget.isCask))
-    setBusy(false)
+    busy.value = true
+    await runAction(() => api.upgrade(viewTarget.value.name, viewTarget.value.isCask))
+    busy.value = false
     refresh()
   }
 
   async function doUninstall() {
-    if (!viewTarget || !pkg) return
+    if (!pkg) return
     const checkboxes: { label: string }[] = []
-    const zapIdx = viewTarget.isCask ? checkboxes.push({ label: t('packageDetail.checkboxRemoveAppData') }) - 1 : -1
+    const zapIdx = viewTarget.value.isCask
+      ? checkboxes.push({ label: t('packageDetail.checkboxRemoveAppData') }) - 1
+      : -1
     const forceIdx = checkboxes.push({ label: t('packageDetail.checkboxRemoveAllVersions') }) - 1
     const snapshotIdx = checkboxes.push({ label: t('packageDetail.checkboxSnapshot') }) - 1
 
     const zapTrashPaths = pkg.zapTrashPaths ?? []
     const body =
-      viewTarget.isCask && zapTrashPaths.length > 0
+      viewTarget.value.isCask && zapTrashPaths.length > 0
         ? t('packageDetail.confirmUninstallBodyWithZap', { paths: zapTrashPaths.join('\n') })
         : t('packageDetail.confirmUninstallBody')
 
     const { ok, checked } = await confirm({
-      title: t('packageDetail.confirmUninstallTitle', { name: viewTarget.name }),
+      title: t('packageDetail.confirmUninstallTitle', { name: viewTarget.value.name }),
       body,
       confirmLabel: t('common.uninstall'),
       danger: true,
@@ -214,7 +217,7 @@ export default function PackageDetailModal({ target, onClose, onChanged }: Props
     const force = checked[forceIdx]
     const snapshot = checked[snapshotIdx]
 
-    setBusy(true)
+    busy.value = true
     if (snapshot) {
       try {
         await api.createSnapshot()
@@ -224,67 +227,64 @@ export default function PackageDetailModal({ target, onClose, onChanged }: Props
       }
     }
     await uninstallWithElevation(
-      { name: viewTarget.name, isCask: viewTarget.isCask, zap, force },
+      { name: viewTarget.value.name, isCask: viewTarget.value.isCask, zap, force },
       {
         title: t('packageDetail.elevateUninstallTitle'),
         body: t('packageDetail.elevateUninstallBody'),
         confirmLabel: t('packageDetail.elevateUninstallConfirmLabel'),
       }
     )
-    setBusy(false)
+    busy.value = false
     refresh()
   }
 
   async function doReinstall() {
-    if (!viewTarget) return
-    setBusy(true)
-    await runAction(() => api.reinstall(viewTarget.name, viewTarget.isCask))
-    setBusy(false)
+    busy.value = true
+    await runAction(() => api.reinstall(viewTarget.value.name, viewTarget.value.isCask))
+    busy.value = false
     refresh()
   }
 
   async function doPinToggle() {
-    if (!viewTarget || !pkg) return
-    setBusy(true)
-    await runAction(() => (pkg.pinned ? api.unpin(viewTarget.name) : api.pin(viewTarget.name)))
-    setBusy(false)
+    if (!pkg) return
+    busy.value = true
+    await runAction(() => (pkg.pinned ? api.unpin(viewTarget.value.name) : api.pin(viewTarget.value.name)))
+    busy.value = false
     refresh()
   }
 
   async function doLinkToggle() {
-    if (!viewTarget || !pkg) return
-    setBusy(true)
-    await runAction(() => (pkg.linked ? api.unlink(viewTarget.name) : api.link(viewTarget.name, true)))
-    setBusy(false)
+    if (!pkg) return
+    busy.value = true
+    await runAction(() => (pkg.linked ? api.unlink(viewTarget.value.name) : api.link(viewTarget.value.name, true)))
+    busy.value = false
     refresh()
   }
 
   async function doReveal() {
-    if (!viewTarget) return
     try {
-      await api.revealPackage(viewTarget.name, viewTarget.isCask)
+      await api.revealPackage(viewTarget.value.name, viewTarget.value.isCask)
     } catch (e) {
       notify('error', String(e))
     }
   }
 
-  const tags = userData.tagsFor(viewTarget.name, viewTarget.isCask)
-  const favorite = userData.isFavorite(viewTarget.name, viewTarget.isCask)
+  const tags = userData.tagsFor(viewTarget.value.name, viewTarget.value.isCask)
+  const favorite = userData.isFavorite(viewTarget.value.name, viewTarget.value.isCask)
 
   function addTag() {
-    const t = tagInput.trim()
-    if (!t || !viewTarget) return
+    const t = tagInput.value.trim()
+    if (!t) return
     if (!tags.includes(t)) {
-      void userData.setTags(viewTarget.name, viewTarget.isCask, [...tags, t])
+      void userData.setTags(viewTarget.value.name, viewTarget.value.isCask, [...tags, t])
     }
-    setTagInput('')
+    tagInput.value = ''
   }
 
   function removeTag(t: string) {
-    if (!viewTarget) return
     void userData.setTags(
-      viewTarget.name,
-      viewTarget.isCask,
+      viewTarget.value.name,
+      viewTarget.value.isCask,
       tags.filter((x) => x !== t)
     )
   }
@@ -293,7 +293,7 @@ export default function PackageDetailModal({ target, onClose, onChanged }: Props
 
   return (
     <dialog className="modal modal-open">
-      <div className={`modal-box ${tab === 'graph' ? 'max-w-4xl' : 'max-w-2xl'}`}>
+      <div className={`modal-box ${tab.value === 'graph' ? 'max-w-4xl' : 'max-w-2xl'}`}>
         <button
           className="btn btn-sm btn-circle btn-ghost absolute right-3 top-3"
           onClick={onClose}
@@ -315,10 +315,10 @@ export default function PackageDetailModal({ target, onClose, onChanged }: Props
         {!loading && pkg && (
           <>
             <div className="flex items-start gap-3 pr-8">
-              <PackageIcon name={viewTarget.name} isCask={viewTarget.isCask} className="size-10 mt-0.5" />
+              <PackageIcon name={viewTarget.value.name} isCask={viewTarget.value.isCask} className="size-10 mt-0.5" />
               <button
                 className="btn btn-sm btn-circle btn-ghost mt-0.5"
-                onClick={() => userData.toggleFavorite(viewTarget.name, viewTarget.isCask)}
+                onClick={() => userData.toggleFavorite(viewTarget.value.name, viewTarget.value.isCask)}
                 aria-label={t('packageDetail.toggleFavoriteAriaLabel')}
               >
                 <StarIcon filled={favorite} className={`size-4 ${favorite ? 'text-warning' : ''}`} />
@@ -401,8 +401,8 @@ export default function PackageDetailModal({ target, onClose, onChanged }: Props
               <input
                 type="text"
                 placeholder={t('packageDetail.tagPlaceholder')}
-                value={tagInput}
-                onChange={(e) => setTagInput(e.currentTarget.value)}
+                value={tagInput.value}
+                onChange={(e) => (tagInput.value = e.currentTarget.value)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
                     e.preventDefault()
@@ -415,16 +415,16 @@ export default function PackageDetailModal({ target, onClose, onChanged }: Props
             <div role="tablist" className="tabs tabs-border mt-4">
               <button
                 role="tab"
-                className={`tab ${tab === 'overview' ? 'tab-active' : ''}`}
-                onClick={() => setTab('overview')}
+                className={`tab ${tab.value === 'overview' ? 'tab-active' : ''}`}
+                onClick={() => (tab.value = 'overview')}
               >
                 {t('packageDetail.tabOverview')}
               </button>
               <button
                 role="tab"
-                className={`tab ${tab === 'deps' ? 'tab-active' : ''}`}
+                className={`tab ${tab.value === 'deps' ? 'tab-active' : ''}`}
                 onClick={() => {
-                  setTab('deps')
+                  tab.value = 'deps'
                   void loadTree()
                 }}
               >
@@ -432,17 +432,17 @@ export default function PackageDetailModal({ target, onClose, onChanged }: Props
               </button>
               <button
                 role="tab"
-                className={`tab ${tab === 'graph' ? 'tab-active' : ''}`}
-                onClick={() => setTab('graph')}
+                className={`tab ${tab.value === 'graph' ? 'tab-active' : ''}`}
+                onClick={() => (tab.value = 'graph')}
               >
                 {t('packageDetail.tabDependencyGraph')}
               </button>
               {pkg.isCask && (
                 <button
                   role="tab"
-                  className={`tab ${tab === 'security' ? 'tab-active' : ''}`}
+                  className={`tab ${tab.value === 'security' ? 'tab-active' : ''}`}
                   onClick={() => {
-                    setTab('security')
+                    tab.value = 'security'
                     if (pkg.installed) void loadSecurity()
                   }}
                 >
@@ -451,7 +451,7 @@ export default function PackageDetailModal({ target, onClose, onChanged }: Props
               )}
             </div>
 
-            {tab === 'overview' && (
+            {tab.value === 'overview' && (
               <div className="mt-3 space-y-3 text-sm">
                 {pkg.caveats && (
                   <div className="alert alert-warning alert-soft text-xs whitespace-pre-wrap">{pkg.caveats}</div>
@@ -473,13 +473,13 @@ export default function PackageDetailModal({ target, onClose, onChanged }: Props
                     <div className="font-medium text-xs uppercase text-base-content/50 mb-1">
                       {t('packageDetail.usedBy')}
                     </div>
-                    {uses === null ? (
+                    {uses.value === null ? (
                       <span className="text-base-content/50 text-xs">{t('common.loading')}</span>
-                    ) : uses.length === 0 ? (
+                    ) : uses.value.length === 0 ? (
                       <span className="text-base-content/50 text-xs">{t('packageDetail.usedByNone')}</span>
                     ) : (
                       <div className="flex flex-wrap gap-1">
-                        {uses.map((u) => (
+                        {uses.value.map((u) => (
                           <span key={u} className="badge badge-ghost badge-sm">
                             {u}
                           </span>
@@ -524,142 +524,160 @@ export default function PackageDetailModal({ target, onClose, onChanged }: Props
                     className="textarea textarea-sm w-full"
                     rows={2}
                     placeholder={t('packageDetail.notePlaceholder')}
-                    value={note}
-                    onChange={(e) => setNote(e.currentTarget.value)}
-                    onBlur={() => void userData.setNote(viewTarget.name, viewTarget.isCask, note)}
+                    value={note.value}
+                    onChange={(e) => (note.value = e.currentTarget.value)}
+                    onBlur={() => void userData.setNote(viewTarget.value.name, viewTarget.value.isCask, note.value)}
                   />
                 </div>
               </div>
             )}
 
-            {tab === 'deps' && (
+            {tab.value === 'deps' && (
               <div className="mt-3">
-                {treeLoading ? (
+                {treeLoading.value ? (
                   <div className="flex items-center gap-2 text-base-content/60 text-sm py-4">
                     <span className="loading loading-spinner loading-xs" /> {t('packageDetail.loadingDepTree')}
                   </div>
                 ) : (
                   <pre className="mockup-code text-xs overflow-x-auto max-h-72">
-                    <code className="whitespace-pre px-4">{tree || t('packageDetail.noDependencies')}</code>
+                    <code className="whitespace-pre px-4">{tree.value || t('packageDetail.noDependencies')}</code>
                   </pre>
                 )}
               </div>
             )}
 
-            {tab === 'graph' && <DependencyGraph target={viewTarget} onSelectPackage={(t) => setViewTarget(t)} />}
+            {tab.value === 'graph' && (
+              <DependencyGraph
+                key={viewKey}
+                target={viewTarget.value}
+                onSelectPackage={(t) => (viewTarget.value = t)}
+              />
+            )}
 
-            {tab === 'security' && pkg.installed && (
+            {tab.value === 'security' && pkg.installed && (
               <div className="mt-3 text-sm">
-                {securityLoading && (
+                {securityLoading.value && (
                   <div className="flex items-center gap-2 text-base-content/60 py-4">
                     <span className="loading loading-spinner loading-xs" /> {t('packageDetail.inspectingSignature')}
                   </div>
                 )}
-                {securityError && <div className="alert alert-error alert-soft text-xs">{securityError}</div>}
-                {security && !securityLoading && (
+                {securityError.value && (
+                  <div className="alert alert-error alert-soft text-xs">{securityError.value}</div>
+                )}
+                {security.value && !securityLoading.value && (
                   <div className="space-y-2">
                     <div className="flex items-center gap-2">
-                      {security.gatekeeperOk ? (
+                      {security.value.gatekeeperOk ? (
                         <CheckIcon className="size-4 text-success" />
                       ) : (
                         <ShieldIcon className="size-4 text-error" />
                       )}
                       <span>
-                        {security.gatekeeperOk ? t('packageDetail.gatekeeperPass') : t('packageDetail.gatekeeperFail')}
+                        {security.value.gatekeeperOk
+                          ? t('packageDetail.gatekeeperPass')
+                          : t('packageDetail.gatekeeperFail')}
                       </span>
                     </div>
                     <div className="text-xs text-base-content/60 space-y-1">
                       <div>
                         {t('packageDetail.signed', {
-                          value: security.signed ? t('packageDetail.yes') : t('packageDetail.no'),
+                          value: security.value.signed ? t('packageDetail.yes') : t('packageDetail.no'),
                         })}
                       </div>
-                      {security.authority && (
-                        <div>{t('packageDetail.authority', { authority: security.authority })}</div>
+                      {security.value.authority && (
+                        <div>{t('packageDetail.authority', { authority: security.value.authority })}</div>
                       )}
-                      {security.teamId && <div>{t('packageDetail.teamId', { teamId: security.teamId })}</div>}
+                      {security.value.teamId && (
+                        <div>{t('packageDetail.teamId', { teamId: security.value.teamId })}</div>
+                      )}
                       <div>
                         {t('packageDetail.quarantineFlag', {
-                          value: security.quarantined
+                          value: security.value.quarantined
                             ? t('packageDetail.quarantinePresent')
                             : t('packageDetail.quarantineCleared'),
                         })}
                       </div>
                     </div>
-                    {security.quarantined && (
+                    {security.value.quarantined && (
                       <button className="btn btn-xs" onClick={doRemoveQuarantine}>
                         {t('packageDetail.removeQuarantine')}
                       </button>
                     )}
                     <pre className="mockup-code text-xs overflow-x-auto max-h-40 mt-2">
-                      <code className="whitespace-pre px-4">{security.assessment}</code>
+                      <code className="whitespace-pre px-4">{security.value.assessment}</code>
                     </pre>
                   </div>
                 )}
               </div>
             )}
 
-            {tab === 'security' && !pkg.installed && (
+            {tab.value === 'security' && !pkg.installed && (
               <div className="mt-3 text-sm space-y-3">
                 <p className="text-xs text-base-content/60">{t('packageDetail.verifyBeforeInstallExplainer')}</p>
-                {!preInstallSecurity && !preInstallLoading && (
+                {!preInstallSecurity.value && !preInstallLoading.value && (
                   <button className="btn btn-sm" onClick={verifyBeforeInstall}>
                     <ShieldIcon className="size-4" /> {t('packageDetail.verifyBeforeInstallButton')}
                   </button>
                 )}
-                {preInstallLoading && (
+                {preInstallLoading.value && (
                   <div className="flex items-center gap-2 text-base-content/60 py-4">
                     <span className="loading loading-spinner loading-xs" /> {t('packageDetail.verifyingBeforeInstall')}
                   </div>
                 )}
-                {preInstallError && <div className="alert alert-error alert-soft text-xs">{preInstallError}</div>}
-                {preInstallSecurity && !preInstallLoading && (
+                {preInstallError.value && (
+                  <div className="alert alert-error alert-soft text-xs">{preInstallError.value}</div>
+                )}
+                {preInstallSecurity.value && !preInstallLoading.value && (
                   <div className="space-y-2">
-                    {!preInstallSecurity.unsupported && (
+                    {!preInstallSecurity.value.unsupported && (
                       <div className="flex items-center gap-2">
-                        {preInstallSecurity.gatekeeperOk ? (
+                        {preInstallSecurity.value.gatekeeperOk ? (
                           <CheckIcon className="size-4 text-success" />
                         ) : (
                           <ShieldIcon className="size-4 text-error" />
                         )}
                         <span>
-                          {preInstallSecurity.gatekeeperOk
+                          {preInstallSecurity.value.gatekeeperOk
                             ? t('packageDetail.gatekeeperPass')
                             : t('packageDetail.gatekeeperFail')}
                         </span>
                       </div>
                     )}
                     <div className="text-xs text-base-content/60 space-y-1">
-                      {preInstallSecurity.downloadSizeHuman && (
-                        <div>{t('packageDetail.downloadSize', { size: preInstallSecurity.downloadSizeHuman })}</div>
+                      {preInstallSecurity.value.downloadSizeHuman && (
+                        <div>
+                          {t('packageDetail.downloadSize', { size: preInstallSecurity.value.downloadSizeHuman })}
+                        </div>
                       )}
-                      {!preInstallSecurity.unsupported && (
+                      {!preInstallSecurity.value.unsupported && (
                         <>
                           <div>
                             {t('packageDetail.signed', {
-                              value: preInstallSecurity.signed ? t('packageDetail.yes') : t('packageDetail.no'),
+                              value: preInstallSecurity.value.signed ? t('packageDetail.yes') : t('packageDetail.no'),
                             })}
                           </div>
-                          {preInstallSecurity.authority && (
-                            <div>{t('packageDetail.authority', { authority: preInstallSecurity.authority })}</div>
+                          {preInstallSecurity.value.authority && (
+                            <div>{t('packageDetail.authority', { authority: preInstallSecurity.value.authority })}</div>
                           )}
-                          {preInstallSecurity.teamId && (
-                            <div>{t('packageDetail.teamId', { teamId: preInstallSecurity.teamId })}</div>
+                          {preInstallSecurity.value.teamId && (
+                            <div>{t('packageDetail.teamId', { teamId: preInstallSecurity.value.teamId })}</div>
                           )}
                           <div>
                             {t('packageDetail.notarized', {
-                              value: preInstallSecurity.notarized ? t('packageDetail.yes') : t('packageDetail.no'),
+                              value: preInstallSecurity.value.notarized
+                                ? t('packageDetail.yes')
+                                : t('packageDetail.no'),
                             })}
                           </div>
                         </>
                       )}
                     </div>
-                    {preInstallSecurity.note && (
-                      <div className="alert alert-warning alert-soft text-xs">{preInstallSecurity.note}</div>
+                    {preInstallSecurity.value.note && (
+                      <div className="alert alert-warning alert-soft text-xs">{preInstallSecurity.value.note}</div>
                     )}
-                    {preInstallSecurity.assessment && (
+                    {preInstallSecurity.value.assessment && (
                       <pre className="mockup-code text-xs overflow-x-auto max-h-40 mt-2">
-                        <code className="whitespace-pre px-4">{preInstallSecurity.assessment}</code>
+                        <code className="whitespace-pre px-4">{preInstallSecurity.value.assessment}</code>
                       </pre>
                     )}
                     <button className="btn btn-xs" onClick={verifyBeforeInstall}>
@@ -672,31 +690,31 @@ export default function PackageDetailModal({ target, onClose, onChanged }: Props
 
             <div className="modal-action">
               {!pkg.isCask && pkg.installed && (
-                <button className="btn btn-sm" disabled={busy} onClick={doLinkToggle}>
+                <button className="btn btn-sm" disabled={busy.value} onClick={doLinkToggle}>
                   <RefreshIcon className="size-4" /> {pkg.linked ? t('common.unlink') : t('common.link')}
                 </button>
               )}
               {!pkg.isCask && pkg.installed && (
-                <button className="btn btn-sm" disabled={busy} onClick={doPinToggle}>
+                <button className="btn btn-sm" disabled={busy.value} onClick={doPinToggle}>
                   <PinIcon className="size-4" /> {pkg.pinned ? t('common.unpin') : t('common.pin')}
                 </button>
               )}
               {pkg.installed && pkg.outdated && (
-                <button className="btn btn-sm btn-warning" disabled={busy} onClick={doUpgrade}>
+                <button className="btn btn-sm btn-warning" disabled={busy.value} onClick={doUpgrade}>
                   <ArrowUpCircleIcon className="size-4" /> {t('common.upgrade')}
                 </button>
               )}
               {pkg.installed && (
-                <button className="btn btn-sm" disabled={busy} onClick={doReinstall}>
+                <button className="btn btn-sm" disabled={busy.value} onClick={doReinstall}>
                   <RefreshIcon className="size-4" /> {t('common.reinstall')}
                 </button>
               )}
               {pkg.installed ? (
-                <button className="btn btn-sm btn-error" disabled={busy} onClick={doUninstall}>
+                <button className="btn btn-sm btn-error" disabled={busy.value} onClick={doUninstall}>
                   <TrashIcon className="size-4" /> {t('common.uninstall')}
                 </button>
               ) : (
-                <button className="btn btn-sm btn-primary" disabled={busy} onClick={doInstall}>
+                <button className="btn btn-sm btn-primary" disabled={busy.value} onClick={doInstall}>
                   <DownloadIcon className="size-4" /> {t('common.install')}
                 </button>
               )}

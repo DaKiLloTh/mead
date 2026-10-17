@@ -19,6 +19,36 @@ export default tseslint.config(
     },
     rules: {
       ...reactHooks.configs.recommended.rules,
+      // Component state is @preact/signals, updated by assigning signal.value.
+      // This React Compiler rule reads that as mutating a hook's return value.
+      'react-hooks/immutability': 'off',
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: 'preact',
+              importNames: ['createContext'],
+              message: 'Shared state lives in module-level signal stores (see src/context/), not Context.',
+            },
+            ...['preact/hooks', 'preact/compat', 'react'].map((name) => ({
+              name,
+              importNames: [
+                'useState',
+                'useReducer',
+                'useEffect',
+                'useLayoutEffect',
+                'useMemo',
+                'useCallback',
+                'useContext',
+                'useRef',
+              ],
+              message:
+                'Use @preact/signals: useSignal for state, useSignalRef (@preact/signals/utils) for DOM refs, useComputed for derived values, useSignalEffect for side effects, module-level signal stores for shared state.',
+            })),
+          ],
+        },
+      ],
       '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
       '@typescript-eslint/no-explicit-any': 'off',
     },

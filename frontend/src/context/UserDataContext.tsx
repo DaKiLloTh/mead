@@ -1,110 +1,81 @@
-import { createContext } from 'preact'
-import type { ComponentChildren } from 'preact'
-import { useCallback, useContext, useEffect, useState } from 'preact/hooks'
+import { signal } from '@preact/signals'
 import { api, pkgKey, UserData } from '../lib/api'
 
-interface UserDataContextValue {
-  data: UserData | null
-  refresh: () => void
-  isFavorite: (name: string, isCask: boolean) => boolean
-  toggleFavorite: (name: string, isCask: boolean) => Promise<void>
-  tagsFor: (name: string, isCask: boolean) => string[]
-  setTags: (name: string, isCask: boolean, tags: string[]) => Promise<void>
-  noteFor: (name: string, isCask: boolean) => string
-  setNote: (name: string, isCask: boolean, note: string) => Promise<void>
-  snoozedUntil: (name: string, isCask: boolean) => Date | null
-  snooze: (name: string, isCask: boolean, days: number) => Promise<void>
-  unsnooze: (name: string, isCask: boolean) => Promise<void>
-  allTags: string[]
+// Module-level signal store for favorites, tags, notes and snoozes. The
+// read helpers below all read `userDataSignal.value`, so calling one inside
+// a useComputed or useSignalEffect subscribes to user data changes. That's
+// what lets Updates' snoozed split and Installed's favorites filter be
+// computeds instead of memos with hand-kept dependency lists.
+//
+// The file keeps its old name so .storybook/main.ts can keep aliasing it to
+// the inert mock in .storybook/mocks/UserDataContext.tsx.
+export const userDataSignal = signal<UserData | null>(null)
+
+export function refreshUserData() {
+  api
+    .getUserData()
+    .then((v) => (userDataSignal.value = v))
+    .catch(() => {})
 }
 
-// Left as Context, not converted to a signal: unlike InstalledPackages/
-// SystemInfo/Outdated, there's no cross-context boot-sequencing problem here
-// for a signal to remove, and turning six mutating methods (toggleFavorite,
-// setTags, setNote, snooze, unsnooze, plus their read-side lookups) into
-// free functions over a mutable module global would just relocate the
-// complexity, not reduce it.
-const UserDataContext = createContext<UserDataContextValue | null>(null)
+let loadStarted = false
 
-export function useUserData(): UserDataContextValue {
-  const ctx = useContext(UserDataContext)
-  if (!ctx) throw new Error('useUserData must be used within a UserDataProvider')
-  return ctx
+/** Loads user data once, for the life of the app. Called from App on mount. */
+export function startUserDataLoad() {
+  if (loadStarted) return
+  loadStarted = true
+  refreshUserData()
 }
 
-export function UserDataProvider({ children }: { children: ComponentChildren }) {
-  const [data, setData] = useState<UserData | null>(null)
+export function isFavorite(name: string, isCask: boolean) {
+  return !!userDataSignal.value?.favorites?.[pkgKey(name, isCask)]
+}
 
-  const refresh = useCallback(() => {
-    api
-      .getUserData()
-      .then(setData)
-      .catch(() => {})
-  }, [])
+async function toggleFavorite(name: string, isCask: boolean) {
+  await api.toggleFavorite(name, isCask)
+  refreshUserData()
+}
 
-  useEffect(refresh, [refresh])
+function tagsFor(name: string, isCask: boolean) {
+  return userDataSignal.value?.tags?.[pkgKey(name, isCask)] ?? []
+}
 
-  const isFavorite = useCallback((name: string, isCask: boolean) => !!data?.favorites?.[pkgKey(name, isCask)], [data])
+async function setTags(name: string, isCask: boolean, tags: string[]) {
+  await api.setTags(name, isCask, tags)
+  refreshUserData()
+}
 
-  const toggleFavorite = useCallback(
-    async (name: string, isCask: boolean) => {
-      await api.toggleFavorite(name, isCask)
-      refresh()
-    },
-    [refresh]
-  )
+function noteFor(name: string, isCask: boolean) {
+  return userDataSignal.value?.notes?.[pkgKey(name, isCask)] ?? ''
+}
 
-  const tagsFor = useCallback((name: string, isCask: boolean) => data?.tags?.[pkgKey(name, isCask)] ?? [], [data])
+async function setNote(name: string, isCask: boolean, note: string) {
+  await api.setNote(name, isCask, note)
+  refreshUserData()
+}
 
-  const setTags = useCallback(
-    async (name: string, isCask: boolean, tags: string[]) => {
-      await api.setTags(name, isCask, tags)
-      refresh()
-    },
-    [refresh]
-  )
+export function snoozedUntil(name: string, isCask: boolean) {
+  const iso = userDataSignal.value?.snoozed?.[pkgKey(name, isCask)]
+  if (!iso) return null
+  const d = new Date(iso)
+  return d.getTime() > Date.now() ? d : null
+}
 
-  const noteFor = useCallback((name: string, isCask: boolean) => data?.notes?.[pkgKey(name, isCask)] ?? '', [data])
+async function snooze(name: string, isCask: boolean, days: number) {
+  await api.snoozePackage(name, isCask, days)
+  refreshUserData()
+}
 
-  const setNote = useCallback(
-    async (name: string, isCask: boolean, note: string) => {
-      await api.setNote(name, isCask, note)
-      refresh()
-    },
-    [refresh]
-  )
+async function unsnooze(name: string, isCask: boolean) {
+  await api.unsnoozePackage(name, isCask)
+  refreshUserData()
+}
 
-  const snoozedUntil = useCallback(
-    (name: string, isCask: boolean) => {
-      const iso = data?.snoozed?.[pkgKey(name, isCask)]
-      if (!iso) return null
-      const d = new Date(iso)
-      return d.getTime() > Date.now() ? d : null
-    },
-    [data]
-  )
-
-  const snooze = useCallback(
-    async (name: string, isCask: boolean, days: number) => {
-      await api.snoozePackage(name, isCask, days)
-      refresh()
-    },
-    [refresh]
-  )
-
-  const unsnooze = useCallback(
-    async (name: string, isCask: boolean) => {
-      await api.unsnoozePackage(name, isCask)
-      refresh()
-    },
-    [refresh]
-  )
-
-  const allTags = Array.from(new Set(Object.values(data?.tags ?? {}).flat())).sort()
-
-  const value: UserDataContextValue = {
+export function useUserData() {
+  const data = userDataSignal.value
+  return {
     data,
-    refresh,
+    refresh: refreshUserData,
     isFavorite,
     toggleFavorite,
     tagsFor,
@@ -114,8 +85,6 @@ export function UserDataProvider({ children }: { children: ComponentChildren }) 
     snoozedUntil,
     snooze,
     unsnooze,
-    allTags,
+    allTags: Array.from(new Set(Object.values(data?.tags ?? {}).flat())).sort(),
   }
-
-  return <UserDataContext.Provider value={value}>{children}</UserDataContext.Provider>
 }

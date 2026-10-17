@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from 'preact/hooks'
+import { useComputed, useSignal } from '@preact/signals'
 import { useTranslation } from 'react-i18next'
 import { api, BrewPackage } from '../lib/api'
 import { useJobs } from '../context/JobsContext'
 import { useConfirm } from '../context/ConfirmContext'
 import { useUserData } from '../context/UserDataContext'
-import { useInstalledPackages } from '../context/InstalledPackagesSignal'
+import { installedPackagesSignal, useInstalledPackages } from '../context/InstalledPackagesSignal'
+import { bump, useRefreshEffect } from '../context/RefreshSignal'
 import PackageDetailModal, { DetailTarget } from '../components/PackageDetailModal'
 import PackageIcon from '../components/PackageIcon'
 import TypeBadge from '../components/TypeBadge'
@@ -18,8 +19,6 @@ import { rankBySearch } from '../lib/searchRelevance'
 export type Filter = 'all' | 'formula' | 'cask' | 'outdated' | 'favorites' | 'deprecated' | 'disabled' | 'pinned'
 
 interface Props {
-  refreshToken: number
-  bump: () => void
   initialFilter?: Filter
 }
 
@@ -27,7 +26,7 @@ function rowKey(p: BrewPackage) {
   return `${p.isCask ? 'c' : 'f'}:${p.name}`
 }
 
-export default function Installed({ refreshToken, bump, initialFilter }: Props) {
+export default function Installed({ initialFilter }: Props) {
   const { t } = useTranslation()
   const { runAction } = useJobs()
   const confirm = useConfirm()
@@ -36,30 +35,23 @@ export default function Installed({ refreshToken, bump, initialFilter }: Props) 
   const userData = useUserData()
   const { packages: cachedPkgs, loading, error, refresh: refreshPackages } = useInstalledPackages()
   const pkgs = cachedPkgs ?? []
-  const [leaves, setLeaves] = useState<Set<string>>(new Set())
-  const [filter, setFilter] = useState<Filter>(initialFilter ?? 'all')
+  const leaves = useSignal<Set<string>>(new Set())
+  const filter = useSignal<Filter>(initialFilter ?? 'all')
 
-  // Installed is unmounted/remounted on every view switch (App.tsx renders
-  // it conditionally), so the useState initializer above covers the normal
-  // navigation case. This effect is a cheap safety net in case that ever
-  // changes and the component stays mounted across an initialFilter update.
-  useEffect(() => {
-    if (initialFilter) setFilter(initialFilter)
-  }, [initialFilter])
-  const [query, setQuery] = useState('')
-  const [detail, setDetail] = useState<DetailTarget | null>(null)
-  const [rowBusy, setRowBusy] = useState<string | null>(null)
-  const [selected, setSelected] = useState<Set<string>>(new Set())
-  const [bulkBusy, setBulkBusy] = useState(false)
+  const query = useSignal('')
+  const detail = useSignal<DetailTarget | null>(null)
+  const rowBusy = useSignal<string | null>(null)
+  const selected = useSignal<Set<string>>(new Set())
+  const bulkBusy = useSignal(false)
 
   function loadLeaves() {
     api
       .leaves()
-      .then((l) => setLeaves(new Set(l)))
+      .then((l) => (leaves.value = new Set(l)))
       .catch(() => {})
   }
 
-  useEffect(loadLeaves, [refreshToken])
+  useRefreshEffect(loadLeaves)
 
   // Full reload of both the shared package cache and this view's own leaves
   // lookup — used by the error-retry button and by actions (pin/unpin) that
@@ -71,42 +63,39 @@ export default function Installed({ refreshToken, bump, initialFilter }: Props) 
     loadLeaves()
   }
 
-  const filtered = useMemo(() => {
-    const inTab = pkgs.filter((p) => {
-      if (filter === 'formula' && p.isCask) return false
-      if (filter === 'cask' && !p.isCask) return false
-      if (filter === 'outdated' && !p.outdated) return false
-      if (filter === 'favorites' && !userData.isFavorite(p.name, p.isCask)) return false
-      if (filter === 'deprecated' && !p.deprecated) return false
-      if (filter === 'disabled' && !p.disabled) return false
-      if (filter === 'pinned' && !p.pinned) return false
+  const filtered = useComputed(() => {
+    const inTab = (installedPackagesSignal.value.packages ?? []).filter((p) => {
+      if (filter.value === 'formula' && p.isCask) return false
+      if (filter.value === 'cask' && !p.isCask) return false
+      if (filter.value === 'outdated' && !p.outdated) return false
+      if (filter.value === 'favorites' && !userData.isFavorite(p.name, p.isCask)) return false
+      if (filter.value === 'deprecated' && !p.deprecated) return false
+      if (filter.value === 'disabled' && !p.disabled) return false
+      if (filter.value === 'pinned' && !p.pinned) return false
       return true
     })
     // With a query, matches are ordered by relevance (an exact name first)
     // instead of the list's own order.
-    return rankBySearch(inTab, query)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pkgs, filter, query, userData.data])
+    return rankBySearch(inTab, query.value)
+  })
 
   function toggleSelected(p: BrewPackage) {
     const key = rowKey(p)
-    setSelected((prev) => {
-      const next = new Set(prev)
-      if (next.has(key)) next.delete(key)
-      else next.add(key)
-      return next
-    })
+    const next = new Set(selected.value)
+    if (next.has(key)) next.delete(key)
+    else next.add(key)
+    selected.value = next
   }
 
   function toggleSelectAll() {
-    if (selected.size === filtered.length) {
-      setSelected(new Set())
+    if (selected.value.size === filtered.value.length) {
+      selected.value = new Set()
     } else {
-      setSelected(new Set(filtered.map(rowKey)))
+      selected.value = new Set(filtered.value.map(rowKey))
     }
   }
 
-  const selectedPkgs = filtered.filter((p) => selected.has(rowKey(p)))
+  const selectedPkgs = filtered.value.filter((p) => selected.value.has(rowKey(p)))
 
   async function quickUninstall(p: BrewPackage) {
     const { ok, checked } = await confirm({
@@ -118,7 +107,7 @@ export default function Installed({ refreshToken, bump, initialFilter }: Props) 
     })
     if (!ok) return
     const zap = checked[0] ?? false
-    setRowBusy(p.name)
+    rowBusy.value = p.name
     await uninstallWithElevation(
       { name: p.name, isCask: p.isCask, zap },
       {
@@ -127,15 +116,15 @@ export default function Installed({ refreshToken, bump, initialFilter }: Props) 
         confirmLabel: t('installed.elevateUninstallConfirmLabel'),
       }
     )
-    setRowBusy(null)
+    rowBusy.value = null
     loadLeaves()
     bump()
   }
 
   async function quickUpgrade(p: BrewPackage) {
-    setRowBusy(p.name)
+    rowBusy.value = p.name
     await runAction(() => api.upgrade(p.name, p.isCask))
-    setRowBusy(null)
+    rowBusy.value = null
     loadLeaves()
     bump()
   }
@@ -151,7 +140,7 @@ export default function Installed({ refreshToken, bump, initialFilter }: Props) 
     })
     if (!ok) return
     const zap = checked[0] ?? false
-    setBulkBusy(true)
+    bulkBusy.value = true
     await uninstallMany(
       selectedPkgs.map((p) => ({ name: p.name, isCask: p.isCask, zap })),
       (names) => ({
@@ -160,30 +149,30 @@ export default function Installed({ refreshToken, bump, initialFilter }: Props) 
         confirmLabel: t('installed.elevateUninstallConfirmLabel'),
       })
     )
-    setBulkBusy(false)
-    setSelected(new Set())
+    bulkBusy.value = false
+    selected.value = new Set()
     loadLeaves()
     bump()
   }
 
   async function bulkUpgrade() {
-    setBulkBusy(true)
+    bulkBusy.value = true
     for (const p of selectedPkgs.filter((p) => p.outdated)) {
       await runAction(() => api.upgrade(p.name, p.isCask))
     }
-    setBulkBusy(false)
-    setSelected(new Set())
+    bulkBusy.value = false
+    selected.value = new Set()
     loadLeaves()
     bump()
   }
 
   async function bulkPin() {
-    setBulkBusy(true)
+    bulkBusy.value = true
     for (const p of selectedPkgs.filter((p) => !p.isCask && !p.pinned)) {
       await runAction(() => api.pin(p.name))
     }
-    setBulkBusy(false)
-    setSelected(new Set())
+    bulkBusy.value = false
+    selected.value = new Set()
     load()
   }
 
@@ -209,78 +198,82 @@ export default function Installed({ refreshToken, bump, initialFilter }: Props) 
           <input
             type="text"
             placeholder={t('installed.filterPlaceholder')}
-            value={query}
-            onChange={(e) => setQuery(e.currentTarget.value)}
+            value={query.value}
+            onChange={(e) => (query.value = e.currentTarget.value)}
           />
         </label>
       </div>
 
       <div className="flex items-center justify-between mb-4 gap-4 flex-wrap">
         <div role="tablist" className="tabs tabs-box tabs-sm w-fit">
-          <button role="tab" className={`tab ${filter === 'all' ? 'tab-active' : ''}`} onClick={() => setFilter('all')}>
+          <button
+            role="tab"
+            className={`tab ${filter.value === 'all' ? 'tab-active' : ''}`}
+            onClick={() => (filter.value = 'all')}
+          >
             {t('installed.tabAll', { count: pkgs.length })}
           </button>
           <button
             role="tab"
-            className={`tab ${filter === 'formula' ? 'tab-active' : ''}`}
-            onClick={() => setFilter('formula')}
+            className={`tab ${filter.value === 'formula' ? 'tab-active' : ''}`}
+            onClick={() => (filter.value = 'formula')}
           >
             {t('installed.tabFormulae', { count: formulaCount })}
           </button>
           <button
             role="tab"
-            className={`tab ${filter === 'cask' ? 'tab-active' : ''}`}
-            onClick={() => setFilter('cask')}
+            className={`tab ${filter.value === 'cask' ? 'tab-active' : ''}`}
+            onClick={() => (filter.value = 'cask')}
           >
             {t('installed.tabCasks', { count: caskCount })}
           </button>
           <button
             role="tab"
-            className={`tab ${filter === 'outdated' ? 'tab-active' : ''}`}
-            onClick={() => setFilter('outdated')}
+            className={`tab ${filter.value === 'outdated' ? 'tab-active' : ''}`}
+            onClick={() => (filter.value = 'outdated')}
           >
             {t('installed.tabOutdated', { count: outdatedCount })}
           </button>
           <button
             role="tab"
-            className={`tab ${filter === 'favorites' ? 'tab-active' : ''}`}
-            onClick={() => setFilter('favorites')}
+            className={`tab ${filter.value === 'favorites' ? 'tab-active' : ''}`}
+            onClick={() => (filter.value = 'favorites')}
           >
             {t('installed.tabFavorites', { count: favoriteCount })}
           </button>
           <button
             role="tab"
-            className={`tab ${filter === 'deprecated' ? 'tab-active' : ''}`}
-            onClick={() => setFilter('deprecated')}
+            className={`tab ${filter.value === 'deprecated' ? 'tab-active' : ''}`}
+            onClick={() => (filter.value = 'deprecated')}
           >
             {t('installed.tabDeprecated', { count: deprecatedCount })}
           </button>
           <button
             role="tab"
-            className={`tab ${filter === 'disabled' ? 'tab-active' : ''}`}
-            onClick={() => setFilter('disabled')}
+            className={`tab ${filter.value === 'disabled' ? 'tab-active' : ''}`}
+            onClick={() => (filter.value = 'disabled')}
           >
             {t('installed.tabDisabled', { count: disabledCount })}
           </button>
           <button
             role="tab"
-            className={`tab ${filter === 'pinned' ? 'tab-active' : ''}`}
-            onClick={() => setFilter('pinned')}
+            className={`tab ${filter.value === 'pinned' ? 'tab-active' : ''}`}
+            onClick={() => (filter.value = 'pinned')}
           >
             {t('installed.tabPinned', { count: pinnedCount })}
           </button>
         </div>
 
-        {selected.size > 0 && (
+        {selected.value.size > 0 && (
           <div className="flex items-center gap-2 text-sm">
-            <span className="text-base-content/60">{t('installed.selectedCount', { count: selected.size })}</span>
-            <button className="btn btn-xs" disabled={bulkBusy} onClick={bulkUpgrade}>
+            <span className="text-base-content/60">{t('installed.selectedCount', { count: selected.value.size })}</span>
+            <button className="btn btn-xs" disabled={bulkBusy.value} onClick={bulkUpgrade}>
               {t('common.upgrade')}
             </button>
-            <button className="btn btn-xs" disabled={bulkBusy} onClick={bulkPin}>
+            <button className="btn btn-xs" disabled={bulkBusy.value} onClick={bulkPin}>
               {t('common.pin')}
             </button>
-            <button className="btn btn-xs btn-error" disabled={bulkBusy} onClick={bulkUninstall}>
+            <button className="btn btn-xs btn-error" disabled={bulkBusy.value} onClick={bulkUninstall}>
               {t('common.uninstall')}
             </button>
           </div>
@@ -308,7 +301,7 @@ export default function Installed({ refreshToken, bump, initialFilter }: Props) 
                 <input
                   type="checkbox"
                   className="checkbox checkbox-xs"
-                  checked={filtered.length > 0 && selected.size === filtered.length}
+                  checked={filtered.value.length > 0 && selected.value.size === filtered.value.length}
                   onChange={toggleSelectAll}
                 />
               </th>
@@ -320,7 +313,7 @@ export default function Installed({ refreshToken, bump, initialFilter }: Props) 
             </tr>
           </thead>
           <tbody>
-            {filtered.map((p) => {
+            {filtered.value.map((p) => {
               const key = rowKey(p)
               const favorite = userData.isFavorite(p.name, p.isCask)
               return (
@@ -329,11 +322,11 @@ export default function Installed({ refreshToken, bump, initialFilter }: Props) 
                     <input
                       type="checkbox"
                       className="checkbox checkbox-xs"
-                      checked={selected.has(key)}
+                      checked={selected.value.has(key)}
                       onChange={() => toggleSelected(p)}
                     />
                   </td>
-                  <td className="cursor-pointer" onClick={() => setDetail({ name: p.name, isCask: p.isCask })}>
+                  <td className="cursor-pointer" onClick={() => (detail.value = { name: p.name, isCask: p.isCask })}>
                     <div className="font-medium flex items-center gap-1.5 min-w-0">
                       <PackageIcon name={p.name} isCask={p.isCask} className="size-5" />
                       {favorite && <StarIcon filled className="size-3.5 text-warning shrink-0" />}
@@ -356,7 +349,7 @@ export default function Installed({ refreshToken, bump, initialFilter }: Props) 
                         </span>
                       )}
                       {p.pinned && <span className="badge badge-sm badge-ghost">{t('common.badgePinned')}</span>}
-                      {!p.isCask && leaves.has(p.name) && (
+                      {!p.isCask && leaves.value.has(p.name) && (
                         <span className="badge badge-sm badge-ghost">{t('installed.badgeLeaf')}</span>
                       )}
                       {!p.isCask && !p.linked && (
@@ -372,7 +365,7 @@ export default function Installed({ refreshToken, bump, initialFilter }: Props) 
                       {p.outdated && (
                         <button
                           className="btn btn-xs btn-ghost text-warning"
-                          disabled={rowBusy === p.name}
+                          disabled={rowBusy.value === p.name}
                           onClick={() => quickUpgrade(p)}
                           title={t('installed.upgradeTooltip')}
                         >
@@ -382,11 +375,11 @@ export default function Installed({ refreshToken, bump, initialFilter }: Props) 
                       {!p.isCask && (
                         <button
                           className="btn btn-xs btn-ghost"
-                          disabled={rowBusy === p.name}
+                          disabled={rowBusy.value === p.name}
                           onClick={async () => {
-                            setRowBusy(p.name)
+                            rowBusy.value = p.name
                             await runAction(() => (p.pinned ? api.unpin(p.name) : api.pin(p.name)))
-                            setRowBusy(null)
+                            rowBusy.value = null
                             load()
                           }}
                           title={p.pinned ? t('installed.unpinTooltip') : t('installed.pinTooltip')}
@@ -396,7 +389,7 @@ export default function Installed({ refreshToken, bump, initialFilter }: Props) 
                       )}
                       <button
                         className="btn btn-xs btn-ghost text-error"
-                        disabled={rowBusy === p.name}
+                        disabled={rowBusy.value === p.name}
                         onClick={() => quickUninstall(p)}
                         title={t('installed.uninstallTooltip')}
                       >
@@ -407,7 +400,7 @@ export default function Installed({ refreshToken, bump, initialFilter }: Props) 
                 </tr>
               )
             })}
-            {filtered.length === 0 && (
+            {filtered.value.length === 0 && (
               <tr>
                 <td colSpan={6} className="text-center text-base-content/50 py-8">
                   {t('installed.noMatches')}
@@ -419,8 +412,8 @@ export default function Installed({ refreshToken, bump, initialFilter }: Props) 
       )}
 
       <PackageDetailModal
-        target={detail}
-        onClose={() => setDetail(null)}
+        target={detail.value}
+        onClose={() => (detail.value = null)}
         onChanged={() => {
           loadLeaves()
           bump()

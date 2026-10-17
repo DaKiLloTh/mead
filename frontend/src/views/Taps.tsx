@@ -1,71 +1,67 @@
-import { useEffect, useState } from 'preact/hooks'
+import { useSignal } from '@preact/signals'
 import type { TargetedSubmitEvent } from 'preact'
 import { useTranslation } from 'react-i18next'
 import { api, TapDetail } from '../lib/api'
 import { useJobs } from '../context/JobsContext'
 import { useConfirm } from '../context/ConfirmContext'
+import { bump, useRefreshEffect } from '../context/RefreshSignal'
 import { ChevronDownIcon, ExternalLinkIcon, TapIcon, TrashIcon } from '../components/Icons'
 import ExternalLink from '../components/ExternalLink'
 import LoadingRow from '../components/LoadingRow'
 import ErrorAlert from '../components/ErrorAlert'
 
-interface Props {
-  refreshToken: number
-  bump: () => void
-}
-
-export default function Taps({ refreshToken, bump }: Props) {
+export default function Taps() {
   const { t } = useTranslation()
   const { runAction } = useJobs()
   const confirm = useConfirm()
-  const [taps, setTaps] = useState<string[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [newTap, setNewTap] = useState('')
-  const [adding, setAdding] = useState(false)
-  const [rowBusy, setRowBusy] = useState<string | null>(null)
-  const [expanded, setExpanded] = useState<string | null>(null)
-  const [detail, setDetail] = useState<TapDetail | null>(null)
-  const [detailLoading, setDetailLoading] = useState(false)
-  const [removeError, setRemoveError] = useState<Record<string, string>>({})
+  const taps = useSignal<string[]>([])
+  const loading = useSignal(true)
+  const error = useSignal<string | null>(null)
+  const newTap = useSignal('')
+  const adding = useSignal(false)
+  const rowBusy = useSignal<string | null>(null)
+  const expanded = useSignal<string | null>(null)
+  const detail = useSignal<TapDetail | null>(null)
+  const detailLoading = useSignal(false)
+  const removeError = useSignal<Record<string, string>>({})
 
   function load() {
-    setLoading(true)
-    setError(null)
+    loading.value = true
+    error.value = null
     api
       .taps()
-      .then(setTaps)
-      .catch((e) => setError(String(e)))
-      .finally(() => setLoading(false))
+      .then((v) => (taps.value = v))
+      .catch((e) => (error.value = String(e)))
+      .finally(() => (loading.value = false))
   }
 
-  useEffect(load, [refreshToken])
+  useRefreshEffect(load)
 
   async function addTap(e: TargetedSubmitEvent<HTMLFormElement>) {
     e.preventDefault()
-    const name = newTap.trim()
+    const name = newTap.value.trim()
     if (!name) return
-    setAdding(true)
+    adding.value = true
     await runAction(() => api.tapAdd(name))
-    setAdding(false)
-    setNewTap('')
+    adding.value = false
+    newTap.value = ''
     load()
     bump()
   }
 
   async function toggleExpand(name: string) {
-    if (expanded === name) {
-      setExpanded(null)
+    if (expanded.value === name) {
+      expanded.value = null
       return
     }
-    setExpanded(name)
-    setDetail(null)
-    setDetailLoading(true)
+    expanded.value = name
+    detail.value = null
+    detailLoading.value = true
     try {
       const d = await api.tapInfo(name)
-      setDetail(d)
+      detail.value = d
     } finally {
-      setDetailLoading(false)
+      detailLoading.value = false
     }
   }
 
@@ -76,12 +72,12 @@ export default function Taps({ refreshToken, bump }: Props) {
       confirmLabel: t('taps.confirmRemoveLabel'),
     })
     if (!ok) return
-    setRowBusy(name)
-    setRemoveError((prev) => ({ ...prev, [name]: '' }))
+    rowBusy.value = name
+    removeError.value = { ...removeError.value, [name]: '' }
     const job = await runAction(() => api.tapRemove(name))
-    setRowBusy(null)
+    rowBusy.value = null
     if (job.status === 'error') {
-      setRemoveError((prev) => ({ ...prev, [name]: job.error || t('taps.removeFailedFallback') }))
+      removeError.value = { ...removeError.value, [name]: job.error || t('taps.removeFailedFallback') }
       return
     }
     load()
@@ -96,10 +92,10 @@ export default function Taps({ refreshToken, bump }: Props) {
       confirmLabel: t('taps.confirmForceRemoveLabel'),
     })
     if (!ok) return
-    setRowBusy(name)
+    rowBusy.value = name
     await runAction(() => api.tapRemoveForce(name))
-    setRowBusy(null)
-    setRemoveError((prev) => ({ ...prev, [name]: '' }))
+    rowBusy.value = null
+    removeError.value = { ...removeError.value, [name]: '' }
     load()
     bump()
   }
@@ -115,73 +111,75 @@ export default function Taps({ refreshToken, bump }: Props) {
           <input
             type="text"
             placeholder={t('taps.addPlaceholder')}
-            value={newTap}
-            onChange={(e) => setNewTap(e.currentTarget.value)}
+            value={newTap.value}
+            onChange={(e) => (newTap.value = e.currentTarget.value)}
           />
         </label>
-        <button className="btn btn-sm btn-primary" type="submit" disabled={adding || !newTap.trim()}>
-          {adding ? <span className="loading loading-spinner loading-xs" /> : t('taps.addButton')}
+        <button className="btn btn-sm btn-primary" type="submit" disabled={adding.value || !newTap.value.trim()}>
+          {adding.value ? <span className="loading loading-spinner loading-xs" /> : t('taps.addButton')}
         </button>
       </form>
 
-      {loading ? (
+      {loading.value ? (
         <LoadingRow>{t('common.loading')}</LoadingRow>
-      ) : error ? (
-        <ErrorAlert title={t('taps.errorTitle')} message={error} onRetry={load} />
+      ) : error.value ? (
+        <ErrorAlert title={t('taps.errorTitle')} message={error.value} onRetry={load} />
       ) : (
         <ul className="menu bg-base-200 rounded-box w-full">
-          {taps.map((tapName) => (
+          {taps.value.map((tapName) => (
             <li key={tapName}>
               <div className="flex flex-col items-stretch p-0!">
                 <div className="flex items-center justify-between px-3 py-2">
                   <button className="flex items-center gap-1.5 font-mono text-sm" onClick={() => toggleExpand(tapName)}>
                     <ChevronDownIcon
-                      className={`size-3.5 transition-transform ${expanded === tapName ? '' : '-rotate-90'}`}
+                      className={`size-3.5 transition-transform ${expanded.value === tapName ? '' : '-rotate-90'}`}
                     />
                     {tapName}
                   </button>
                   <button
                     className="btn btn-xs btn-ghost text-error"
-                    disabled={rowBusy === tapName}
+                    disabled={rowBusy.value === tapName}
                     onClick={() => removeTap(tapName)}
                     title={t('taps.untapTooltip')}
                   >
                     <TrashIcon className="size-4" />
                   </button>
                 </div>
-                {expanded === tapName && (
+                {expanded.value === tapName && (
                   <div className="px-3 pb-3 text-xs text-base-content/60">
-                    {detailLoading ? (
+                    {detailLoading.value ? (
                       <span className="flex items-center gap-2">
                         <span className="loading loading-spinner loading-xs" /> {t('common.loading')}
                       </span>
-                    ) : detail ? (
+                    ) : detail.value ? (
                       <div className="space-y-0.5">
-                        {detail.remote && (
+                        {detail.value.remote && (
                           <div className="flex items-center gap-1">
-                            <ExternalLink className="link inline-flex items-center gap-1" href={detail.remote}>
-                              {detail.remote} <ExternalLinkIcon className="size-3" />
+                            <ExternalLink className="link inline-flex items-center gap-1" href={detail.value.remote}>
+                              {detail.value.remote} <ExternalLinkIcon className="size-3" />
                             </ExternalLink>
                           </div>
                         )}
                         <div>
                           {t('taps.formulaCaskCounts', {
-                            formulaCount: detail.formulaCount,
-                            caskCount: detail.caskCount,
+                            formulaCount: detail.value.formulaCount,
+                            caskCount: detail.value.caskCount,
                           })}
-                          {detail.official && t('taps.officialSuffix')}
+                          {detail.value.official && t('taps.officialSuffix')}
                         </div>
-                        {detail.lastCommit && <div>{t('taps.lastCommit', { commit: detail.lastCommit })}</div>}
+                        {detail.value.lastCommit && (
+                          <div>{t('taps.lastCommit', { commit: detail.value.lastCommit })}</div>
+                        )}
                       </div>
                     ) : (
                       <span>{t('taps.noDetail')}</span>
                     )}
                   </div>
                 )}
-                {removeError[tapName] && (
+                {removeError.value[tapName] && (
                   <div className="px-3 pb-3">
                     <div className="alert alert-warning alert-soft text-xs flex items-center justify-between gap-2">
-                      <span>{removeError[tapName]}</span>
+                      <span>{removeError.value[tapName]}</span>
                       <button className="btn btn-xs" onClick={() => forceRemoveTap(tapName)}>
                         {t('taps.forceUntap')}
                       </button>
@@ -191,7 +189,7 @@ export default function Taps({ refreshToken, bump }: Props) {
               </div>
             </li>
           ))}
-          {taps.length === 0 && <li className="text-base-content/50 text-sm px-3 py-2">{t('taps.noTaps')}</li>}
+          {taps.value.length === 0 && <li className="text-base-content/50 text-sm px-3 py-2">{t('taps.noTaps')}</li>}
         </ul>
       )}
     </div>

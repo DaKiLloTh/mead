@@ -1,3 +1,4 @@
+import { signal } from '@preact/signals'
 import i18n, { type i18n as I18nInstance } from 'i18next'
 import { initReactI18next } from 'react-i18next'
 import LanguageDetector from 'i18next-browser-languagedetector'
@@ -18,6 +19,13 @@ export const resources = {
 } as const
 
 export const supportedLngs = Object.keys(resources)
+
+/**
+ * The active language, as a signal. Computeds that translate labels read
+ * this so they recompute on a language switch: react-i18next's `t` keeps a
+ * stable reference across switches, so reading `t` alone wouldn't.
+ */
+export const languageSignal = signal('')
 
 /**
  * Locales that read right-to-left (Arabic, Yiddish, ...). Kept as its own
@@ -88,14 +96,18 @@ export function initI18n(): Promise<I18nInstance> {
           caches: ['localStorage'],
         },
         interpolation: {
-          // React already escapes interpolated values when rendering.
+          // Preact already escapes interpolated values when rendering.
           escapeValue: false,
         },
         returnEmptyString: false,
       })
 
     applyDocumentDirection(i18n.language)
-    i18n.on('languageChanged', applyDocumentDirection)
+    languageSignal.value = i18n.language
+    i18n.on('languageChanged', (lng) => {
+      applyDocumentDirection(lng)
+      languageSignal.value = lng
+    })
 
     return i18n
   })()

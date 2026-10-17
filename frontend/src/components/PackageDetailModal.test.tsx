@@ -203,3 +203,41 @@ describe('PackageDetailModal security tab', () => {
     expect(inspectCaskBeforeInstall).not.toHaveBeenCalled()
   })
 })
+
+describe('PackageDetailModal loading', () => {
+  it('shows loading, not the previous details, when reopened for the same package', async () => {
+    getInfo.mockResolvedValue(fakePackage('thing', true, { installed: true, desc: 'Thing desc' }))
+    const target = { name: 'thing', isCask: true }
+    const { rerender } = render(<PackageDetailModal target={target} onClose={vi.fn()} />)
+    expect(await screen.findByText('Thing desc')).toBeTruthy()
+
+    rerender(<PackageDetailModal target={null} onClose={vi.fn()} />)
+    getInfo.mockReturnValue(new Promise(() => {}))
+    // rerender flushes effects before returning, so record every node added
+    // or removed along the way to catch a frame that rendered the old
+    // details. Removed nodes keep their text; added ones are read live.
+    const observer = new MutationObserver(() => {})
+    observer.observe(document.body, { childList: true, subtree: true })
+    rerender(<PackageDetailModal target={{ ...target }} onClose={vi.fn()} />)
+    const touched = observer.takeRecords().flatMap((r) => [...r.addedNodes, ...r.removedNodes])
+    observer.disconnect()
+
+    expect(touched.some((n) => n.textContent?.includes('Thing desc'))).toBe(false)
+    expect(screen.getByText('packageDetail.loading')).toBeTruthy()
+  })
+
+  it('ignores a late response for a package the modal has moved away from', async () => {
+    let resolveFirst: (p: BrewPackage) => void = () => {}
+    getInfo.mockReturnValueOnce(new Promise<BrewPackage>((r) => (resolveFirst = r)))
+    getInfo.mockReturnValueOnce(new Promise(() => {}))
+    const { rerender } = render(<PackageDetailModal target={{ name: 'first', isCask: true }} onClose={vi.fn()} />)
+    rerender(<PackageDetailModal target={{ name: 'second', isCask: true }} onClose={vi.fn()} />)
+
+    resolveFirst(fakePackage('first', true, { desc: 'First desc' }))
+    await waitFor(() => expect(getInfo).toHaveBeenCalledTimes(2))
+    await Promise.resolve()
+
+    expect(screen.getByText('packageDetail.loading')).toBeTruthy()
+    expect(screen.queryByText('First desc')).toBeNull()
+  })
+})

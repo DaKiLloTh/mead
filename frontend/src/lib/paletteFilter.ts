@@ -1,6 +1,6 @@
 // Pure, dependency-free fuzzy-ish matching used by the command palette
 // (CommandPalette.tsx). Kept separate from the component so it can be
-// unit tested without touching React/DOM.
+// unit tested without touching Preact or the DOM.
 
 export interface PaletteNavItem {
   key: string

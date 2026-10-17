@@ -1,5 +1,5 @@
 // Storybook stand-in for ../../src/context/JobsContext.tsx, aliased in
-// .storybook/main.ts. mead's real JobsProvider ultimately drives real
+// .storybook/main.ts. mead's real jobs store ultimately drives real
 // Wails-bound job subprocesses (brew install/upgrade/etc.), which don't
 // exist outside the Wails runtime -- Storybook renders in a plain browser,
 // so any component that calls useJobs() needs a safe, inert stand-in
@@ -69,3 +69,11 @@ export function useJobs() {
     },
   }
 }
+
+// Same names the real store exports, for components that track them in a
+// computed or signal effect (JobConsole).
+export const jobsSignal = mockJobsSignal
+export const toastsSignal = mockToastsSignal
+export const consoleOpenSignal = mockConsoleOpenSignal
+export const selectedJobIdSignal = mockSelectedJobIdSignal
+export function startJobEvents() {}

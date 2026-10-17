@@ -1,5 +1,5 @@
+import { useSignal } from '@preact/signals'
 import type { Meta, StoryObj } from '@storybook/preact-vite'
-import { useState } from 'preact/hooks'
 import { installWailsMocks } from '@dakilloth/storybook-wails-mock'
 import PackageDetailModal from './PackageDetailModal'
 import { fakePackage, defaultGoMocks } from '../../.storybook/mocks/wailsApi'
@@ -41,7 +41,7 @@ const csv = (s: string) =>
 // stay mocked too, since installWailsMocks replaces window.go wholesale
 // rather than merging.
 function Modal(args: StoryArgs) {
-  const [open, setOpen] = useState(true)
+  const open = useSignal(true)
 
   installWailsMocks({
     go: {
@@ -66,9 +66,9 @@ function Modal(args: StoryArgs) {
     },
   })
 
-  if (!open) {
+  if (!open.value) {
     return (
-      <button className="btn btn-sm" onClick={() => setOpen(true)}>
+      <button className="btn btn-sm" onClick={() => (open.value = true)}>
         Reopen
       </button>
     )
@@ -76,7 +76,7 @@ function Modal(args: StoryArgs) {
   return (
     <PackageDetailModal
       target={{ name: args.name, isCask: args.isCask }}
-      onClose={() => setOpen(false)}
+      onClose={() => (open.value = false)}
       onChanged={() => {}}
     />
   )

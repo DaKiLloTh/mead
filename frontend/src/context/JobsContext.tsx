@@ -1,6 +1,4 @@
-import { createContext } from 'preact'
-import type { ComponentChildren } from 'preact'
-import { useCallback, useContext, useEffect, useRef, useState } from 'preact/hooks'
+import { signal } from '@preact/signals'
 import { EventsOn } from '../../wailsjs/runtime'
 import { api } from '../lib/api'
 import { JobTracker, type JobState, type JobLine } from './jobTracker'
@@ -13,116 +11,75 @@ export interface Toast {
   message: string
 }
 
-interface JobsContextValue {
-  jobs: JobState[]
-  activeCount: number
-  toasts: Toast[]
-  dismissToast: (id: string) => void
-  runAction: (action: () => Promise<string>) => Promise<JobState>
-  notify: (type: Toast['type'], message: string) => void
-  consoleOpen: boolean
-  setConsoleOpen: (open: boolean) => void
-  selectedJobId: string | null
-  setSelectedJobId: (id: string | null) => void
-  cancelJob: (id: string) => void
-  clearFinishedJobs: () => void
+// Module-level signal store for jobs, toasts and the job console. The file
+// keeps its old name so .storybook/main.ts can keep aliasing it to the
+// inert mock in .storybook/mocks/JobsContext.tsx.
+export const jobsSignal = signal<JobState[]>([])
+export const toastsSignal = signal<Toast[]>([])
+export const consoleOpenSignal = signal(false)
+export const selectedJobIdSignal = signal<string | null>(null)
+
+function dismissToast(id: string) {
+  toastsSignal.value = toastsSignal.value.filter((x) => x.id !== id)
 }
 
-// Left as Context, not converted to a signal: the job list's authoritative
-// source of truth already lives outside React state, in JobTracker (see
-// jobTracker.ts), specifically to avoid a synchronization race against the
-// live event bus. Converting the React-facing mirror (`jobs` state below) to
-// a signal would just move where that mirror lives, not remove the tracker,
-// so it isn't a real simplification.
-const JobsContext = createContext<JobsContextValue | null>(null)
-
-export function useJobs(): JobsContextValue {
-  const ctx = useContext(JobsContext)
-  if (!ctx) throw new Error('useJobs must be used within a JobsProvider')
-  return ctx
+function pushToast(type: Toast['type'], message: string) {
+  const id = Math.random().toString(36).slice(2)
+  toastsSignal.value = [...toastsSignal.value, { id, type, message }]
+  setTimeout(() => dismissToast(id), 5000)
 }
 
-export function JobsProvider({ children }: { children: ComponentChildren }) {
-  const [jobs, setJobs] = useState<JobState[]>([])
-  const [toasts, setToasts] = useState<Toast[]>([])
-  const [consoleOpen, setConsoleOpen] = useState(false)
-  const [selectedJobId, setSelectedJobId] = useState<string | null>(null)
+// The tracker owns the authoritative, synchronously-updated job list and
+// resolver bookkeeping (see jobTracker.ts for why this must live outside
+// rendered state to avoid the job:done-vs-RPC-promise race). jobsSignal is
+// just a mirror of it, for rendering.
+const tracker = new JobTracker({
+  onJobsChange: (next) => (jobsSignal.value = next),
+  onNotify: (type, message) => pushToast(type, message),
+  onJobStarted: (id) => {
+    selectedJobIdSignal.value = id
+    consoleOpenSignal.value = true
+  },
+})
 
-  const dismissToast = useCallback((id: string) => {
-    setToasts((t) => t.filter((x) => x.id !== id))
-  }, [])
+let eventsStarted = false
 
-  const pushToast = useCallback((type: Toast['type'], message: string) => {
-    const id = Math.random().toString(36).slice(2)
-    setToasts((t) => [...t, { id, type, message }])
-    setTimeout(() => {
-      setToasts((t) => t.filter((x) => x.id !== id))
-    }, 5000)
-  }, [])
+/** Subscribes the tracker to the backend's job events, once. Called from App on mount. */
+export function startJobEvents() {
+  if (eventsStarted) return
+  eventsStarted = true
+  EventsOn('job:start', tracker.handleStart)
+  EventsOn('job:output', tracker.handleOutput)
+  EventsOn('job:done', tracker.handleDone)
+}
 
-  // The tracker owns the authoritative, synchronously-updated job list and
-  // resolver bookkeeping (see jobTracker.ts for why this must live outside
-  // React state to avoid the job:done-vs-RPC-promise race). React state
-  // (`jobs` above) is just a mirror of it, for rendering.
-  const trackerRef = useRef<JobTracker | null>(null)
-  // Lazy ref initialization: reading/writing .current during render is only
-  // unsafe in general because it can produce inconsistent output across
-  // renders, but this specific "create once, guarded by a null check" shape
-  // is the documented exception (https://react.dev/reference/react/useRef).
-  // eslint-disable-next-line react-hooks/refs
-  if (!trackerRef.current) {
-    trackerRef.current = new JobTracker({
-      onJobsChange: (next) => setJobs(next),
-      onNotify: (type, message) => pushToast(type, message),
-      onJobStarted: (id) => {
-        setSelectedJobId(id)
-        setConsoleOpen(true)
-      },
-    })
-  }
+function runAction(action: () => Promise<string>): Promise<JobState> {
+  return tracker.runAction(action)
+}
 
-  useEffect(() => {
-    const tracker = trackerRef.current!
-    const offStart = EventsOn('job:start', tracker.handleStart)
-    const offOutput = EventsOn('job:output', tracker.handleOutput)
-    const offDone = EventsOn('job:done', tracker.handleDone)
+function cancelJob(id: string) {
+  void api.cancelJob(id)
+}
 
-    return () => {
-      offStart()
-      offOutput()
-      offDone()
-    }
-  }, [])
+function clearFinishedJobs() {
+  tracker.clearFinished()
+  selectedJobIdSignal.value = null
+}
 
-  const runAction = useCallback((action: () => Promise<string>): Promise<JobState> => {
-    return trackerRef.current!.runAction(action)
-  }, [])
-
-  const cancelJob = useCallback((id: string) => {
-    void api.cancelJob(id)
-  }, [])
-
-  const clearFinishedJobs = useCallback(() => {
-    trackerRef.current!.clearFinished()
-    setSelectedJobId(null)
-  }, [])
-
-  const activeCount = jobs.filter((j) => j.status === 'running').length
-
-  const value: JobsContextValue = {
+export function useJobs() {
+  const jobs = jobsSignal.value
+  return {
     jobs,
-    activeCount,
-    toasts,
+    activeCount: jobs.filter((j) => j.status === 'running').length,
+    toasts: toastsSignal.value,
     dismissToast,
     runAction,
     notify: pushToast,
-    consoleOpen,
-    setConsoleOpen,
-    selectedJobId,
-    setSelectedJobId,
+    consoleOpen: consoleOpenSignal.value,
+    setConsoleOpen: (open: boolean) => (consoleOpenSignal.value = open),
+    selectedJobId: selectedJobIdSignal.value,
+    setSelectedJobId: (id: string | null) => (selectedJobIdSignal.value = id),
     cancelJob,
     clearFinishedJobs,
   }
-
-  return <JobsContext.Provider value={value}>{children}</JobsContext.Provider>
 }

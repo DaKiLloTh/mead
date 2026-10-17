@@ -5,3 +5,7 @@
 export function useConfirm() {
   return async () => ({ ok: true, checked: [] as boolean[] })
 }
+
+export function ConfirmDialog() {
+  return null
+}

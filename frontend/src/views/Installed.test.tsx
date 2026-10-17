@@ -39,7 +39,16 @@ vi.mock('../context/ConfirmContext', () => ({ useConfirm: () => m.confirm }))
 vi.mock('../context/UserDataContext', () => ({
   useUserData: () => ({ isFavorite: (name: string) => m.favorites.has(name) }),
 }))
+vi.mock('../context/RefreshSignal', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../context/RefreshSignal')>()),
+  bump: m.bump,
+}))
 vi.mock('../context/InstalledPackagesSignal', () => ({
+  installedPackagesSignal: {
+    get value() {
+      return m.state
+    },
+  },
   useInstalledPackages: () => ({
     packages: m.state.packages,
     loading: m.state.loading,
@@ -86,8 +95,7 @@ function show(...pkgs: BrewPackage[]) {
   m.state = { packages: pkgs, loading: false, error: null }
 }
 
-const renderInstalled = (props: Partial<Parameters<typeof Installed>[0]> = {}) =>
-  render(<Installed refreshToken={0} bump={m.bump} {...props} />)
+const renderInstalled = (props: Partial<Parameters<typeof Installed>[0]> = {}) => render(<Installed {...props} />)
 const row = (name: string) => screen.getByText(name).closest('tr') as HTMLTableRowElement
 const tab = (label: string) => fireEvent.click(screen.getByRole('tab', { name: new RegExp(`^installed\\.${label}`) }))
 const names = () =>

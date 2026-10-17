@@ -2,7 +2,7 @@
 // the "what do we show before the real answer comes back" behavior can be
 // unit tested without rendering Preact or mocking the Wails bridge.
 //
-// Unlike SystemInfoContext/InstalledPackagesContext, this cache is fetched
+// Unlike SystemInfoSignal/InstalledPackagesSignal, this cache is fetched
 // exactly once (api.capabilities() answers with a fixed value for the life
 // of the process -- a platform doesn't gain or lose Gatekeeper mid-session)
 // and never polled or explicitly refreshed. The one thing worth getting
@@ -51,7 +51,7 @@ export type FetchOutcome = { ok: true; caps: Capabilities } | { ok: false; error
  * - failure: keep `caps` as null (so callers fall back to
  *   defaultCapabilities) but surface the error for logging, loading -> false.
  *   There's no "already had good data" branch to preserve here the way
- *   SystemInfoContext has, since this is a one-shot fetch rather than a
+ *   SystemInfoSignal has, since this is a one-shot fetch rather than a
  *   repeating poll.
  */
 export function applyFetchOutcome(state: CapabilitiesState, outcome: FetchOutcome): CapabilitiesState {

@@ -22,6 +22,8 @@ vi.mock('../components/PackageDetailModal', () => ({ default: () => null }))
 
 const scanAdoptableApps = vi.fn()
 const adoptCask = vi.fn(async () => 'job-1')
+const bump = vi.hoisted(() => vi.fn())
+vi.mock('../context/RefreshSignal', () => ({ bump }))
 vi.mock('../lib/api', () => ({
   api: {
     scanAdoptableApps: () => scanAdoptableApps(),
@@ -55,7 +57,7 @@ afterEach(cleanup)
 describe('Adopt', () => {
   it('lists candidates after a scan', async () => {
     scanAdoptableApps.mockResolvedValue([candidate('Alpha'), candidate('Beta')])
-    render(<Adopt bump={vi.fn()} />)
+    render(<Adopt />)
     fireEvent.click(screen.getByText('adopt.scanButton'))
     await waitFor(() => expect(screen.getByText('Alpha')).toBeTruthy())
     expect(screen.getByText('Beta')).toBeTruthy()
@@ -63,8 +65,7 @@ describe('Adopt', () => {
 
   it('still shows results when scanning again after adopting one', async () => {
     scanAdoptableApps.mockResolvedValueOnce([candidate('Alpha'), candidate('Beta')])
-    const bump = vi.fn()
-    render(<Adopt bump={bump} />)
+    render(<Adopt />)
     fireEvent.click(screen.getByText('adopt.scanButton'))
     await waitFor(() => expect(screen.getByText('Alpha')).toBeTruthy())
 
@@ -83,7 +84,7 @@ describe('Adopt', () => {
 
   it('warns on App Store apps only', async () => {
     scanAdoptableApps.mockResolvedValue([{ ...candidate('Windows App'), isAppStoreApp: true }, candidate('Discord')])
-    render(<Adopt bump={vi.fn()} />)
+    render(<Adopt />)
     fireEvent.click(screen.getByText('adopt.scanButton'))
     await waitFor(() => expect(screen.getByText('Windows App')).toBeTruthy())
     // One warning for the one App Store app, not one per card.
@@ -96,7 +97,7 @@ describe('Adopt', () => {
 
   it('says so when a scan finds nothing', async () => {
     scanAdoptableApps.mockResolvedValue([])
-    render(<Adopt bump={vi.fn()} />)
+    render(<Adopt />)
     fireEvent.click(screen.getByText('adopt.scanButton'))
     await waitFor(() => expect(screen.getByText('adopt.nothingToAdopt')).toBeTruthy())
   })

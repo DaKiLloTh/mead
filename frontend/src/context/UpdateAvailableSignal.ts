@@ -16,7 +16,7 @@ const POLL_INTERVAL_MS = 60_000
  * updateAvailableCache.ts for the decision logic: once a restart has been
  * offered, this never reverts back to "nothing to report".
  *
- * Deliberately not wired into the app's shared refreshToken/bump() signal
+ * Deliberately not wired into the app's shared bump() (see RefreshSignal.ts)
  * the way installed-packages/system-info/outdated are -- nothing the user
  * does inside mead ever changes its own on-disk version, only an external
  * `brew upgrade --cask mead` does, so there is nothing for an in-app action

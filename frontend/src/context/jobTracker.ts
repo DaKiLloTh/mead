@@ -12,7 +12,7 @@
 //
 // The fix here: `this.jobs` is a plain field mutated synchronously, in-line,
 // by the `handleStart`/`handleOutput`/`handleDone` event handlers — it does
-// not depend on React's render/commit cycle to become visible. So by the
+// not depend on Preact's render/commit cycle to become visible. So by the
 // time `runAction()`'s `await action()` resumes, `this.jobs` already
 // reflects any `job:done` that raced ahead of it, and `runAction` can detect
 // the already-terminal job and resolve immediately instead of registering a
@@ -69,7 +69,7 @@ export interface JobDonePayload {
 }
 
 export interface JobTrackerCallbacks {
-  /** Called synchronously whenever the tracked job list changes, so a host (e.g. React) can mirror it. */
+  /** Called synchronously whenever the tracked job list changes, so a host (the jobs signal store) can mirror it. */
   onJobsChange: (jobs: JobState[]) => void
   onNotify: (type: ToastType, message: string) => void
   /** Called when a new job starts (e.g. to auto-select it / open a console). */
@@ -164,7 +164,7 @@ export class JobTracker {
   runAction = async (action: () => Promise<string>): Promise<JobState> => {
     const id = await action()
     // `this.jobs` is updated synchronously by handleStart/handleDone above,
-    // independent of any React re-render, so this reliably reflects a
+    // independent of any Preact re-render, so this reliably reflects a
     // job:done that raced ahead of `action()` resolving.
     const existing = this.jobs.find((j) => j.id === id)
     if (existing && existing.status !== 'running') {

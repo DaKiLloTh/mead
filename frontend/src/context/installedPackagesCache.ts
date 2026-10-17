@@ -1,6 +1,6 @@
-// Framework-independent decision logic for InstalledPackagesContext, extracted
+// Framework-independent decision logic for InstalledPackagesSignal, extracted
 // so the "what happens to the cache when a fetch resolves" behavior can be
-// unit tested without rendering React or mocking timers.
+// unit tested without rendering Preact or mocking timers.
 //
 // Why this exists: the shared installed-packages cache is refreshed from three
 // places — the initial load on app start, a background poll every
