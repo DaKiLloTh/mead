@@ -41,9 +41,10 @@ export default tseslint.config(
                 'useMemo',
                 'useCallback',
                 'useContext',
+                'useRef',
               ],
               message:
-                'Use @preact/signals: useSignal for state, useComputed for derived values, useSignalEffect for side effects, module-level signal stores for shared state.',
+                'Use @preact/signals: useSignal for state, useSignalRef (@preact/signals/utils) for DOM refs, useComputed for derived values, useSignalEffect for side effects, module-level signal stores for shared state.',
             })),
           ],
         },

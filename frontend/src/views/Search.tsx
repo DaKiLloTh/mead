@@ -1,5 +1,4 @@
 import { untracked, useComputed, useSignal, useSignalEffect } from '@preact/signals'
-import { useRef } from 'preact/hooks'
 import { useTranslation } from 'react-i18next'
 import { api, SearchResult } from '../lib/api'
 import { useJobs } from '../context/JobsContext'
@@ -21,8 +20,8 @@ export default function Search() {
   const installedKeys = useSignal<Set<string>>(new Set())
   const rowBusy = useSignal<string | null>(null)
   const searchDesc = useSignal(false)
-  // issuedSeqRef: id of the most recently *fired* search request (assigned
-  // when its debounce elapses, not on every keystroke). appliedSeqRef: id
+  // issuedSeq: id of the most recently *fired* search request (assigned
+  // when its debounce elapses, not on every keystroke). appliedSeq: id
   // of the most recently *applied* (rendered) response. Together these let
   // every request run to completion and update the UI as it lands -- a
   // response is only refused if something newer has already been applied,
@@ -31,8 +30,10 @@ export default function Search() {
   // slower later one arrives) while still guaranteeing a slow, broader,
   // out-of-order response (e.g. "ard" arriving after "arduino" already
   // rendered) can never clobber a fresher, more relevant one.
-  const issuedSeqRef = useRef(0)
-  const appliedSeqRef = useRef(0)
+  // Never rendered, so they're only read inside callbacks and never
+  // subscribe anything.
+  const issuedSeq = useSignal(0)
+  const appliedSeq = useSignal(0)
 
   useRefreshEffect(() => {
     api
@@ -64,18 +65,18 @@ export default function Search() {
       // clobbering its more relevant results, not merely that two requests
       // overlapped.
       const handle = setTimeout(() => {
-        const seq = ++issuedSeqRef.current
+        const seq = ++issuedSeq.value
         api
           .search(q, desc)
           .then((r) => {
-            if (seq > appliedSeqRef.current) {
-              appliedSeqRef.current = seq
+            if (seq > appliedSeq.value) {
+              appliedSeq.value = seq
               results.value = r
             }
           })
           .catch(() => {
-            if (seq > appliedSeqRef.current) {
-              appliedSeqRef.current = seq
+            if (seq > appliedSeq.value) {
+              appliedSeq.value = seq
               results.value = []
             }
           })
@@ -83,7 +84,7 @@ export default function Search() {
             // Only the most recently *issued* request controls the spinner
             // -- an older one settling after a newer one has already started
             // shouldn't flip loading back off.
-            if (seq === issuedSeqRef.current) loading.value = false
+            if (seq === issuedSeq.value) loading.value = false
           })
       }, 300)
       return () => clearTimeout(handle)

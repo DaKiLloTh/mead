@@ -1,5 +1,5 @@
 import { useComputed, useSignal, useSignalEffect } from '@preact/signals'
-import { useRef } from 'preact/hooks'
+import { useSignalRef } from '@preact/signals/utils'
 import type { VNode, TargetedKeyboardEvent } from 'preact'
 import { useTranslation } from 'react-i18next'
 import { filterNavItems, filterPackages } from '../lib/paletteFilter'
@@ -53,7 +53,7 @@ export default function CommandPalette({ onNavigate, defaultOpen = false }: Prop
   // warm on first open instead of fetching lazily every session.
   const packagesLoading = installedPackagesSignal.value.loading
   const detail = useSignal<DetailTarget | null>(null)
-  const inputRef = useRef<HTMLInputElement>(null)
+  const inputEl = useSignalRef<HTMLInputElement | null>(null)
 
   // Opening resets the transient state; the input is focused by the effect
   // below once the dialog is actually visible.
@@ -87,7 +87,7 @@ export default function CommandPalette({ onNavigate, defaultOpen = false }: Prop
   })
 
   useSignalEffect(() => {
-    if (open.value) inputRef.current?.focus()
+    if (open.value) inputEl.peek()?.focus()
   })
 
   // Translated nav labels. Reads languageSignal so it recomputes on a
@@ -149,7 +149,7 @@ export default function CommandPalette({ onNavigate, defaultOpen = false }: Prop
           <label className="input input-lg w-full rounded-none border-0 border-b border-base-300 focus-within:outline-none">
             <SearchIcon className="size-4 opacity-50" />
             <input
-              ref={inputRef}
+              ref={inputEl}
               type="text"
               placeholder={t('commandPalette.placeholder')}
               value={query.value}

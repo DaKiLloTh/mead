@@ -1,5 +1,4 @@
 import { untracked, useComputed, useSignal, useSignalEffect } from '@preact/signals'
-import { useRef } from 'preact/hooks'
 import { useTranslation } from 'react-i18next'
 import cytoscape from 'cytoscape'
 import CytoscapeComponent from 'react-cytoscapejs'
@@ -68,8 +67,6 @@ export default function DependencyGraph({ target, onSelectPackage }: Props) {
   const exporting = useSignal(false)
   const cy = useSignal<cytoscape.Core | null>(null)
   const colors = themeColorsSignal()
-  const containerRef = useRef<HTMLDivElement | null>(null)
-
   // Fetches once per mount. PackageDetailModal keys this component on the
   // package, so a different target is a fresh mount.
   useSignalEffect(() =>
@@ -270,11 +267,7 @@ export default function DependencyGraph({ target, onSelectPackage }: Props) {
         </div>
       </div>
 
-      <div
-        ref={containerRef}
-        className="relative rounded-box border border-base-300 bg-base-100"
-        style={{ height: 320 }}
-      >
+      <div className="relative rounded-box border border-base-300 bg-base-100" style={{ height: 320 }}>
         {loading.value && (
           <div className="absolute inset-0 flex items-center gap-2 text-base-content/60 text-sm justify-center">
             <span className="loading loading-spinner loading-xs" /> {t('packageDetail.depGraphLoading')}

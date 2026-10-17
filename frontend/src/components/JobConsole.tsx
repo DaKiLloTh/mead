@@ -1,5 +1,5 @@
 import { useComputed, useSignal, useSignalEffect } from '@preact/signals'
-import { useRef } from 'preact/hooks'
+import { useSignalRef } from '@preact/signals/utils'
 import { useTranslation } from 'react-i18next'
 import { jobsSignal, selectedJobIdSignal, useJobs } from '../context/JobsContext'
 import { duration } from '../lib/format'
@@ -59,7 +59,7 @@ function GistLogsButton({ title }: { title: string }) {
 export default function JobConsole() {
   const { t } = useTranslation()
   const { jobs, activeCount, consoleOpen, setConsoleOpen, setSelectedJobId, cancelJob, clearFinishedJobs } = useJobs()
-  const bodyRef = useRef<HTMLDivElement>(null)
+  const bodyEl = useSignalRef<HTMLDivElement | null>(null)
 
   const selectedSignal = useComputed(() => {
     const all = jobsSignal.value
@@ -87,9 +87,8 @@ export default function JobConsole() {
   useSignalEffect(() => {
     void selectedSignal.value?.lines.length
     void selectedSignal.value?.id
-    if (bodyRef.current) {
-      bodyRef.current.scrollTop = bodyRef.current.scrollHeight
-    }
+    const body = bodyEl.peek()
+    if (body) body.scrollTop = body.scrollHeight
   })
 
   if (jobs.length === 0) {
@@ -165,7 +164,7 @@ export default function JobConsole() {
                 {selected.status === 'error' && <GistLogsButton title={selected.title} />}
               </div>
             )}
-            <div ref={bodyRef} className="flex-1 overflow-y-auto bg-neutral text-neutral-content font-mono text-xs p-3">
+            <div ref={bodyEl} className="flex-1 overflow-y-auto bg-neutral text-neutral-content font-mono text-xs p-3">
               {selected?.lines.length ? (
                 selected.lines.map((l, i) => (
                   <div key={i} className={l.stream === 'stderr' ? 'text-error-content/90' : ''}>
