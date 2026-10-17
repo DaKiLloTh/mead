@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'preact/hooks'
+import { useSignal } from '@preact/signals'
+import { useEffect } from 'preact/hooks'
 import { useTranslation } from 'react-i18next'
 import { api, HistoryEntry } from '../lib/api'
 import { useConfirm } from '../context/ConfirmContext'
@@ -9,13 +10,13 @@ import EmptyState from '../components/EmptyState'
 export default function History() {
   const { t } = useTranslation()
   const confirm = useConfirm()
-  const [entries, setEntries] = useState<HistoryEntry[] | null>(null)
+  const entries = useSignal<HistoryEntry[] | null>(null)
 
   function load() {
-    api.getUserData().then((d) => setEntries(d.history ?? []))
+    api.getUserData().then((d) => (entries.value = d.history ?? []))
   }
 
-  useEffect(load, [])
+  useEffect(load, [entries])
 
   async function clear() {
     const { ok } = await confirm({
@@ -28,7 +29,7 @@ export default function History() {
     load()
   }
 
-  const sorted = [...(entries ?? [])].reverse()
+  const sorted = [...(entries.value ?? [])].reverse()
 
   return (
     <div className="p-6 max-w-3xl">
@@ -44,7 +45,7 @@ export default function History() {
         )}
       </div>
 
-      {entries === null ? (
+      {entries.value === null ? (
         <LoadingRow>{t('common.loading')}</LoadingRow>
       ) : sorted.length === 0 ? (
         <EmptyState icon={ClockIcon}>{t('history.noActivity')}</EmptyState>

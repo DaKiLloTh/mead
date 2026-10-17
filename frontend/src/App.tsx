@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'preact/hooks'
+import { useSignal } from '@preact/signals'
+import { useEffect, useMemo } from 'preact/hooks'
 import { useTranslation } from 'react-i18next'
 import { JobsProvider, useJobs } from './context/JobsContext'
 import { ConfirmProvider } from './context/ConfirmContext'
@@ -71,10 +72,10 @@ function AppShell() {
   const outdated = useOutdated()
   const { version: updateAvailableVersion } = useUpdateAvailable()
   const capabilities = useCapabilities()
-  const [view, setView] = useState<ViewKey>('dashboard')
-  const [refreshToken, setRefreshToken] = useState(0)
-  const [installedInitialFilter, setInstalledInitialFilter] = useState<InstalledFilter | undefined>(undefined)
-  const [headerUpdateBusy, setHeaderUpdateBusy] = useState(false)
+  const view = useSignal<ViewKey>('dashboard')
+  const refreshToken = useSignal(0)
+  const installedInitialFilter = useSignal<InstalledFilter | undefined>(undefined)
+  const headerUpdateBusy = useSignal(false)
   const installedPackages = useInstalledPackages()
 
   // Starts the three signal-backed caches exactly once, for the life of the
@@ -103,13 +104,13 @@ function AppShell() {
   // navigate elsewhere, then open Installed again from the sidebar, and it
   // would still land pre-filtered to Deprecated instead of showing All.
   const changeView = (v: ViewKey) => {
-    setInstalledInitialFilter(undefined)
-    setView(v)
+    installedInitialFilter.value = undefined
+    view.value = v
   }
 
   const navigateToInstalled = (filter?: InstalledFilter) => {
-    setInstalledInitialFilter(filter)
-    setView('installed')
+    installedInitialFilter.value = filter
+    view.value = 'installed'
   }
 
   // Fired on hover, before the click that would actually mount the view --
@@ -140,7 +141,7 @@ function AppShell() {
   // actually refreshes everything it's documented to, regardless of which
   // view is currently mounted.
   const bump = () => {
-    setRefreshToken((t) => t + 1)
+    refreshToken.value = refreshToken.value + 1
     installedPackages.refresh()
     refreshSystemInfo()
     outdated.refresh()
@@ -152,13 +153,13 @@ function AppShell() {
   // bump() so Dashboard and Updates pick up the fresh state, same as
   // Dashboard's own button does via its local refresh().
   const runHeaderUpdate = () => {
-    setHeaderUpdateBusy(true)
+    headerUpdateBusy.value = true
     runAction(() => api.update())
       .catch((e) => {
         console.error('Homebrew update failed:', e)
       })
       .finally(() => {
-        setHeaderUpdateBusy(false)
+        headerUpdateBusy.value = false
         bump()
       })
   }
@@ -241,10 +242,10 @@ function AppShell() {
       {capabilities.hasFloatingTitleBar && <div className="drag-region h-9 shrink-0" />}
       {updateAvailableVersion && <RestartBanner version={updateAvailableVersion} onRestart={handleRestart} />}
       <div className="flex flex-1 min-h-0">
-        <Sidebar view={view} onSelect={changeView} onHover={handleNavHover} outdatedCount={outdatedCount} />
+        <Sidebar view={view.value} onSelect={changeView} onHover={handleNavHover} outdatedCount={outdatedCount} />
         <div className="flex-1 min-w-0 flex flex-col">
           <div className="drag-region h-14 shrink-0 flex items-center px-6 border-b border-base-300">
-            <span className="text-sm font-medium text-base-content/60">{t(viewTitleKeys[view])}</span>
+            <span className="text-sm font-medium text-base-content/60">{t(viewTitleKeys[view.value])}</span>
             <div className="ml-auto flex items-center gap-4">
               {systemInfo && (
                 <div className="text-xs text-base-content/50 text-right no-drag hidden sm:block leading-tight">
@@ -254,8 +255,12 @@ function AppShell() {
                   </div>
                 </div>
               )}
-              <button className="btn btn-sm btn-outline no-drag" disabled={headerUpdateBusy} onClick={runHeaderUpdate}>
-                {headerUpdateBusy ? (
+              <button
+                className="btn btn-sm btn-outline no-drag"
+                disabled={headerUpdateBusy.value}
+                onClick={runHeaderUpdate}
+              >
+                {headerUpdateBusy.value ? (
                   <span className="loading loading-spinner loading-xs" />
                 ) : (
                   <RefreshIcon className="size-4" />
@@ -269,28 +274,28 @@ function AppShell() {
             </div>
           </div>
           <div className="flex-1 min-h-0 overflow-y-auto">
-            {view === 'dashboard' && (
+            {view.value === 'dashboard' && (
               <Dashboard
                 onNavigate={changeView}
                 onNavigateInstalled={navigateToInstalled}
-                refreshToken={refreshToken}
+                refreshToken={refreshToken.value}
               />
             )}
-            {view === 'installed' && (
-              <Installed refreshToken={refreshToken} bump={bump} initialFilter={installedInitialFilter} />
+            {view.value === 'installed' && (
+              <Installed refreshToken={refreshToken.value} bump={bump} initialFilter={installedInitialFilter.value} />
             )}
-            {view === 'search' && <Search refreshToken={refreshToken} bump={bump} />}
-            {view === 'collections' && <Collections bump={bump} />}
-            {view === 'updates' && <Updates refreshToken={refreshToken} bump={bump} />}
-            {view === 'applications' && <Applications bump={bump} />}
-            {view === 'taps' && <Taps refreshToken={refreshToken} bump={bump} />}
-            {view === 'services' && <Services refreshToken={refreshToken} bump={bump} />}
-            {view === 'adopt' && <Adopt bump={bump} />}
-            {view === 'appstore' && <AppStore />}
-            {view === 'security' && <Security />}
-            {view === 'maintenance' && <Maintenance />}
-            {view === 'history' && <History />}
-            {view === 'settings' && <Settings />}
+            {view.value === 'search' && <Search refreshToken={refreshToken.value} bump={bump} />}
+            {view.value === 'collections' && <Collections bump={bump} />}
+            {view.value === 'updates' && <Updates refreshToken={refreshToken.value} bump={bump} />}
+            {view.value === 'applications' && <Applications bump={bump} />}
+            {view.value === 'taps' && <Taps refreshToken={refreshToken.value} bump={bump} />}
+            {view.value === 'services' && <Services refreshToken={refreshToken.value} bump={bump} />}
+            {view.value === 'adopt' && <Adopt bump={bump} />}
+            {view.value === 'appstore' && <AppStore />}
+            {view.value === 'security' && <Security />}
+            {view.value === 'maintenance' && <Maintenance />}
+            {view.value === 'history' && <History />}
+            {view.value === 'settings' && <Settings />}
           </div>
         </div>
       </div>

@@ -1,4 +1,4 @@
-import { useState } from 'preact/hooks'
+import { useSignal } from '@preact/signals'
 import { Trans, useTranslation } from 'react-i18next'
 import { api, AdoptCandidate } from '../lib/api'
 import { useJobs } from '../context/JobsContext'
@@ -27,22 +27,22 @@ export default function Adopt({ bump }: Props) {
   const { t } = useTranslation()
   const { runAction } = useJobs()
   const confirm = useConfirm()
-  const [candidates, setCandidates] = useState<AdoptCandidate[] | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [adopting, setAdopting] = useState<string | null>(null)
-  const [detail, setDetail] = useState<DetailTarget | null>(null)
+  const candidates = useSignal<AdoptCandidate[] | null>(null)
+  const loading = useSignal(false)
+  const error = useSignal<string | null>(null)
+  const adopting = useSignal<string | null>(null)
+  const detail = useSignal<DetailTarget | null>(null)
 
   async function scan() {
-    setLoading(true)
-    setError(null)
+    loading.value = true
+    error.value = null
     try {
       const results = await api.scanAdoptableApps()
-      setCandidates(results)
+      candidates.value = results
     } catch (e) {
-      setError(String(e))
+      error.value = String(e)
     } finally {
-      setLoading(false)
+      loading.value = false
     }
   }
 
@@ -76,10 +76,10 @@ export default function Adopt({ bump }: Props) {
       })
       if (!ok) return
     }
-    setAdopting(c.caskToken)
+    adopting.value = c.caskToken
     await runAction(() => api.adoptCask(c.caskToken, force))
-    setAdopting(null)
-    setCandidates((prev) => prev?.filter((x) => x.caskToken !== c.caskToken) ?? null)
+    adopting.value = null
+    candidates.value = candidates.value?.filter((x) => x.caskToken !== c.caskToken) ?? null
     bump()
   }
 
@@ -90,22 +90,24 @@ export default function Adopt({ bump }: Props) {
         <Trans i18nKey="adopt.subtitle" components={{ path: <span className="font-mono" /> } as any} />
       </p>
 
-      <button className="btn btn-sm btn-primary mb-4" disabled={loading} onClick={scan}>
-        {loading ? <span className="loading loading-spinner loading-xs" /> : <ImportIcon className="size-4" />}
+      <button className="btn btn-sm btn-primary mb-4" disabled={loading.value} onClick={scan}>
+        {loading.value ? <span className="loading loading-spinner loading-xs" /> : <ImportIcon className="size-4" />}
         {t('adopt.scanButton')}
       </button>
 
-      {loading && <p className="text-sm text-base-content/50">{t('adopt.scanningHint')}</p>}
+      {loading.value && <p className="text-sm text-base-content/50">{t('adopt.scanningHint')}</p>}
 
-      {error && !loading && <ErrorAlert title={t('adopt.scanFailedTitle')} message={error} className="text-sm mb-4" />}
+      {error.value && !loading.value && (
+        <ErrorAlert title={t('adopt.scanFailedTitle')} message={error.value} className="text-sm mb-4" />
+      )}
 
-      {candidates && !loading && (
+      {candidates.value && !loading.value && (
         <>
-          {candidates.length === 0 ? (
+          {candidates.value.length === 0 ? (
             <div className="alert alert-success alert-soft text-sm">{t('adopt.nothingToAdopt')}</div>
           ) : (
             <div className="flex flex-col gap-3">
-              {candidates.map((c) => {
+              {candidates.value.map((c) => {
                 const versionsDiffer = needsForceAdopt(c)
                 const adoptLabel = c.possibleDowngrade
                   ? t('adopt.adoptAndDowngradeButton')
@@ -147,10 +149,10 @@ export default function Adopt({ bump }: Props) {
                     footerRight={
                       <button
                         className="btn btn-xs btn-primary shrink-0"
-                        disabled={adopting === c.caskToken}
+                        disabled={adopting.value === c.caskToken}
                         onClick={() => adopt(c)}
                       >
-                        {adopting === c.caskToken ? (
+                        {adopting.value === c.caskToken ? (
                           <span className="loading loading-spinner loading-xs" />
                         ) : (
                           <DownloadIcon className="size-3.5" />
@@ -163,7 +165,7 @@ export default function Adopt({ bump }: Props) {
                       <span className="text-base-content/50">{t('adopt.caskLabel')} </span>
                       <button
                         className="font-mono link link-hover text-primary"
-                        onClick={() => setDetail({ name: c.caskToken, isCask: true })}
+                        onClick={() => (detail.value = { name: c.caskToken, isCask: true })}
                       >
                         {c.caskToken}
                       </button>
@@ -183,7 +185,7 @@ export default function Adopt({ bump }: Props) {
         </>
       )}
 
-      <PackageDetailModal target={detail} onClose={() => setDetail(null)} onChanged={bump} />
+      <PackageDetailModal target={detail.value} onClose={() => (detail.value = null)} onChanged={bump} />
     </div>
   )
 }

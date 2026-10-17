@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'preact/hooks'
+import { useSignal } from '@preact/signals'
+import { useEffect, useRef } from 'preact/hooks'
 import { useTranslation } from 'react-i18next'
 import { useJobs } from '../context/JobsContext'
 import { duration } from '../lib/format'
@@ -16,43 +17,43 @@ const gistableTitleRe = /^(?:Install|Upgrade|Reinstall) (\S+)/
 function GistLogsButton({ title }: { title: string }) {
   const { t } = useTranslation()
   const m = gistableTitleRe.exec(title)
-  const [state, setState] = useState<'idle' | 'loading' | { url: string } | { error: string }>('idle')
+  const state = useSignal<'idle' | 'loading' | { url: string } | { error: string }>('idle')
 
   if (!m) return null
   const name = m[1]
 
   async function create() {
-    setState('loading')
+    state.value = 'loading'
     try {
       const url = await api.gistLogs(name)
-      setState({ url })
+      state.value = { url }
     } catch (e) {
-      setState({ error: String(e) })
+      state.value = { error: String(e) }
     }
   }
 
-  if (state === 'idle') {
+  if (state.value === 'idle') {
     return (
       <button className="btn btn-ghost btn-xs" onClick={create}>
         {t('jobConsole.createGist')}
       </button>
     )
   }
-  if (state === 'loading') {
+  if (state.value === 'loading') {
     return (
       <span className="btn btn-ghost btn-xs" aria-disabled>
         <span className="loading loading-spinner loading-xs" /> {t('jobConsole.uploading')}
       </span>
     )
   }
-  if ('url' in state) {
+  if ('url' in state.value) {
     return (
-      <ExternalLink className="link link-primary text-xs" href={state.url}>
-        {state.url}
+      <ExternalLink className="link link-primary text-xs" href={state.value.url}>
+        {state.value.url}
       </ExternalLink>
     )
   }
-  return <span className="text-error text-xs">{state.error}</span>
+  return <span className="text-error text-xs">{state.value.error}</span>
 }
 
 export default function JobConsole() {
@@ -68,7 +69,7 @@ export default function JobConsole() {
     clearFinishedJobs,
   } = useJobs()
   const bodyRef = useRef<HTMLDivElement>(null)
-  const [inputValue, setInputValue] = useState('')
+  const inputValue = useSignal('')
 
   const selected = jobs.find((j) => j.id === selectedJobId) ?? jobs[jobs.length - 1]
 
@@ -77,13 +78,13 @@ export default function JobConsole() {
   // half-typed password from a previous job never lingers into the next
   // one's input box.
   useEffect(() => {
-    setInputValue('')
-  }, [selected?.id])
+    inputValue.value = ''
+  }, [inputValue, selected?.id])
 
   function sendInput() {
-    if (!selected || !inputValue) return
-    void api.sendJobInput(selected.id, inputValue)
-    setInputValue('')
+    if (!selected || !inputValue.value) return
+    void api.sendJobInput(selected.id, inputValue.value)
+    inputValue.value = ''
   }
 
   useEffect(() => {
@@ -184,8 +185,8 @@ export default function JobConsole() {
                   autoFocus
                   className="input input-sm w-full font-mono"
                   placeholder={t('jobConsole.inputPlaceholder')}
-                  value={inputValue}
-                  onChange={(e) => setInputValue(e.currentTarget.value)}
+                  value={inputValue.value}
+                  onChange={(e) => (inputValue.value = e.currentTarget.value)}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') sendInput()
                   }}

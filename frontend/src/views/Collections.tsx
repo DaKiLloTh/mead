@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'preact/hooks'
+import { useSignal } from '@preact/signals'
+import { useEffect } from 'preact/hooks'
 import { useTranslation } from 'react-i18next'
 import { api, Collection } from '../lib/api'
 import { useJobs } from '../context/JobsContext'
@@ -11,17 +12,17 @@ interface Props {
 export default function Collections({ bump }: Props) {
   const { t } = useTranslation()
   const { runAction } = useJobs()
-  const [collections, setCollections] = useState<Collection[]>([])
-  const [installing, setInstalling] = useState<string | null>(null)
+  const collections = useSignal<Collection[]>([])
+  const installing = useSignal<string | null>(null)
 
   useEffect(() => {
-    api.getCollections().then(setCollections)
-  }, [])
+    api.getCollections().then((v) => (collections.value = v))
+  }, [collections])
 
   async function install(c: Collection) {
-    setInstalling(c.name)
+    installing.value = c.name
     await runAction(() => api.installCollection(c.name))
-    setInstalling(null)
+    installing.value = null
     bump()
   }
 
@@ -31,7 +32,7 @@ export default function Collections({ bump }: Props) {
       <p className="text-base-content/60 text-sm mb-4">{t('collections.subtitle')}</p>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {collections.map((c) => (
+        {collections.value.map((c) => (
           <div key={c.name} className="card bg-base-200">
             <div className="card-body">
               <h2 className="card-title text-base">
@@ -46,8 +47,12 @@ export default function Collections({ bump }: Props) {
                 ))}
               </div>
               <div className="card-actions mt-2">
-                <button className="btn btn-sm btn-primary" disabled={installing === c.name} onClick={() => install(c)}>
-                  {installing === c.name ? (
+                <button
+                  className="btn btn-sm btn-primary"
+                  disabled={installing.value === c.name}
+                  onClick={() => install(c)}
+                >
+                  {installing.value === c.name ? (
                     <span className="loading loading-spinner loading-xs" />
                   ) : (
                     <DownloadIcon className="size-4" />

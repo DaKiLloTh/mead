@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'preact/hooks'
+import { useSignal } from '@preact/signals'
+import { useEffect } from 'preact/hooks'
 import { api } from './api'
 
 // Frontend-side mirror of the backend's in-memory icon cache (App.icons in
@@ -108,24 +109,24 @@ export function useMasAppIcon(name: string | undefined, available: boolean): str
 }
 
 function useIcon(name: string | undefined, cacheKey: string, run: () => Promise<string>): string | null {
-  const [icon, setIcon] = useState<string | null>(() => (name ? cache.get(cacheKey) || null : null))
+  const icon = useSignal<string | null>(name ? cache.get(cacheKey) || null : null)
 
   useEffect(() => {
     if (!name) {
-      setIcon(null)
+      icon.value = null
       return
     }
     const cached = cache.get(cacheKey)
     if (cached !== undefined) {
-      setIcon(cached || null)
+      icon.value = cached || null
       return
     }
 
-    setIcon(null)
+    icon.value = null
     let cancelled = false
     fetchIcon(cacheKey, run).then((uri) => {
       cache.set(cacheKey, uri)
-      if (!cancelled) setIcon(uri || null)
+      if (!cancelled) icon.value = uri || null
     })
     return () => {
       cancelled = true
@@ -133,5 +134,5 @@ function useIcon(name: string | undefined, cacheKey: string, run: () => Promise<
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [name, cacheKey])
 
-  return icon
+  return icon.value
 }

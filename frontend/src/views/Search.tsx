@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'preact/hooks'
+import { useSignal } from '@preact/signals'
+import { useEffect, useMemo, useRef } from 'preact/hooks'
 import { useTranslation } from 'react-i18next'
 import { api, SearchResult } from '../lib/api'
 import { useJobs } from '../context/JobsContext'
@@ -16,14 +17,14 @@ interface Props {
 export default function Search({ refreshToken, bump }: Props) {
   const { t } = useTranslation()
   const { runAction } = useJobs()
-  const [query, setQuery] = useState('')
-  const [results, setResults] = useState<SearchResult[] | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [filter, setFilter] = useState<Filter>('all')
-  const [detail, setDetail] = useState<DetailTarget | null>(null)
-  const [installedKeys, setInstalledKeys] = useState<Set<string>>(new Set())
-  const [rowBusy, setRowBusy] = useState<string | null>(null)
-  const [searchDesc, setSearchDesc] = useState(false)
+  const query = useSignal('')
+  const results = useSignal<SearchResult[] | null>(null)
+  const loading = useSignal(false)
+  const filter = useSignal<Filter>('all')
+  const detail = useSignal<DetailTarget | null>(null)
+  const installedKeys = useSignal<Set<string>>(new Set())
+  const rowBusy = useSignal<string | null>(null)
+  const searchDesc = useSignal(false)
   // issuedSeqRef: id of the most recently *fired* search request (assigned
   // when its debounce elapses, not on every keystroke). appliedSeqRef: id
   // of the most recently *applied* (rendered) response. Together these let
@@ -40,18 +41,18 @@ export default function Search({ refreshToken, bump }: Props) {
   useEffect(() => {
     api
       .listInstalled()
-      .then((pkgs) => setInstalledKeys(new Set(pkgs.map((p) => `${p.isCask ? 'c' : 'f'}:${p.name}`))))
+      .then((pkgs) => (installedKeys.value = new Set(pkgs.map((p) => `${p.isCask ? 'c' : 'f'}:${p.name}`))))
       .catch(() => {})
-  }, [refreshToken])
+  }, [installedKeys, refreshToken])
 
   useEffect(() => {
-    const q = query.trim()
+    const q = query.value.trim()
     if (!q) {
-      setResults(null)
-      setLoading(false)
+      results.value = null
+      loading.value = false
       return
     }
-    setLoading(true)
+    loading.value = true
     // Debounced so fast, continuous typing doesn't fire a real search on
     // every keystroke -- but once a request does fire, it's left to run
     // and its response is allowed to render (not aborted) purely because
@@ -65,44 +66,44 @@ export default function Search({ refreshToken, bump }: Props) {
     const handle = setTimeout(() => {
       const seq = ++issuedSeqRef.current
       api
-        .search(q, searchDesc)
+        .search(q, searchDesc.value)
         .then((r) => {
           if (seq > appliedSeqRef.current) {
             appliedSeqRef.current = seq
-            setResults(r)
+            results.value = r
           }
         })
         .catch(() => {
           if (seq > appliedSeqRef.current) {
             appliedSeqRef.current = seq
-            setResults([])
+            results.value = []
           }
         })
         .finally(() => {
           // Only the most recently *issued* request controls the spinner
           // -- an older one settling after a newer one has already started
           // shouldn't flip loading back off.
-          if (seq === issuedSeqRef.current) setLoading(false)
+          if (seq === issuedSeqRef.current) loading.value = false
         })
     }, 300)
     return () => clearTimeout(handle)
-  }, [query, searchDesc])
+  }, [loading, query.value, results, searchDesc.value])
 
   const filtered = useMemo(() => {
-    if (!results) return []
-    return results.filter((r) => {
-      if (filter === 'formula') return !r.isCask
-      if (filter === 'cask') return r.isCask
+    if (!results.value) return []
+    return results.value.filter((r) => {
+      if (filter.value === 'formula') return !r.isCask
+      if (filter.value === 'cask') return r.isCask
       return true
     })
-  }, [results, filter])
+  }, [results.value, filter.value])
 
   async function quickInstall(r: SearchResult) {
     const key = `${r.isCask ? 'c' : 'f'}:${r.name}`
-    setRowBusy(key)
+    rowBusy.value = key
     await runAction(() => api.install(r.name, r.isCask))
-    setRowBusy(null)
-    setInstalledKeys((prev) => new Set(prev).add(key))
+    rowBusy.value = null
+    installedKeys.value = new Set(installedKeys.value).add(key)
     bump()
   }
 
@@ -117,79 +118,83 @@ export default function Search({ refreshToken, bump }: Props) {
           <input
             type="text"
             placeholder={t('search.placeholder')}
-            value={query}
+            value={query.value}
             autoFocus
-            onChange={(e) => setQuery(e.currentTarget.value)}
+            onChange={(e) => (query.value = e.currentTarget.value)}
           />
-          {loading && <span className="loading loading-spinner loading-xs" />}
+          {loading.value && <span className="loading loading-spinner loading-xs" />}
         </label>
 
         <label className="label cursor-pointer gap-2 text-sm w-fit">
           <input
             type="checkbox"
             className="checkbox checkbox-sm"
-            checked={searchDesc}
-            onChange={(e) => setSearchDesc(e.currentTarget.checked)}
+            checked={searchDesc.value}
+            onChange={(e) => (searchDesc.value = e.currentTarget.checked)}
           />
           <span className="label-text">{t('search.searchDescLabel')}</span>
         </label>
       </div>
 
-      {results && (
+      {results.value && (
         <div role="tablist" className="tabs tabs-box tabs-sm w-fit mb-4">
-          <button role="tab" className={`tab ${filter === 'all' ? 'tab-active' : ''}`} onClick={() => setFilter('all')}>
-            {t('search.tabAll', { count: results.length })}
+          <button
+            role="tab"
+            className={`tab ${filter.value === 'all' ? 'tab-active' : ''}`}
+            onClick={() => (filter.value = 'all')}
+          >
+            {t('search.tabAll', { count: results.value.length })}
           </button>
           <button
             role="tab"
-            className={`tab ${filter === 'formula' ? 'tab-active' : ''}`}
-            onClick={() => setFilter('formula')}
+            className={`tab ${filter.value === 'formula' ? 'tab-active' : ''}`}
+            onClick={() => (filter.value = 'formula')}
           >
-            {t('search.tabFormulae', { count: results.filter((r) => !r.isCask).length })}
+            {t('search.tabFormulae', { count: results.value.filter((r) => !r.isCask).length })}
           </button>
           <button
             role="tab"
-            className={`tab ${filter === 'cask' ? 'tab-active' : ''}`}
-            onClick={() => setFilter('cask')}
+            className={`tab ${filter.value === 'cask' ? 'tab-active' : ''}`}
+            onClick={() => (filter.value = 'cask')}
           >
-            {t('search.tabCasks', { count: results.filter((r) => r.isCask).length })}
+            {t('search.tabCasks', { count: results.value.filter((r) => r.isCask).length })}
           </button>
         </div>
       )}
 
-      {!results && !loading && (
+      {!results.value && !loading.value && (
         <div className="text-base-content/50 text-sm py-8 text-center">{t('search.emptyPrompt')}</div>
       )}
 
-      {results && (
+      {results.value && (
         // Dimmed rather than cleared while a newer query is in flight --
         // these results are about to be superseded by whatever's loading
         // now (see the effect above), so this keeps that visible instead
         // of letting a stale, possibly-irrelevant list sit there looking
         // current until the new one lands.
-        <div className={`flex flex-col gap-3 transition-opacity ${loading ? 'opacity-50' : ''}`}>
+        <div className={`flex flex-col gap-3 transition-opacity ${loading.value ? 'opacity-50' : ''}`}>
           {filtered.map((r) => {
             const key = `${r.isCask ? 'c' : 'f'}:${r.name}`
             return (
               <SearchResultCard
                 key={key}
                 result={r}
-                installed={installedKeys.has(key)}
-                busy={rowBusy === key}
-                onOpenDetail={() => setDetail({ name: r.name, isCask: r.isCask })}
+                installed={installedKeys.value.has(key)}
+                busy={rowBusy.value === key}
+                onOpenDetail={() => (detail.value = { name: r.name, isCask: r.isCask })}
                 onInstall={() => void quickInstall(r)}
               />
             )
           })}
-          {filtered.length === 0 && !loading && (
+          {filtered.length === 0 && !loading.value && (
             <div className="text-base-content/50 text-sm py-8 text-center">{t('search.noResults')}</div>
           )}
         </div>
       )}
 
       <PackageDetailModal
-        target={detail}
-        onClose={() => setDetail(null)}
+        target={detail.value}
+        onClose={() => (detail.value = null)}
         onChanged={() => {
           bump()
         }}

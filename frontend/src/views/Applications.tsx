@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'preact/hooks'
+import { useSignal } from '@preact/signals'
+import { useMemo } from 'preact/hooks'
 import { useTranslation } from 'react-i18next'
 import { api, BrewPackage } from '../lib/api'
 import { useJobs } from '../context/JobsContext'
@@ -18,8 +19,8 @@ export default function Applications({ bump }: Props) {
   const { t } = useTranslation()
   const { notify } = useJobs()
   const { packages: cachedPkgs, loading, error, refresh } = useInstalledPackages()
-  const [query, setQuery] = useState('')
-  const [detail, setDetail] = useState<DetailTarget | null>(null)
+  const query = useSignal('')
+  const detail = useSignal<DetailTarget | null>(null)
 
   // Every installed cask that declares at least one app artifact -- the
   // same signal security.ResolveCaskAppPath ultimately relies on (see
@@ -28,12 +29,12 @@ export default function Applications({ bump }: Props) {
   // here; the icon falls back to the monogram and double-click surfaces an
   // error toast rather than being silently excluded from the grid.
   const apps = useMemo(() => {
-    const q = query.trim().toLowerCase()
+    const q = query.value.trim().toLowerCase()
     return (cachedPkgs ?? [])
       .filter((p) => p.isCask && p.installed && (p.appPaths?.length ?? 0) > 0)
       .filter((p) => !q || p.name.toLowerCase().includes(q) || p.fullName?.toLowerCase().includes(q))
       .sort((a, b) => a.name.localeCompare(b.name))
-  }, [cachedPkgs, query])
+  }, [cachedPkgs, query.value])
 
   async function openApp(p: BrewPackage) {
     try {
@@ -57,8 +58,8 @@ export default function Applications({ bump }: Props) {
           <input
             type="text"
             placeholder={t('applications.filterPlaceholder')}
-            value={query}
-            onChange={(e) => setQuery(e.currentTarget.value)}
+            value={query.value}
+            onChange={(e) => (query.value = e.currentTarget.value)}
           />
         </label>
       </div>
@@ -75,7 +76,7 @@ export default function Applications({ bump }: Props) {
             <button
               key={p.name}
               className="flex flex-col items-center gap-1.5 rounded-box p-3 border border-transparent hover:bg-base-200 hover:border-base-300 text-center transition-colors"
-              onClick={() => setDetail({ name: p.name, isCask: true })}
+              onClick={() => (detail.value = { name: p.name, isCask: true })}
               onDblClick={() => openApp(p)}
               title={p.desc || p.name}
             >
@@ -87,8 +88,8 @@ export default function Applications({ bump }: Props) {
       )}
 
       <PackageDetailModal
-        target={detail}
-        onClose={() => setDetail(null)}
+        target={detail.value}
+        onClose={() => (detail.value = null)}
         onChanged={() => {
           refresh()
           bump()

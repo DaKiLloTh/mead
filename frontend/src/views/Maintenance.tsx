@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'preact/hooks'
+import { useSignal } from '@preact/signals'
+import { useEffect } from 'preact/hooks'
 import { useTranslation } from 'react-i18next'
 import { api, BundleCleanupItem, BundleEntryType, CacheInfo, LeftoverItem, LeftoverKind, PackageSize } from '../lib/api'
 import { useJobs } from '../context/JobsContext'
@@ -32,133 +33,134 @@ export default function Maintenance() {
   const { t } = useTranslation()
   const { runAction, notify } = useJobs()
   const confirm = useConfirm()
-  const [tab, setTab] = useState<Tab>('doctor')
+  const tab = useSignal<Tab>('doctor')
 
-  const [doctorOutput, setDoctorOutput] = useState<string[] | null>(null)
-  const [doctorRunning, setDoctorRunning] = useState(false)
+  const doctorOutput = useSignal<string[] | null>(null)
+  const doctorRunning = useSignal(false)
 
-  const [cache, setCache] = useState<CacheInfo | null>(null)
-  const [largest, setLargest] = useState<PackageSize[] | null>(null)
-  const [largestLoading, setLargestLoading] = useState(false)
-  const [cleanupOutput, setCleanupOutput] = useState<string[] | null>(null)
-  const [cleanupRunning, setCleanupRunning] = useState<'preview' | 'real' | 'autoremove' | 'autoremove-preview' | null>(
-    null
-  )
-  const [clearingCache, setClearingCache] = useState(false)
+  const cache = useSignal<CacheInfo | null>(null)
+  const largest = useSignal<PackageSize[] | null>(null)
+  const largestLoading = useSignal(false)
+  const cleanupOutput = useSignal<string[] | null>(null)
+  const cleanupRunning = useSignal<'preview' | 'real' | 'autoremove' | 'autoremove-preview' | null>(null)
+  const clearingCache = useSignal(false)
 
-  const [leftovers, setLeftovers] = useState<LeftoverItem[] | null>(null)
-  const [leftoversLoading, setLeftoversLoading] = useState(false)
-  const [selectedLeftovers, setSelectedLeftovers] = useState<Set<string>>(new Set())
-  const [deletingLeftovers, setDeletingLeftovers] = useState(false)
+  const leftovers = useSignal<LeftoverItem[] | null>(null)
+  const leftoversLoading = useSignal(false)
+  const selectedLeftovers = useSignal<Set<string>>(new Set())
+  const deletingLeftovers = useSignal(false)
 
-  const [config, setConfig] = useState<string | null>(null)
-  const [configLoading, setConfigLoading] = useState(false)
+  const config = useSignal<string | null>(null)
+  const configLoading = useSignal(false)
 
-  const [exporting, setExporting] = useState(false)
-  const [exportedPath, setExportedPath] = useState<string | null>(null)
-  const [importing, setImporting] = useState(false)
+  const exporting = useSignal(false)
+  const exportedPath = useSignal<string | null>(null)
+  const importing = useSignal(false)
 
-  const [bundlePath, setBundlePath] = useState<string | null>(null)
-  const [bundleCheckResult, setBundleCheckResult] = useState<string | null>(null)
-  const [bundleCheckLoading, setBundleCheckLoading] = useState(false)
-  const [bundleListResult, setBundleListResult] = useState<string | null>(null)
-  const [bundleListLoading, setBundleListLoading] = useState(false)
-  const [cleanupPreview, setCleanupPreview] = useState<BundleCleanupItem[] | null>(null)
-  const [cleanupPreviewLoading, setCleanupPreviewLoading] = useState(false)
-  const [cleanupRunningReal, setCleanupRunningReal] = useState(false)
+  const bundlePath = useSignal<string | null>(null)
+  const bundleCheckResult = useSignal<string | null>(null)
+  const bundleCheckLoading = useSignal(false)
+  const bundleListResult = useSignal<string | null>(null)
+  const bundleListLoading = useSignal(false)
+  const cleanupPreview = useSignal<BundleCleanupItem[] | null>(null)
+  const cleanupPreviewLoading = useSignal(false)
+  const cleanupRunningReal = useSignal(false)
 
   useEffect(() => {
     api
       .cacheInfo()
-      .then(setCache)
+      .then((v) => (cache.value = v))
       .catch(() => {})
     loadLargest()
+    // Only reads and writes signals, which never change identity.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   async function loadLargest() {
-    setLargestLoading(true)
+    largestLoading.value = true
     try {
-      setLargest(await api.largestInstalledPackages())
+      largest.value = await api.largestInstalledPackages()
     } catch {
       // best-effort report; leave whatever was previously loaded in place
     } finally {
-      setLargestLoading(false)
+      largestLoading.value = false
     }
   }
 
   async function runAutoremove(dryRun: boolean) {
-    setCleanupRunning(dryRun ? 'autoremove-preview' : 'autoremove')
-    setCleanupOutput(null)
+    cleanupRunning.value = dryRun ? 'autoremove-preview' : 'autoremove'
+    cleanupOutput.value = null
     const job = await runAction(() => api.autoremove(dryRun))
-    setCleanupOutput(job.lines.map((l) => l.text))
-    setCleanupRunning(null)
+    cleanupOutput.value = job.lines.map((l) => l.text)
+    cleanupRunning.value = null
   }
 
   async function doExport() {
-    setExporting(true)
-    setExportedPath(null)
+    exporting.value = true
+    exportedPath.value = null
     try {
       const path = await api.exportBrewfileToFile()
-      setExportedPath(path || null)
+      exportedPath.value = path || null
     } finally {
-      setExporting(false)
+      exporting.value = false
     }
   }
 
   async function doImport() {
-    setImporting(true)
+    importing.value = true
     await runAction(() => api.importBrewfile())
-    setImporting(false)
+    importing.value = false
   }
 
   async function pickBundlePath() {
     const path = await api.pickBrewfile()
     if (!path) return
-    setBundlePath(path)
-    setBundleCheckResult(null)
-    setBundleListResult(null)
-    setCleanupPreview(null)
+    bundlePath.value = path
+    bundleCheckResult.value = null
+    bundleListResult.value = null
+    cleanupPreview.value = null
   }
 
   async function doBundleCheck() {
-    if (!bundlePath) return
-    setBundleCheckLoading(true)
+    if (!bundlePath.value) return
+    bundleCheckLoading.value = true
     try {
-      setBundleCheckResult(await api.bundleCheck(bundlePath))
+      bundleCheckResult.value = await api.bundleCheck(bundlePath.value)
     } catch (e) {
-      setBundleCheckResult(String(e))
+      bundleCheckResult.value = String(e)
     } finally {
-      setBundleCheckLoading(false)
+      bundleCheckLoading.value = false
     }
   }
 
   async function doBundleList() {
-    if (!bundlePath) return
-    setBundleListLoading(true)
+    if (!bundlePath.value) return
+    bundleListLoading.value = true
     try {
-      setBundleListResult(await api.bundleList(bundlePath))
+      bundleListResult.value = await api.bundleList(bundlePath.value)
     } catch (e) {
-      setBundleListResult(String(e))
+      bundleListResult.value = String(e)
     } finally {
-      setBundleListLoading(false)
+      bundleListLoading.value = false
     }
   }
 
   async function doCleanupPreview() {
-    if (!bundlePath) return
-    setCleanupPreviewLoading(true)
+    if (!bundlePath.value) return
+    cleanupPreviewLoading.value = true
     try {
-      setCleanupPreview(await api.bundleCleanupPreview(bundlePath))
+      cleanupPreview.value = await api.bundleCleanupPreview(bundlePath.value)
     } finally {
-      setCleanupPreviewLoading(false)
+      cleanupPreviewLoading.value = false
     }
   }
 
   async function doCleanupReal() {
-    if (!bundlePath || !cleanupPreview || cleanupPreview.length === 0) return
+    const path = bundlePath.value
+    if (!path || !cleanupPreview.value || cleanupPreview.value.length === 0) return
     const { ok, checked } = await confirm({
-      title: t('maintenance.confirmRemoveTitle', { count: cleanupPreview.length }),
-      body: t('maintenance.confirmRemoveBody', { names: cleanupPreview.map((i) => i.name).join(', ') }),
+      title: t('maintenance.confirmRemoveTitle', { count: cleanupPreview.value.length }),
+      body: t('maintenance.confirmRemoveBody', { names: cleanupPreview.value.map((i) => i.name).join(', ') }),
       confirmLabel: t('maintenance.confirmRemoveLabel'),
       danger: true,
       checkboxes: [{ label: t('maintenance.checkboxSnapshot') }],
@@ -172,86 +174,85 @@ export default function Maintenance() {
         notify('error', String(e))
       }
     }
-    setCleanupRunningReal(true)
-    await runAction(() => api.bundleCleanup(bundlePath))
-    setCleanupRunningReal(false)
-    setCleanupPreview(null)
+    cleanupRunningReal.value = true
+    await runAction(() => api.bundleCleanup(path))
+    cleanupRunningReal.value = false
+    cleanupPreview.value = null
   }
 
   async function runDoctor() {
-    setDoctorRunning(true)
-    setDoctorOutput(null)
+    doctorRunning.value = true
+    doctorOutput.value = null
     const job = await runAction(() => api.doctor())
-    setDoctorOutput(job.lines.map((l) => l.text))
-    setDoctorRunning(false)
+    doctorOutput.value = job.lines.map((l) => l.text)
+    doctorRunning.value = false
   }
 
   async function runCleanup(dryRun: boolean) {
-    setCleanupRunning(dryRun ? 'preview' : 'real')
-    setCleanupOutput(null)
+    cleanupRunning.value = dryRun ? 'preview' : 'real'
+    cleanupOutput.value = null
     const job = await runAction(() => api.cleanup(dryRun))
-    setCleanupOutput(job.lines.map((l) => l.text))
-    setCleanupRunning(null)
+    cleanupOutput.value = job.lines.map((l) => l.text)
+    cleanupRunning.value = null
     api
       .cacheInfo()
-      .then(setCache)
+      .then((v) => (cache.value = v))
       .catch(() => {})
   }
 
   async function runClearCache() {
-    setClearingCache(true)
-    setCleanupOutput(null)
+    clearingCache.value = true
+    cleanupOutput.value = null
     const job = await runAction(() => api.clearCache())
-    setCleanupOutput(job.lines.map((l) => l.text))
-    setClearingCache(false)
+    cleanupOutput.value = job.lines.map((l) => l.text)
+    clearingCache.value = false
     api
       .cacheInfo()
-      .then(setCache)
+      .then((v) => (cache.value = v))
       .catch(() => {})
   }
 
   async function loadConfig() {
-    setConfigLoading(true)
+    configLoading.value = true
     try {
       const c = await api.config()
-      setConfig(c)
+      config.value = c
     } finally {
-      setConfigLoading(false)
+      configLoading.value = false
     }
   }
 
   async function scanLeftovers() {
-    setLeftoversLoading(true)
-    setSelectedLeftovers(new Set())
+    leftoversLoading.value = true
+    selectedLeftovers.value = new Set()
     try {
-      setLeftovers(await api.scanLeftovers())
+      leftovers.value = await api.scanLeftovers()
     } catch (e) {
       notify('error', String(e))
     } finally {
-      setLeftoversLoading(false)
+      leftoversLoading.value = false
     }
   }
 
   function toggleLeftover(path: string) {
-    setSelectedLeftovers((prev) => {
-      const next = new Set(prev)
-      if (next.has(path)) {
-        next.delete(path)
-      } else {
-        next.add(path)
-      }
-      return next
-    })
+    const next = new Set(selectedLeftovers.value)
+    if (next.has(path)) {
+      next.delete(path)
+    } else {
+      next.add(path)
+    }
+    selectedLeftovers.value = next
   }
 
   function toggleAllLeftovers() {
-    if (!leftovers) return
-    setSelectedLeftovers((prev) => (prev.size === leftovers.length ? new Set() : new Set(leftovers.map((l) => l.path))))
+    if (!leftovers.value) return
+    selectedLeftovers.value =
+      selectedLeftovers.value.size === leftovers.value.length ? new Set() : new Set(leftovers.value.map((l) => l.path))
   }
 
   async function deleteSelectedLeftovers() {
-    if (!leftovers || selectedLeftovers.size === 0) return
-    const selected = leftovers.filter((l) => selectedLeftovers.has(l.path))
+    if (!leftovers.value || selectedLeftovers.value.size === 0) return
+    const selected = leftovers.value.filter((l) => selectedLeftovers.value.has(l.path))
     const { ok } = await confirm({
       title: t('maintenance.confirmDeleteLeftoversTitle', { count: selected.length }),
       body: t('maintenance.confirmDeleteLeftoversBody', { names: selected.map((l) => l.name).join(', ') }),
@@ -260,7 +261,7 @@ export default function Maintenance() {
     })
     if (!ok) return
 
-    setDeletingLeftovers(true)
+    deletingLeftovers.value = true
     try {
       await api.deleteLeftovers(selected.map((l) => l.path))
       notify('success', t('maintenance.leftoversDeleted', { count: selected.length }))
@@ -268,7 +269,7 @@ export default function Maintenance() {
     } catch (e) {
       notify('error', String(e))
     } finally {
-      setDeletingLeftovers(false)
+      deletingLeftovers.value = false
     }
   }
 
@@ -278,72 +279,82 @@ export default function Maintenance() {
       <p className="text-base-content/60 text-sm mb-4">{t('maintenance.subtitle')}</p>
 
       <div role="tablist" className="tabs tabs-box tabs-sm w-fit mb-4">
-        <button role="tab" className={`tab ${tab === 'doctor' ? 'tab-active' : ''}`} onClick={() => setTab('doctor')}>
+        <button
+          role="tab"
+          className={`tab ${tab.value === 'doctor' ? 'tab-active' : ''}`}
+          onClick={() => (tab.value = 'doctor')}
+        >
           <WrenchIcon className="size-3.5 mr-1" /> {t('maintenance.tabDoctor')}
         </button>
-        <button role="tab" className={`tab ${tab === 'cleanup' ? 'tab-active' : ''}`} onClick={() => setTab('cleanup')}>
+        <button
+          role="tab"
+          className={`tab ${tab.value === 'cleanup' ? 'tab-active' : ''}`}
+          onClick={() => (tab.value = 'cleanup')}
+        >
           <TrashIcon className="size-3.5 mr-1" /> {t('maintenance.tabCleanup')}
         </button>
         <button
           role="tab"
-          className={`tab ${tab === 'leftovers' ? 'tab-active' : ''}`}
-          onClick={() => setTab('leftovers')}
+          className={`tab ${tab.value === 'leftovers' ? 'tab-active' : ''}`}
+          onClick={() => (tab.value = 'leftovers')}
         >
           <AppWindowIcon className="size-3.5 mr-1" /> {t('maintenance.tabLeftovers')}
         </button>
         <button
           role="tab"
-          className={`tab ${tab === 'brewfile' ? 'tab-active' : ''}`}
-          onClick={() => setTab('brewfile')}
+          className={`tab ${tab.value === 'brewfile' ? 'tab-active' : ''}`}
+          onClick={() => (tab.value = 'brewfile')}
         >
           <ImportIcon className="size-3.5 mr-1" /> {t('maintenance.tabBrewfile')}
         </button>
         <button
           role="tab"
-          className={`tab ${tab === 'config' ? 'tab-active' : ''}`}
+          className={`tab ${tab.value === 'config' ? 'tab-active' : ''}`}
           onClick={() => {
-            setTab('config')
-            if (config === null) void loadConfig()
+            tab.value = 'config'
+            if (config.value === null) void loadConfig()
           }}
         >
           <BeakerIcon className="size-3.5 mr-1" /> {t('maintenance.tabConfig')}
         </button>
       </div>
 
-      {tab === 'doctor' && (
+      {tab.value === 'doctor' && (
         <div className="space-y-3">
           <p className="text-sm text-base-content/70">{t('maintenance.doctorDescription')}</p>
-          <button className="btn btn-sm btn-primary" disabled={doctorRunning} onClick={runDoctor}>
-            {doctorRunning ? (
+          <button className="btn btn-sm btn-primary" disabled={doctorRunning.value} onClick={runDoctor}>
+            {doctorRunning.value ? (
               <span className="loading loading-spinner loading-xs" />
             ) : (
               <WrenchIcon className="size-4" />
             )}
             {t('maintenance.runDoctor')}
           </button>
-          {doctorOutput && (
+          {doctorOutput.value && (
             <pre className="mockup-code text-xs overflow-x-auto max-h-96">
-              <code className="whitespace-pre px-4">{doctorOutput.join('\n') || t('maintenance.doctorAllGood')}</code>
+              <code className="whitespace-pre px-4">
+                {doctorOutput.value.join('\n') || t('maintenance.doctorAllGood')}
+              </code>
             </pre>
           )}
         </div>
       )}
 
-      {tab === 'cleanup' && (
+      {tab.value === 'cleanup' && (
         <div className="space-y-3">
-          {cache && (
+          {cache.value && (
             <div className="stats shadow bg-base-200">
               <div className="stat py-3">
                 <div className="stat-title">{t('maintenance.downloadCache')}</div>
-                <div className="stat-value text-lg">{cache.sizeHuman}</div>
-                <div className="stat-desc font-mono truncate max-w-xs">{cache.path}</div>
+                <div className="stat-value text-lg">{cache.value.sizeHuman}</div>
+                <div className="stat-desc font-mono truncate max-w-xs">{cache.value.path}</div>
                 <div className="stat-actions">
                   <button
                     className="btn btn-xs"
-                    disabled={clearingCache || cleanupRunning !== null}
+                    disabled={clearingCache.value || cleanupRunning.value !== null}
                     onClick={runClearCache}
                   >
-                    {clearingCache ? (
+                    {clearingCache.value ? (
                       <span className="loading loading-spinner loading-xs" />
                     ) : (
                       <TrashIcon className="size-3.5" />
@@ -354,24 +365,24 @@ export default function Maintenance() {
               </div>
             </div>
           )}
-          {cache && <p className="text-xs text-base-content/50">{t('maintenance.clearCacheDescription')}</p>}
+          {cache.value && <p className="text-xs text-base-content/50">{t('maintenance.clearCacheDescription')}</p>}
 
           <p className="text-sm text-base-content/70">{t('maintenance.cleanupDescription')}</p>
           <div className="flex gap-2">
             <button
               className="btn btn-sm"
-              disabled={cleanupRunning !== null || clearingCache}
+              disabled={cleanupRunning.value !== null || clearingCache.value}
               onClick={() => runCleanup(true)}
             >
-              {cleanupRunning === 'preview' ? <span className="loading loading-spinner loading-xs" /> : null}
+              {cleanupRunning.value === 'preview' ? <span className="loading loading-spinner loading-xs" /> : null}
               {t('maintenance.previewDryRun')}
             </button>
             <button
               className="btn btn-sm btn-error"
-              disabled={cleanupRunning !== null || clearingCache}
+              disabled={cleanupRunning.value !== null || clearingCache.value}
               onClick={() => runCleanup(false)}
             >
-              {cleanupRunning === 'real' ? (
+              {cleanupRunning.value === 'real' ? (
                 <span className="loading loading-spinner loading-xs" />
               ) : (
                 <TrashIcon className="size-4" />
@@ -385,8 +396,8 @@ export default function Maintenance() {
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <p className="text-sm text-base-content/70">{t('maintenance.largestDescription')}</p>
-              <button className="btn btn-xs" disabled={largestLoading} onClick={loadLargest}>
-                {largestLoading ? (
+              <button className="btn btn-xs" disabled={largestLoading.value} onClick={loadLargest}>
+                {largestLoading.value ? (
                   <span className="loading loading-spinner loading-xs" />
                 ) : (
                   <RefreshIcon className="size-3.5" />
@@ -394,7 +405,7 @@ export default function Maintenance() {
                 {t('common.refresh')}
               </button>
             </div>
-            {largest && largest.length > 0 && (
+            {largest.value && largest.value.length > 0 && (
               <TableShell colgroup={[<col />, <col className="w-24" />, <col className="w-28" />]}>
                 <thead>
                   <tr>
@@ -404,7 +415,7 @@ export default function Maintenance() {
                   </tr>
                 </thead>
                 <tbody>
-                  {largest.map((p) => (
+                  {largest.value.map((p) => (
                     <tr key={`${p.isCask ? 'c' : 'f'}:${p.name}`} className="hover:bg-base-200">
                       <td className="font-medium truncate">{p.name}</td>
                       <td>
@@ -416,7 +427,7 @@ export default function Maintenance() {
                 </tbody>
               </TableShell>
             )}
-            {largest && largest.length === 0 && (
+            {largest.value && largest.value.length === 0 && (
               <div className="text-xs text-base-content/50">{t('maintenance.noInstalledPackages')}</div>
             )}
           </div>
@@ -427,18 +438,20 @@ export default function Maintenance() {
           <div className="flex gap-2">
             <button
               className="btn btn-sm"
-              disabled={cleanupRunning !== null || clearingCache}
+              disabled={cleanupRunning.value !== null || clearingCache.value}
               onClick={() => runAutoremove(true)}
             >
-              {cleanupRunning === 'autoremove-preview' ? <span className="loading loading-spinner loading-xs" /> : null}
+              {cleanupRunning.value === 'autoremove-preview' ? (
+                <span className="loading loading-spinner loading-xs" />
+              ) : null}
               {t('maintenance.previewOrphans')}
             </button>
             <button
               className="btn btn-sm btn-warning"
-              disabled={cleanupRunning !== null || clearingCache}
+              disabled={cleanupRunning.value !== null || clearingCache.value}
               onClick={() => runAutoremove(false)}
             >
-              {cleanupRunning === 'autoremove' ? (
+              {cleanupRunning.value === 'autoremove' ? (
                 <span className="loading loading-spinner loading-xs" />
               ) : (
                 <TrashIcon className="size-4" />
@@ -446,40 +459,42 @@ export default function Maintenance() {
               {t('maintenance.removeOrphanedDeps')}
             </button>
           </div>
-          {cleanupOutput && (
+          {cleanupOutput.value && (
             <pre className="mockup-code text-xs overflow-x-auto max-h-96">
               <code className="whitespace-pre px-4">
-                {cleanupOutput.join('\n') || t('maintenance.nothingToCleanUp')}
+                {cleanupOutput.value.join('\n') || t('maintenance.nothingToCleanUp')}
               </code>
             </pre>
           )}
         </div>
       )}
 
-      {tab === 'leftovers' && (
+      {tab.value === 'leftovers' && (
         <div className="space-y-3">
           <p className="text-sm text-base-content/70">{t('maintenance.leftoversDescription')}</p>
           <div className="flex items-center gap-2">
-            <button className="btn btn-sm btn-primary" disabled={leftoversLoading} onClick={scanLeftovers}>
-              {leftoversLoading ? (
+            <button className="btn btn-sm btn-primary" disabled={leftoversLoading.value} onClick={scanLeftovers}>
+              {leftoversLoading.value ? (
                 <span className="loading loading-spinner loading-xs" />
               ) : (
                 <AppWindowIcon className="size-4" />
               )}
               {t('maintenance.scanLeftovers')}
             </button>
-            {leftovers && leftovers.length > 0 && (
+            {leftovers.value && leftovers.value.length > 0 && (
               <button className="btn btn-xs" onClick={toggleAllLeftovers}>
-                {selectedLeftovers.size === leftovers.length ? t('maintenance.selectNone') : t('maintenance.selectAll')}
+                {selectedLeftovers.value.size === leftovers.value.length
+                  ? t('maintenance.selectNone')
+                  : t('maintenance.selectAll')}
               </button>
             )}
           </div>
 
-          {leftovers && leftovers.length === 0 && (
+          {leftovers.value && leftovers.value.length === 0 && (
             <div className="alert alert-success alert-soft text-sm">{t('maintenance.noLeftoversFound')}</div>
           )}
 
-          {leftovers && leftovers.length > 0 && (
+          {leftovers.value && leftovers.value.length > 0 && (
             <div className="space-y-2">
               <TableShell
                 colgroup={[<col className="w-8" />, <col />, <col className="w-40" />, <col className="w-24" />]}
@@ -493,13 +508,13 @@ export default function Maintenance() {
                   </tr>
                 </thead>
                 <tbody>
-                  {leftovers.map((item) => (
+                  {leftovers.value.map((item) => (
                     <tr key={item.path} className="hover:bg-base-200">
                       <td>
                         <input
                           type="checkbox"
                           className="checkbox checkbox-sm"
-                          checked={selectedLeftovers.has(item.path)}
+                          checked={selectedLeftovers.value.has(item.path)}
                           onChange={() => toggleLeftover(item.path)}
                         />
                       </td>
@@ -521,21 +536,21 @@ export default function Maintenance() {
               </TableShell>
               <div className="flex items-center justify-between">
                 <span className="text-xs text-base-content/50">
-                  {selectedLeftovers.size > 0
-                    ? t('maintenance.selectedSummary', { count: selectedLeftovers.size })
+                  {selectedLeftovers.value.size > 0
+                    ? t('maintenance.selectedSummary', { count: selectedLeftovers.value.size })
                     : ''}
                 </span>
                 <button
                   className="btn btn-sm btn-error"
-                  disabled={selectedLeftovers.size === 0 || deletingLeftovers}
+                  disabled={selectedLeftovers.value.size === 0 || deletingLeftovers.value}
                   onClick={deleteSelectedLeftovers}
                 >
-                  {deletingLeftovers ? (
+                  {deletingLeftovers.value ? (
                     <span className="loading loading-spinner loading-xs" />
                   ) : (
                     <TrashIcon className="size-4" />
                   )}
-                  {t('maintenance.removeSelectedButton', { count: selectedLeftovers.size })}
+                  {t('maintenance.removeSelectedButton', { count: selectedLeftovers.value.size })}
                 </button>
               </div>
             </div>
@@ -543,27 +558,31 @@ export default function Maintenance() {
         </div>
       )}
 
-      {tab === 'brewfile' && (
+      {tab.value === 'brewfile' && (
         <div className="space-y-4">
           <div>
             <p className="text-sm text-base-content/70 mb-2">{t('maintenance.exportDescription')}</p>
-            <button className="btn btn-sm btn-primary" disabled={exporting} onClick={doExport}>
-              {exporting ? (
+            <button className="btn btn-sm btn-primary" disabled={exporting.value} onClick={doExport}>
+              {exporting.value ? (
                 <span className="loading loading-spinner loading-xs" />
               ) : (
                 <DownloadIcon className="size-4" />
               )}
               {t('maintenance.exportButton')}
             </button>
-            {exportedPath && (
-              <p className="text-xs text-success mt-2">{t('maintenance.savedTo', { path: exportedPath })}</p>
+            {exportedPath.value && (
+              <p className="text-xs text-success mt-2">{t('maintenance.savedTo', { path: exportedPath.value })}</p>
             )}
           </div>
           <div className="divider my-1" />
           <div>
             <p className="text-sm text-base-content/70 mb-2">{t('maintenance.importDescription')}</p>
-            <button className="btn btn-sm" disabled={importing} onClick={doImport}>
-              {importing ? <span className="loading loading-spinner loading-xs" /> : <ImportIcon className="size-4" />}
+            <button className="btn btn-sm" disabled={importing.value} onClick={doImport}>
+              {importing.value ? (
+                <span className="loading loading-spinner loading-xs" />
+              ) : (
+                <ImportIcon className="size-4" />
+              )}
               {t('maintenance.importButton')}
             </button>
           </div>
@@ -574,46 +593,48 @@ export default function Maintenance() {
             <p className="text-sm text-base-content/70 mb-2">{t('maintenance.checkDescription')}</p>
             <div className="flex items-center gap-2 mb-3">
               <button className="btn btn-sm" onClick={pickBundlePath}>
-                {bundlePath ? t('maintenance.changeBrewfile') : t('maintenance.selectBrewfile')}
+                {bundlePath.value ? t('maintenance.changeBrewfile') : t('maintenance.selectBrewfile')}
               </button>
-              {bundlePath && <span className="font-mono text-xs text-base-content/60 truncate">{bundlePath}</span>}
+              {bundlePath.value && (
+                <span className="font-mono text-xs text-base-content/60 truncate">{bundlePath.value}</span>
+              )}
             </div>
 
-            {bundlePath && (
+            {bundlePath.value && (
               <div className="space-y-3">
                 <div className="flex flex-wrap gap-2">
-                  <button className="btn btn-xs" disabled={bundleCheckLoading} onClick={doBundleCheck}>
-                    {bundleCheckLoading && <span className="loading loading-spinner loading-xs" />}{' '}
+                  <button className="btn btn-xs" disabled={bundleCheckLoading.value} onClick={doBundleCheck}>
+                    {bundleCheckLoading.value && <span className="loading loading-spinner loading-xs" />}{' '}
                     {t('maintenance.check')}
                   </button>
-                  <button className="btn btn-xs" disabled={bundleListLoading} onClick={doBundleList}>
-                    {bundleListLoading && <span className="loading loading-spinner loading-xs" />}{' '}
+                  <button className="btn btn-xs" disabled={bundleListLoading.value} onClick={doBundleList}>
+                    {bundleListLoading.value && <span className="loading loading-spinner loading-xs" />}{' '}
                     {t('maintenance.listContents')}
                   </button>
-                  <button className="btn btn-xs" disabled={cleanupPreviewLoading} onClick={doCleanupPreview}>
-                    {cleanupPreviewLoading && <span className="loading loading-spinner loading-xs" />}{' '}
+                  <button className="btn btn-xs" disabled={cleanupPreviewLoading.value} onClick={doCleanupPreview}>
+                    {cleanupPreviewLoading.value && <span className="loading loading-spinner loading-xs" />}{' '}
                     {t('maintenance.previewCleanup')}
                   </button>
                 </div>
 
-                {bundleCheckResult && (
+                {bundleCheckResult.value && (
                   <div
-                    className={`alert alert-soft text-xs ${bundleCheckResult.includes('satisfied') ? 'alert-success' : 'alert-warning'}`}
+                    className={`alert alert-soft text-xs ${bundleCheckResult.value.includes('satisfied') ? 'alert-success' : 'alert-warning'}`}
                   >
-                    {bundleCheckResult.includes('satisfied') && <CheckIcon className="size-4" />}
-                    <span className="whitespace-pre-wrap">{bundleCheckResult}</span>
+                    {bundleCheckResult.value.includes('satisfied') && <CheckIcon className="size-4" />}
+                    <span className="whitespace-pre-wrap">{bundleCheckResult.value}</span>
                   </div>
                 )}
 
-                {bundleListResult && (
+                {bundleListResult.value && (
                   <pre className="mockup-code text-xs overflow-x-auto max-h-64">
-                    <code className="whitespace-pre px-4">{bundleListResult}</code>
+                    <code className="whitespace-pre px-4">{bundleListResult.value}</code>
                   </pre>
                 )}
 
-                {cleanupPreview && (
+                {cleanupPreview.value && (
                   <div>
-                    {cleanupPreview.length === 0 ? (
+                    {cleanupPreview.value.length === 0 ? (
                       <div className="alert alert-success alert-soft text-xs">
                         {t('maintenance.cleanupNothingToRemove')}
                       </div>
@@ -621,20 +642,24 @@ export default function Maintenance() {
                       <div className="space-y-2">
                         <div className="text-xs text-base-content/60">{t('maintenance.notInBrewfile')}</div>
                         <div className="flex flex-wrap gap-1.5">
-                          {cleanupPreview.map((item) => (
+                          {cleanupPreview.value.map((item) => (
                             <span key={`${item.type}:${item.name}`} className="inline-flex items-center gap-1">
                               <BundleEntryBadge type={item.type as BundleEntryType} size="xs" />
                               <span className="text-xs font-mono">{item.name}</span>
                             </span>
                           ))}
                         </div>
-                        <button className="btn btn-xs btn-error" disabled={cleanupRunningReal} onClick={doCleanupReal}>
-                          {cleanupRunningReal ? (
+                        <button
+                          className="btn btn-xs btn-error"
+                          disabled={cleanupRunningReal.value}
+                          onClick={doCleanupReal}
+                        >
+                          {cleanupRunningReal.value ? (
                             <span className="loading loading-spinner loading-xs" />
                           ) : (
                             <TrashIcon className="size-3.5" />
                           )}
-                          {t('maintenance.removePackagesButton', { count: cleanupPreview.length })}
+                          {t('maintenance.removePackagesButton', { count: cleanupPreview.value.length })}
                         </button>
                       </div>
                     )}
@@ -646,12 +671,12 @@ export default function Maintenance() {
         </div>
       )}
 
-      {tab === 'config' && (
+      {tab.value === 'config' && (
         <div className="space-y-3">
-          {configLoading && <LoadingRow>{t('common.loading')}</LoadingRow>}
-          {config && (
+          {configLoading.value && <LoadingRow>{t('common.loading')}</LoadingRow>}
+          {config.value && (
             <pre className="mockup-code text-xs overflow-x-auto max-h-128">
-              <code className="whitespace-pre px-4">{config}</code>
+              <code className="whitespace-pre px-4">{config.value}</code>
             </pre>
           )}
         </div>

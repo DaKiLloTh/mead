@@ -1,6 +1,7 @@
+import { useSignal } from '@preact/signals'
 import { createContext } from 'preact'
 import type { ComponentChildren } from 'preact'
-import { useCallback, useContext, useEffect, useState } from 'preact/hooks'
+import { useCallback, useContext, useEffect } from 'preact/hooks'
 import { api, pkgKey, UserData } from '../lib/api'
 
 interface UserDataContextValue {
@@ -33,18 +34,21 @@ export function useUserData(): UserDataContextValue {
 }
 
 export function UserDataProvider({ children }: { children: ComponentChildren }) {
-  const [data, setData] = useState<UserData | null>(null)
+  const data = useSignal<UserData | null>(null)
 
   const refresh = useCallback(() => {
     api
       .getUserData()
-      .then(setData)
+      .then((v) => (data.value = v))
       .catch(() => {})
-  }, [])
+  }, [data])
 
   useEffect(refresh, [refresh])
 
-  const isFavorite = useCallback((name: string, isCask: boolean) => !!data?.favorites?.[pkgKey(name, isCask)], [data])
+  const isFavorite = useCallback(
+    (name: string, isCask: boolean) => !!data.value?.favorites?.[pkgKey(name, isCask)],
+    [data.value]
+  )
 
   const toggleFavorite = useCallback(
     async (name: string, isCask: boolean) => {
@@ -54,7 +58,10 @@ export function UserDataProvider({ children }: { children: ComponentChildren }) 
     [refresh]
   )
 
-  const tagsFor = useCallback((name: string, isCask: boolean) => data?.tags?.[pkgKey(name, isCask)] ?? [], [data])
+  const tagsFor = useCallback(
+    (name: string, isCask: boolean) => data.value?.tags?.[pkgKey(name, isCask)] ?? [],
+    [data.value]
+  )
 
   const setTags = useCallback(
     async (name: string, isCask: boolean, tags: string[]) => {
@@ -64,7 +71,10 @@ export function UserDataProvider({ children }: { children: ComponentChildren }) 
     [refresh]
   )
 
-  const noteFor = useCallback((name: string, isCask: boolean) => data?.notes?.[pkgKey(name, isCask)] ?? '', [data])
+  const noteFor = useCallback(
+    (name: string, isCask: boolean) => data.value?.notes?.[pkgKey(name, isCask)] ?? '',
+    [data.value]
+  )
 
   const setNote = useCallback(
     async (name: string, isCask: boolean, note: string) => {
@@ -76,12 +86,12 @@ export function UserDataProvider({ children }: { children: ComponentChildren }) 
 
   const snoozedUntil = useCallback(
     (name: string, isCask: boolean) => {
-      const iso = data?.snoozed?.[pkgKey(name, isCask)]
+      const iso = data.value?.snoozed?.[pkgKey(name, isCask)]
       if (!iso) return null
       const d = new Date(iso)
       return d.getTime() > Date.now() ? d : null
     },
-    [data]
+    [data.value]
   )
 
   const snooze = useCallback(
@@ -100,10 +110,10 @@ export function UserDataProvider({ children }: { children: ComponentChildren }) 
     [refresh]
   )
 
-  const allTags = Array.from(new Set(Object.values(data?.tags ?? {}).flat())).sort()
+  const allTags = Array.from(new Set(Object.values(data.value?.tags ?? {}).flat())).sort()
 
   const value: UserDataContextValue = {
-    data,
+    data: data.value,
     refresh,
     isFavorite,
     toggleFavorite,

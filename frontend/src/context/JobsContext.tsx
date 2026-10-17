@@ -1,6 +1,7 @@
+import { useSignal } from '@preact/signals'
 import { createContext } from 'preact'
 import type { ComponentChildren } from 'preact'
-import { useCallback, useContext, useEffect, useRef, useState } from 'preact/hooks'
+import { useCallback, useContext, useEffect, useRef } from 'preact/hooks'
 import { EventsOn } from '../../wailsjs/runtime'
 import { api } from '../lib/api'
 import { JobTracker, type JobState, type JobLine } from './jobTracker'
@@ -43,22 +44,28 @@ export function useJobs(): JobsContextValue {
 }
 
 export function JobsProvider({ children }: { children: ComponentChildren }) {
-  const [jobs, setJobs] = useState<JobState[]>([])
-  const [toasts, setToasts] = useState<Toast[]>([])
-  const [consoleOpen, setConsoleOpen] = useState(false)
-  const [selectedJobId, setSelectedJobId] = useState<string | null>(null)
+  const jobs = useSignal<JobState[]>([])
+  const toasts = useSignal<Toast[]>([])
+  const consoleOpen = useSignal(false)
+  const selectedJobId = useSignal<string | null>(null)
 
-  const dismissToast = useCallback((id: string) => {
-    setToasts((t) => t.filter((x) => x.id !== id))
-  }, [])
+  const dismissToast = useCallback(
+    (id: string) => {
+      toasts.value = toasts.value.filter((x) => x.id !== id)
+    },
+    [toasts]
+  )
 
-  const pushToast = useCallback((type: Toast['type'], message: string) => {
-    const id = Math.random().toString(36).slice(2)
-    setToasts((t) => [...t, { id, type, message }])
-    setTimeout(() => {
-      setToasts((t) => t.filter((x) => x.id !== id))
-    }, 5000)
-  }, [])
+  const pushToast = useCallback(
+    (type: Toast['type'], message: string) => {
+      const id = Math.random().toString(36).slice(2)
+      toasts.value = [...toasts.value, { id, type, message }]
+      setTimeout(() => {
+        toasts.value = toasts.value.filter((x) => x.id !== id)
+      }, 5000)
+    },
+    [toasts]
+  )
 
   // The tracker owns the authoritative, synchronously-updated job list and
   // resolver bookkeeping (see jobTracker.ts for why this must live outside
@@ -72,11 +79,11 @@ export function JobsProvider({ children }: { children: ComponentChildren }) {
   // eslint-disable-next-line react-hooks/refs
   if (!trackerRef.current) {
     trackerRef.current = new JobTracker({
-      onJobsChange: (next) => setJobs(next),
+      onJobsChange: (next) => (jobs.value = next),
       onNotify: (type, message) => pushToast(type, message),
       onJobStarted: (id) => {
-        setSelectedJobId(id)
-        setConsoleOpen(true)
+        selectedJobId.value = id
+        consoleOpen.value = true
       },
     })
   }
@@ -104,22 +111,22 @@ export function JobsProvider({ children }: { children: ComponentChildren }) {
 
   const clearFinishedJobs = useCallback(() => {
     trackerRef.current!.clearFinished()
-    setSelectedJobId(null)
-  }, [])
+    selectedJobId.value = null
+  }, [selectedJobId])
 
-  const activeCount = jobs.filter((j) => j.status === 'running').length
+  const activeCount = jobs.value.filter((j) => j.status === 'running').length
 
   const value: JobsContextValue = {
-    jobs,
+    jobs: jobs.value,
     activeCount,
-    toasts,
+    toasts: toasts.value,
     dismissToast,
     runAction,
     notify: pushToast,
-    consoleOpen,
-    setConsoleOpen,
-    selectedJobId,
-    setSelectedJobId,
+    consoleOpen: consoleOpen.value,
+    setConsoleOpen: (v) => (consoleOpen.value = v),
+    selectedJobId: selectedJobId.value,
+    setSelectedJobId: (v) => (selectedJobId.value = v),
     cancelJob,
     clearFinishedJobs,
   }

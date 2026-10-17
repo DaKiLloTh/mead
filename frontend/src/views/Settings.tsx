@@ -1,6 +1,8 @@
-import { useEffect, useState } from 'preact/hooks'
+import { useSignal } from '@preact/signals'
+import { useEffect } from 'preact/hooks'
 import { Trans, useTranslation } from 'react-i18next'
 import { api } from '../lib/api'
+import { useLazySignal } from '../lib/useLazySignal'
 import { useJobs } from '../context/JobsContext'
 import { useConfirm } from '../context/ConfirmContext'
 import { useUserData } from '../context/UserDataContext'
@@ -37,58 +39,58 @@ export default function Settings() {
   const confirm = useConfirm()
   const userData = useUserData()
 
-  const [analytics, setAnalytics] = useState<string | null>(null)
-  const [analyticsLoading, setAnalyticsLoading] = useState(false)
-  const [analyticsBusy, setAnalyticsBusy] = useState<string | null>(null)
+  const analytics = useSignal<string | null>(null)
+  const analyticsLoading = useSignal(false)
+  const analyticsBusy = useSignal<string | null>(null)
 
-  const [appDir, setAppDir] = useState('')
-  const [appDirSaved, setAppDirSaved] = useState(false)
+  const appDir = useSignal('')
+  const appDirSaved = useSignal(false)
 
-  const [size, setSize] = useState<SizeKey>(getInitialSize)
+  const size = useLazySignal<SizeKey>(getInitialSize)
 
-  const [exportingData, setExportingData] = useState(false)
-  const [importingData, setImportingData] = useState(false)
+  const exportingData = useSignal(false)
+  const importingData = useSignal(false)
 
   function loadAnalytics() {
-    setAnalyticsLoading(true)
+    analyticsLoading.value = true
     api
       .analyticsState()
-      .then(setAnalytics)
-      .catch((e) => setAnalytics(String(e)))
-      .finally(() => setAnalyticsLoading(false))
+      .then((v) => (analytics.value = v))
+      .catch((e) => (analytics.value = String(e)))
+      .finally(() => (analyticsLoading.value = false))
   }
 
-  useEffect(loadAnalytics, [])
+  useEffect(loadAnalytics, [analytics, analyticsLoading])
 
   useEffect(() => {
-    setAppDir(userData.data?.settings?.caskAppDir ?? '')
-  }, [userData.data])
+    appDir.value = userData.data?.settings?.caskAppDir ?? ''
+  }, [appDir, userData.data])
 
   useEffect(() => {
-    const found = SIZES.find((s) => s.key === size) ?? SIZES[1]
+    const found = SIZES.find((s) => s.key === size.value) ?? SIZES[1]
     document.documentElement.style.fontSize = found.scale
-    localStorage.setItem('textSize', size)
-  }, [size])
+    localStorage.setItem('textSize', size.value)
+  }, [size.value])
 
   async function analyticsToggle(enabled: boolean) {
-    setAnalyticsBusy(enabled ? 'on' : 'off')
+    analyticsBusy.value = enabled ? 'on' : 'off'
     await runAction(() => api.analyticsSetEnabled(enabled))
-    setAnalyticsBusy(null)
+    analyticsBusy.value = null
     loadAnalytics()
   }
 
   async function analyticsRegenerate() {
-    setAnalyticsBusy('regen')
+    analyticsBusy.value = 'regen'
     await runAction(() => api.analyticsRegenerateUUID())
-    setAnalyticsBusy(null)
+    analyticsBusy.value = null
     loadAnalytics()
   }
 
   async function saveAppDir() {
-    await api.setCaskAppDir(appDir.trim())
+    await api.setCaskAppDir(appDir.value.trim())
     userData.refresh()
-    setAppDirSaved(true)
-    setTimeout(() => setAppDirSaved(false), 2000)
+    appDirSaved.value = true
+    setTimeout(() => (appDirSaved.value = false), 2000)
   }
 
   async function clearAllData() {
@@ -104,14 +106,14 @@ export default function Settings() {
   }
 
   async function exportData() {
-    setExportingData(true)
+    exportingData.value = true
     try {
       const path = await api.exportUserDataToFile()
       if (path) notify('success', t('settings.dataExportedToast', { path }))
     } catch (e) {
       notify('error', String(e))
     } finally {
-      setExportingData(false)
+      exportingData.value = false
     }
   }
 
@@ -127,7 +129,7 @@ export default function Settings() {
     })
     if (!ok) return
 
-    setImportingData(true)
+    importingData.value = true
     try {
       await api.importUserDataFromFile(path)
       userData.refresh()
@@ -135,7 +137,7 @@ export default function Settings() {
     } catch (e) {
       notify('error', String(e))
     } finally {
-      setImportingData(false)
+      importingData.value = false
     }
   }
 
@@ -150,25 +152,38 @@ export default function Settings() {
         <div className="card-body">
           <h2 className="card-title text-base">{t('settings.privacyTitle')}</h2>
           <p className="text-sm text-base-content/70">{t('settings.privacyDescription')}</p>
-          {analyticsLoading ? (
+          {analyticsLoading.value ? (
             <div className="flex items-center gap-2 text-base-content/60 text-sm py-1">
               <span className="loading loading-spinner loading-xs" /> {t('settings.checking')}
             </div>
           ) : (
             <pre className="mockup-code text-xs mt-1">
-              <code className="px-4">{analytics}</code>
+              <code className="px-4">{analytics.value}</code>
             </pre>
           )}
           <div className="flex flex-wrap gap-2 mt-1">
-            <button className="btn btn-sm" disabled={analyticsBusy !== null} onClick={() => analyticsToggle(true)}>
-              {analyticsBusy === 'on' && <span className="loading loading-spinner loading-xs" />} {t('settings.turnOn')}
+            <button
+              className="btn btn-sm"
+              disabled={analyticsBusy.value !== null}
+              onClick={() => analyticsToggle(true)}
+            >
+              {analyticsBusy.value === 'on' && <span className="loading loading-spinner loading-xs" />}{' '}
+              {t('settings.turnOn')}
             </button>
-            <button className="btn btn-sm" disabled={analyticsBusy !== null} onClick={() => analyticsToggle(false)}>
-              {analyticsBusy === 'off' && <span className="loading loading-spinner loading-xs" />}{' '}
+            <button
+              className="btn btn-sm"
+              disabled={analyticsBusy.value !== null}
+              onClick={() => analyticsToggle(false)}
+            >
+              {analyticsBusy.value === 'off' && <span className="loading loading-spinner loading-xs" />}{' '}
               {t('settings.turnOff')}
             </button>
-            <button className="btn btn-sm btn-ghost" disabled={analyticsBusy !== null} onClick={analyticsRegenerate}>
-              {analyticsBusy === 'regen' && <span className="loading loading-spinner loading-xs" />}{' '}
+            <button
+              className="btn btn-sm btn-ghost"
+              disabled={analyticsBusy.value !== null}
+              onClick={analyticsRegenerate}
+            >
+              {analyticsBusy.value === 'regen' && <span className="loading loading-spinner loading-xs" />}{' '}
               {t('settings.regenerateId')}
             </button>
           </div>
@@ -186,11 +201,11 @@ export default function Settings() {
               type="text"
               className="input input-sm flex-1"
               placeholder={t('settings.appDirPlaceholder')}
-              value={appDir}
-              onChange={(e) => setAppDir(e.currentTarget.value)}
+              value={appDir.value}
+              onChange={(e) => (appDir.value = e.currentTarget.value)}
             />
             <button className="btn btn-sm btn-primary" onClick={saveAppDir}>
-              {appDirSaved ? t('common.saved') : t('common.save')}
+              {appDirSaved.value ? t('common.saved') : t('common.save')}
             </button>
           </div>
         </div>
@@ -226,8 +241,8 @@ export default function Settings() {
             {SIZES.map((s) => (
               <button
                 key={s.key}
-                className={`btn btn-sm join-item ${size === s.key ? 'btn-primary' : ''}`}
-                onClick={() => setSize(s.key)}
+                className={`btn btn-sm join-item ${size.value === s.key ? 'btn-primary' : ''}`}
+                onClick={() => (size.value = s.key)}
               >
                 {t(s.labelKey)}
               </button>
@@ -246,16 +261,16 @@ export default function Settings() {
             <button className="btn btn-sm" onClick={() => api.revealLocalDataFile()}>
               {t('settings.revealInFinder')}
             </button>
-            <button className="btn btn-sm" disabled={exportingData} onClick={exportData}>
-              {exportingData ? (
+            <button className="btn btn-sm" disabled={exportingData.value} onClick={exportData}>
+              {exportingData.value ? (
                 <span className="loading loading-spinner loading-xs" />
               ) : (
                 <DownloadIcon className="size-4" />
               )}
               {t('settings.exportData')}
             </button>
-            <button className="btn btn-sm" disabled={importingData} onClick={importData}>
-              {importingData ? (
+            <button className="btn btn-sm" disabled={importingData.value} onClick={importData}>
+              {importingData.value ? (
                 <span className="loading loading-spinner loading-xs" />
               ) : (
                 <ImportIcon className="size-4" />

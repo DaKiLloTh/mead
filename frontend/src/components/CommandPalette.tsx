@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'preact/hooks'
+import { useSignal } from '@preact/signals'
+import { useEffect, useMemo, useRef } from 'preact/hooks'
 import type { VNode, TargetedKeyboardEvent } from 'preact'
 import { useTranslation } from 'react-i18next'
 import { filterNavItems, filterPackages } from '../lib/paletteFilter'
@@ -42,15 +43,15 @@ type ResultRow =
  */
 export default function CommandPalette({ onNavigate, bump, defaultOpen = false }: Props) {
   const { t, i18n } = useTranslation()
-  const [open, setOpen] = useState(defaultOpen)
-  const [query, setQuery] = useState('')
-  const [activeIndex, setActiveIndex] = useState(0)
+  const open = useSignal(defaultOpen)
+  const query = useSignal('')
+  const activeIndex = useSignal(0)
   // Backed by the shared installed-packages cache (populated at app start
   // and kept fresh in the background), so the palette's package search is
   // warm on first open instead of fetching lazily every session.
   const { packages, loading: packagesLoading } = useInstalledPackages()
   const capabilities = useCapabilities()
-  const [detail, setDetail] = useState<DetailTarget | null>(null)
+  const detail = useSignal<DetailTarget | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
   // Global Cmd+K (or Ctrl+K where the platform has no Cmd key, see
@@ -60,27 +61,27 @@ export default function CommandPalette({ onNavigate, bump, defaultOpen = false }
     function handleKeyDown(e: KeyboardEvent) {
       if (isPrimaryShortcutModifierPressed(e, capabilities) && e.key.toLowerCase() === 'k') {
         e.preventDefault()
-        setOpen((o) => !o)
+        open.value = !open.value
         return
       }
-      if (e.key === 'Escape' && open) {
+      if (e.key === 'Escape' && open.value) {
         e.preventDefault()
-        setOpen(false)
+        open.value = false
       }
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [open, capabilities])
+  }, [open.value, capabilities, open])
 
   // Reset transient state and (re)focus the input every time the palette
   // opens. The package list itself comes from the shared cache, which is
   // already fetched (or in flight) by the time the app renders at all.
   useEffect(() => {
-    if (!open) return
-    setQuery('')
-    setActiveIndex(0)
+    if (!open.value) return
+    query.value = ''
+    activeIndex.value = 0
     inputRef.current?.focus()
-  }, [open])
+  }, [activeIndex, open.value, query])
 
   // Translated nav labels, recomputed whenever the active language changes.
   // i18n.language is a real dependency despite the lint warning: react-i18next's
@@ -93,14 +94,14 @@ export default function CommandPalette({ onNavigate, bump, defaultOpen = false }
   )
 
   const results = useMemo<ResultRow[]>(() => {
-    const navRows: ResultRow[] = filterNavItems(translatedNavItems, query).map((item) => ({
+    const navRows: ResultRow[] = filterNavItems(translatedNavItems, query.value).map((item) => ({
       kind: 'nav',
       rowKey: `nav:${item.key}`,
       label: item.label,
       icon: item.icon,
       view: item.key,
     }))
-    const pkgRows: ResultRow[] = filterPackages(packages ?? [], query).map((p) => ({
+    const pkgRows: ResultRow[] = filterPackages(packages ?? [], query.value).map((p) => ({
       kind: 'package',
       rowKey: `pkg:${p.isCask ? 'cask' : 'formula'}:${p.name}`,
       label: p.name,
@@ -108,38 +109,38 @@ export default function CommandPalette({ onNavigate, bump, defaultOpen = false }
       isCask: p.isCask,
     }))
     return [...navRows, ...pkgRows]
-  }, [query, packages, translatedNavItems])
+  }, [query.value, packages, translatedNavItems])
 
   useEffect(() => {
-    setActiveIndex(0)
-  }, [query])
+    activeIndex.value = 0
+  }, [activeIndex, query.value])
 
   function selectRow(row: ResultRow) {
     if (row.kind === 'nav') {
       onNavigate(row.view)
     } else {
-      setDetail({ name: row.name, isCask: row.isCask })
+      detail.value = { name: row.name, isCask: row.isCask }
     }
-    setOpen(false)
+    open.value = false
   }
 
   function handleInputKeyDown(e: TargetedKeyboardEvent<HTMLInputElement>) {
     if (e.key === 'ArrowDown') {
       e.preventDefault()
-      setActiveIndex((i) => Math.min(i + 1, results.length - 1))
+      activeIndex.value = Math.min(activeIndex.value + 1, results.length - 1)
     } else if (e.key === 'ArrowUp') {
       e.preventDefault()
-      setActiveIndex((i) => Math.max(i - 1, 0))
+      activeIndex.value = Math.max(activeIndex.value - 1, 0)
     } else if (e.key === 'Enter') {
       e.preventDefault()
-      const row = results[activeIndex]
+      const row = results[activeIndex.value]
       if (row) selectRow(row)
     }
   }
 
   return (
     <>
-      <dialog className={`modal ${open ? 'modal-open' : ''}`}>
+      <dialog className={`modal ${open.value ? 'modal-open' : ''}`}>
         <div className="modal-box max-w-lg p-0 overflow-hidden">
           <label className="input input-lg w-full rounded-none border-0 border-b border-base-300 focus-within:outline-none">
             <SearchIcon className="size-4 opacity-50" />
@@ -147,8 +148,8 @@ export default function CommandPalette({ onNavigate, bump, defaultOpen = false }
               ref={inputRef}
               type="text"
               placeholder={t('commandPalette.placeholder')}
-              value={query}
-              onChange={(e) => setQuery(e.currentTarget.value)}
+              value={query.value}
+              onChange={(e) => (query.value = e.currentTarget.value)}
               onKeyDown={handleInputKeyDown}
             />
           </label>
@@ -163,9 +164,9 @@ export default function CommandPalette({ onNavigate, bump, defaultOpen = false }
                 <button
                   type="button"
                   className={`w-full flex items-center gap-2.5 px-4 py-2 text-sm text-left ${
-                    i === activeIndex ? 'bg-base-200' : 'hover:bg-base-200/60'
+                    i === activeIndex.value ? 'bg-base-200' : 'hover:bg-base-200/60'
                   }`}
-                  onMouseEnter={() => setActiveIndex(i)}
+                  onMouseEnter={() => (activeIndex.value = i)}
                   onClick={() => selectRow(row)}
                 >
                   {row.kind === 'nav' ? (
@@ -181,11 +182,11 @@ export default function CommandPalette({ onNavigate, bump, defaultOpen = false }
           </ul>
         </div>
         <form method="dialog" className="modal-backdrop">
-          <button onClick={() => setOpen(false)}>close</button>
+          <button onClick={() => (open.value = false)}>close</button>
         </form>
       </dialog>
 
-      <PackageDetailModal target={detail} onClose={() => setDetail(null)} onChanged={() => bump?.()} />
+      <PackageDetailModal target={detail.value} onClose={() => (detail.value = null)} onChanged={() => bump?.()} />
     </>
   )
 }

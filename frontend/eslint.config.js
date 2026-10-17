@@ -19,6 +19,19 @@ export default tseslint.config(
     },
     rules: {
       ...reactHooks.configs.recommended.rules,
+      // Component state is @preact/signals, updated by assigning signal.value.
+      // This React Compiler rule reads that as mutating a hook's return value.
+      'react-hooks/immutability': 'off',
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: ['preact/hooks', 'preact/compat', 'react'].map((name) => ({
+            name,
+            importNames: ['useState', 'useReducer'],
+            message: 'Use useSignal from @preact/signals (or useLazySignal from lib/useLazySignal) for component state.',
+          })),
+        },
+      ],
       '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
       '@typescript-eslint/no-explicit-any': 'off',
     },
