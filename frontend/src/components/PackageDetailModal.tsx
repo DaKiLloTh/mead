@@ -46,8 +46,11 @@ export default function PackageDetailModal({ target, onClose, onChanged }: Props
   const confirm = useConfirm()
   const uninstallWithElevation = useUninstall()
   const userData = useUserData()
-  const [pkg, setPkg] = useState<BrewPackage | null>(null)
-  const [loading, setLoading] = useState(false)
+  // The fetched package, tagged with the key it was fetched for. pkg and
+  // loading are derived from it so a result from a previous target (the
+  // modal stays mounted while closed) or a late response for a package the
+  // user has since moved away from never renders against the current one.
+  const [loaded, setLoaded] = useState<{ key: string; pkg: BrewPackage | null } | null>(null)
   const [tab, setTab] = useState<Tab>('overview')
   const [uses, setUses] = useState<string[] | null>(null)
   const [tree, setTree] = useState<string | null>(null)
@@ -76,15 +79,17 @@ export default function PackageDetailModal({ target, onClose, onChanged }: Props
   if (targetKey !== syncedTargetKey) {
     setSyncedTargetKey(targetKey)
     setViewTarget(target)
+    setLoaded(null)
   }
+  const viewKey = viewTarget ? `${viewTarget.name}:${viewTarget.isCask}` : null
+  const loading = viewKey !== null && loaded?.key !== viewKey
+  const pkg = !loading && loaded ? loaded.pkg : null
 
   useEffect(() => {
-    if (!viewTarget) return
-    setLoading(true)
+    if (!viewTarget || !viewKey) return
     setTab('overview')
     setUses(null)
     setTree(null)
-    setPkg(null)
     setSecurity(null)
     setSecurityError(null)
     setPreInstallSecurity(null)
@@ -92,9 +97,8 @@ export default function PackageDetailModal({ target, onClose, onChanged }: Props
     setNote(userData.noteFor(viewTarget.name, viewTarget.isCask))
     api
       .getInfo(viewTarget.name, viewTarget.isCask)
-      .then(setPkg)
-      .catch(() => setPkg(null))
-      .finally(() => setLoading(false))
+      .then((p) => setLoaded({ key: viewKey, pkg: p }))
+      .catch(() => setLoaded({ key: viewKey, pkg: null }))
     if (!viewTarget.isCask) {
       api
         .uses(viewTarget.name)
@@ -107,10 +111,10 @@ export default function PackageDetailModal({ target, onClose, onChanged }: Props
   if (!target || !viewTarget) return null
 
   function refresh() {
-    if (!viewTarget) return
+    if (!viewTarget || !viewKey) return
     api
       .getInfo(viewTarget.name, viewTarget.isCask)
-      .then(setPkg)
+      .then((p) => setLoaded({ key: viewKey, pkg: p }))
       .catch(() => {})
     onChanged?.()
   }
