@@ -32,6 +32,8 @@ vi.mock('../lib/api', () => ({
 }))
 
 import Adopt from './Adopt'
+import { adoptSignal } from '../context/AdoptSignal'
+import { initialAdoptState } from '../context/adoptCache'
 
 function candidate(name: string): AdoptCandidate {
   return {
@@ -51,6 +53,7 @@ function candidate(name: string): AdoptCandidate {
 beforeEach(() => {
   scanAdoptableApps.mockReset()
   adoptCask.mockClear()
+  adoptSignal.value = initialAdoptState
 })
 afterEach(cleanup)
 
@@ -77,9 +80,46 @@ describe('Adopt', () => {
     expect(bump).toHaveBeenCalled()
 
     scanAdoptableApps.mockResolvedValueOnce([candidate('Beta'), candidate('Gamma')])
-    fireEvent.click(screen.getByText('adopt.scanButton'))
+    fireEvent.click(screen.getByText('adopt.rescanButton'))
     await waitFor(() => expect(screen.getByText('Gamma')).toBeTruthy())
     expect(screen.getByText('Beta')).toBeTruthy()
+  })
+
+  it('remembers the last scan after leaving the page and coming back', async () => {
+    scanAdoptableApps.mockResolvedValueOnce([candidate('Alpha')])
+    const { unmount } = render(<Adopt />)
+    fireEvent.click(screen.getByText('adopt.scanButton'))
+    await waitFor(() => expect(screen.getByText('Alpha')).toBeTruthy())
+    unmount()
+
+    render(<Adopt />)
+    expect(screen.getByText('Alpha')).toBeTruthy()
+    expect(screen.getByText('adopt.rescanButton')).toBeTruthy()
+    expect(scanAdoptableApps).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps a scan started before leaving the page', async () => {
+    let resolve!: (v: AdoptCandidate[]) => void
+    scanAdoptableApps.mockReturnValueOnce(new Promise((r) => (resolve = r)))
+    const { unmount } = render(<Adopt />)
+    fireEvent.click(screen.getByText('adopt.scanButton'))
+    unmount()
+
+    await act(async () => resolve([candidate('Alpha')]))
+    render(<Adopt />)
+    expect(screen.getByText('Alpha')).toBeTruthy()
+  })
+
+  it('shows a failed rescan and keeps the previous results', async () => {
+    scanAdoptableApps.mockResolvedValueOnce([candidate('Alpha')])
+    render(<Adopt />)
+    fireEvent.click(screen.getByText('adopt.scanButton'))
+    await waitFor(() => expect(screen.getByText('Alpha')).toBeTruthy())
+
+    scanAdoptableApps.mockRejectedValueOnce(new Error('brew exploded'))
+    fireEvent.click(screen.getByText('adopt.rescanButton'))
+    await waitFor(() => expect(screen.getByText('adopt.scanFailedTitle')).toBeTruthy())
+    expect(screen.getByText('Alpha')).toBeTruthy()
   })
 
   it('warns on App Store apps only', async () => {

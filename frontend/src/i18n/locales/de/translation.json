@@ -245,6 +245,7 @@
     "title": "Vorhandene Apps übernehmen",
     "subtitle": "Apps, die bereits in <path>/Applications</path> liegen und zu einem installierbaren Cask passen, damit Homebrew künftige Updates verwalten kann.",
     "scanButton": "/Applications scannen",
+    "rescanButton": "/Applications erneut scannen",
     "scanningHint": "Jede App wird mit Homebrews Cask-Index abgeglichen. Das kann etwas dauern.",
     "scanFailedTitle": "Scan fehlgeschlagen",
     "nothingToAdopt": "Nichts zu übernehmen. Alles Passende wird bereits von Homebrew verwaltet (oder nichts passte zu einem bekannten Cask).",
