@@ -404,6 +404,10 @@
   "settings": {
     "title": "Settings",
     "subtitle": "Preferences for mead and for Homebrew itself.",
+    "menuBarTitle": "Menu bar",
+    "menuBarDescription": "Show mead's mug in the menu bar with a count of available updates, an Update all button and a shortcut to open mead. It starts when you log in. macOS will tell you mead added a background item.",
+    "menuBarToggle": "Show mead in the menu bar",
+    "menuBarFailedTitle": "Couldn't change the menu bar setting",
     "privacyTitle": "Privacy",
     "privacyDescription": "mead automatically suppresses analytics for its own commands. This setting controls Homebrew's own global analytics preference, which also applies if you use `brew` directly in a terminal.",
     "checking": "Checking…",

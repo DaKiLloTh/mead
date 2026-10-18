@@ -7,6 +7,7 @@ import { useConfirm } from '../context/ConfirmContext'
 import { userDataSignal, useUserData } from '../context/UserDataContext'
 import { supportedLngs } from '../i18n'
 import { DownloadIcon, ImportIcon } from '../components/Icons'
+import MenuBarSetting from '../components/MenuBarSetting'
 
 // Language names in a language picker are conventionally shown in their own
 // endonym (a French speaker sees "Français" whether the UI is currently in
@@ -186,6 +187,8 @@ export default function Settings() {
           </div>
         </div>
       </div>
+
+      <MenuBarSetting />
 
       <div className="card bg-base-200">
         <div className="card-body">

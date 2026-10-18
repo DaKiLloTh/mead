@@ -25,10 +25,18 @@ This produces a `mead-mon` binary in the current directory.
 ./mead-mon
 ```
 
-It adds an icon to your menu bar showing the current count of outdated
-Homebrew packages (blank when everything is up to date). Click it to see the
-full list, each entry formatted as `name (installed -> latest)`. Use "Quit
-mead-mon" in that menu to exit.
+It adds mead's mug to your menu bar. When updates are available the mug
+gets an exclamation mark and the count appears beside it. The menu has:
+
+- the number of updates available (or "Up to date")
+- **Update all**, which runs `brew upgrade` (`--greedy` if configured),
+  sends a notification when it's done, and checks again
+- **Open mead**, which opens the main app
+- **Quit**
+
+The icons are template images, so macOS tints them to match the menu bar.
+Their sources are `icon/*.svg`, with the command to re-render each PNG in
+the file.
 
 On startup it checks immediately, then again on the configured interval
 (default: every 60 minutes). Config is loaded once at startup; restart
@@ -128,10 +136,11 @@ OS notification system. See `diff_test.go` and `format_test.go`.
 go test ./cmd/mead-mon/...
 ```
 
-Config parsing/defaults, the notify-diffing decision (`shouldNotify`), tray
-tooltip/menu-line formatting, and the AppleScript string escaping used by
-`notify` are all plain functions with real unit tests. The systray wiring,
-the actual `osascript` call, and the polling ticker are thin wrappers around
-that tested logic and are exercised by actually running the binary, not by
-unit tests (matches how the rest of this codebase separates pure logic from
+Config parsing/defaults, the notify-diffing decision (`shouldNotify`), what
+the menu shows in each state (`menuView`), and the AppleScript string
+escaping used by `notify` are all plain functions with real unit tests. The
+poller's checks and Update all are tested against fakes for brew, the
+notifier and the tray (`poll_test.go`). The systray wiring and the actual
+`osascript` and `open` calls are thin wrappers, exercised by actually running
+the binary, not by unit tests (matches how the rest of this codebase separates pure logic from
 OS/exec calls, e.g. `internal/system`).

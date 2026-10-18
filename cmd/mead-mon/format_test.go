@@ -1,61 +1,93 @@
 package main
 
 import (
+	"errors"
+	"reflect"
 	"testing"
-
-	"mead/internal/brew"
 )
 
-func TestTooltipText(t *testing.T) {
-	tests := []struct {
-		count int
-		want  string
-	}{
-		{0, "mead-mon: up to date"},
-		{1, "mead-mon: 1 update available"},
-		{2, "mead-mon: 2 updates available"},
-		{42, "mead-mon: 42 updates available"},
-	}
-	for _, tt := range tests {
-		if got := tooltipText(tt.count); got != tt.want {
-			t.Errorf("tooltipText(%d) = %q, want %q", tt.count, got, tt.want)
-		}
-	}
-}
-
-func TestMenuLine(t *testing.T) {
+func TestMenuView(t *testing.T) {
 	tests := []struct {
 		name string
-		pkg  brew.OutdatedPackage
-		want string
+		st   status
+		want view
 	}{
 		{
-			name: "normal package",
-			pkg:  brew.OutdatedPackage{Name: "git", InstalledVersions: []string{"2.40.0"}, CurrentVersion: "2.41.0"},
-			want: "git (2.40.0 -> 2.41.0)",
+			name: "before the first check",
+			st:   status{},
+			want: view{header: "Not checked yet", updateAllTitle: "Update all"},
 		},
 		{
-			name: "multiple installed versions uses the last one",
-			pkg:  brew.OutdatedPackage{Name: "node", InstalledVersions: []string{"18.0.0", "18.1.0"}, CurrentVersion: "20.0.0"},
-			want: "node (18.1.0 -> 20.0.0)",
+			name: "first check running",
+			st:   status{checking: true},
+			want: view{header: "Checking for updates…", updateAllTitle: "Update all"},
 		},
 		{
-			name: "missing installed version",
-			pkg:  brew.OutdatedPackage{Name: "curl", CurrentVersion: "8.0.0"},
-			want: "curl (unknown -> 8.0.0)",
+			name: "first check failed",
+			st:   status{checkFailed: true},
+			want: view{header: "Couldn't check for updates", updateAllTitle: "Update all"},
 		},
 		{
-			name: "missing current version",
-			pkg:  brew.OutdatedPackage{Name: "curl", InstalledVersions: []string{"7.0.0"}},
-			want: "curl (7.0.0 -> unknown)",
+			name: "up to date",
+			st:   status{checked: true},
+			want: view{header: "Up to date", updateAllTitle: "Update all"},
+		},
+		{
+			name: "one update",
+			st:   status{checked: true, count: 1},
+			want: view{alert: true, badge: "1", header: "1 update available", updateAllTitle: "Update all", updateAllEnabled: true},
+		},
+		{
+			name: "several updates",
+			st:   status{checked: true, count: 12},
+			want: view{alert: true, badge: "12", header: "12 updates available", updateAllTitle: "Update all", updateAllEnabled: true},
+		},
+		{
+			name: "rechecking keeps the last count but disables Update all",
+			st:   status{checked: true, count: 3, checking: true},
+			want: view{alert: true, badge: "3", header: "3 updates available", updateAllTitle: "Update all"},
+		},
+		{
+			name: "a failed recheck keeps the last count and says so",
+			st:   status{checked: true, count: 3, checkFailed: true},
+			want: view{alert: true, badge: "3", header: "3 updates available (last check failed)", updateAllTitle: "Update all", updateAllEnabled: true},
+		},
+		{
+			name: "updating",
+			st:   status{checked: true, count: 3, upgrading: true},
+			want: view{alert: true, badge: "3", header: "Updating…", updateAllTitle: "Updating…"},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := menuLine(tt.pkg); got != tt.want {
-				t.Errorf("menuLine() = %q, want %q", got, tt.want)
+			if got := menuView(tt.st); got != tt.want {
+				t.Errorf("menuView(%+v) = %+v, want %+v", tt.st, got, tt.want)
 			}
 		})
+	}
+}
+
+func TestUpgradeArgs(t *testing.T) {
+	if got := upgradeArgs(false); !reflect.DeepEqual(got, []string{"upgrade"}) {
+		t.Errorf("upgradeArgs(false) = %v", got)
+	}
+	if got := upgradeArgs(true); !reflect.DeepEqual(got, []string{"upgrade", "--greedy"}) {
+		t.Errorf("upgradeArgs(true) = %v", got)
+	}
+}
+
+func TestOpenMeadArgs(t *testing.T) {
+	if got := openMeadArgs(); !reflect.DeepEqual(got, []string{"-a", "mead"}) {
+		t.Errorf("openMeadArgs() = %v", got)
+	}
+}
+
+func TestUpgradeResultText(t *testing.T) {
+	if got := upgradeResultText(nil); got != "All packages are up to date." {
+		t.Errorf("success = %q", got)
+	}
+	if got := upgradeResultText(errors.New("cask needs sudo")); got != "Update all failed: cask needs sudo" {
+		t.Errorf("failure = %q", got)
 	}
 }
 

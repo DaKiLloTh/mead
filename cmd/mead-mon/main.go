@@ -16,8 +16,8 @@ func main() {
 	systray.Run(func() {
 		tr := newTray()
 		p := newPoller(cfg, tr)
-		go p.run(ctx)
-		go tr.runQuitListener()
+		go p.run(ctx, tr.updateAll.ClickedCh)
+		go tr.runMenuListener()
 	}, func() {
 		cancel()
 	})

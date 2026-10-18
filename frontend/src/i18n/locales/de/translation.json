@@ -404,6 +404,10 @@
   "settings": {
     "title": "Einstellungen",
     "subtitle": "Einstellungen für mead und für Homebrew selbst.",
+    "menuBarTitle": "Menüleiste",
+    "menuBarDescription": "Zeigt den mead-Krug in der Menüleiste mit der Anzahl verfügbarer Updates, einer Schaltfläche „Alle aktualisieren“ und einer Abkürzung zu mead. Startet bei der Anmeldung. macOS meldet, dass mead ein Hintergrundobjekt hinzugefügt hat.",
+    "menuBarToggle": "mead in der Menüleiste anzeigen",
+    "menuBarFailedTitle": "Menüleisten-Einstellung konnte nicht geändert werden",
     "privacyTitle": "Datenschutz",
     "privacyDescription": "mead unterdrückt automatisch die Analysedaten für seine eigenen Befehle. Diese Einstellung steuert Homebrews eigene globale Analyse-Einstellung, die auch gilt, wenn du `brew` direkt in einem Terminal verwendest.",
     "checking": "Wird geprüft…",
