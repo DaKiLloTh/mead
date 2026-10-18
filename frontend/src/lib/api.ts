@@ -1,5 +1,5 @@
 import * as App from '../../wailsjs/go/app/App'
-import { brew, platform, security, store, touchid } from '../../wailsjs/go/models'
+import { brew, menubar, platform, security, store, touchid } from '../../wailsjs/go/models'
 
 export type BrewPackage = brew.BrewPackage
 export type CacheInfo = brew.CacheInfo
@@ -23,6 +23,7 @@ export type BundleEntryType =
   'formula' | 'cask' | 'tap' | 'mas' | 'vscode' | 'go' | 'cargo' | 'uv' | 'flatpak' | 'winget' | 'krew' | 'npm'
 export type PackageSize = brew.PackageSize
 export type TouchIDStatus = touchid.Status
+export type MenuBarStatus = menubar.Status
 export type Capabilities = platform.Capabilities
 export type DependencyGraph = brew.DependencyGraph
 export type DependencyNode = brew.DependencyNode
@@ -79,6 +80,8 @@ export const api = {
   sendJobInput: (id: string, text: string) => App.SendJobInput(id, text),
   touchIDSudoStatus: () => App.TouchIDSudoStatus(),
   startTouchIDSudoSetup: () => App.StartTouchIDSudoSetup(),
+  menuBarStatus: () => App.MenuBarStatus(),
+  setMenuBarEnabled: (on: boolean) => App.SetMenuBarEnabled(on),
 
   autoremove: (dryRun: boolean) => App.Autoremove(dryRun),
 

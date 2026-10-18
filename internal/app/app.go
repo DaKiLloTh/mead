@@ -8,6 +8,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -19,6 +20,7 @@ import (
 
 	"mead/internal/brew"
 	"mead/internal/jobs"
+	"mead/internal/menubar"
 	"mead/internal/platform"
 	"mead/internal/security"
 	"mead/internal/store"
@@ -64,6 +66,11 @@ func New() *App {
 func (a *App) Startup(ctx context.Context) {
 	a.ctx = ctx
 	a.jobs.SetContext(ctx)
+	if agent, err := menubar.NewAgent(); err == nil {
+		if err := agent.RepairIfMoved(); err != nil {
+			log.Printf("menu bar: repairing launch agent: %v", err)
+		}
+	}
 }
 
 func (a *App) record(action, name string, isCask bool) func(success bool) {
@@ -499,6 +506,27 @@ func (a *App) CancelJob(id string) bool {
 // run sudo internally.
 func (a *App) TouchIDSudoStatus() touchid.Status {
 	return touchid.GetStatus()
+}
+
+// MenuBarStatus reports whether this build ships the menu bar companion
+// (mead-mon) and whether it's turned on (see package menubar).
+func (a *App) MenuBarStatus() menubar.Status {
+	agent, err := menubar.NewAgent()
+	if err != nil {
+		return menubar.Status{}
+	}
+	return agent.Status()
+}
+
+// SetMenuBarEnabled turns the menu bar companion on (starts it now and at
+// every login) or off (stops it and removes its launch agent). Only ever
+// called from the Settings toggle.
+func (a *App) SetMenuBarEnabled(on bool) error {
+	agent, err := menubar.NewAgent()
+	if err != nil {
+		return err
+	}
+	return agent.SetEnabled(on)
 }
 
 // StartTouchIDSudoSetup opens a Terminal window that adds Touch ID to sudo's

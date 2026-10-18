@@ -91,6 +91,12 @@ jobs:
       - name: Build (arm64)
         run: wails build -ldflags "-X mead/internal/app.Version=${{ steps.version.outputs.version }}"
 
+      # The menu bar companion (cmd/mead-mon) ships inside the bundle, next to
+      # mead's own binary, where internal/menubar looks for it. It's off
+      # until the user turns it on in Settings.
+      - name: Bundle menu bar app (arm64)
+        run: CGO_ENABLED=1 GOARCH=arm64 go build -ldflags "-s -w" -o build/bin/mead.app/Contents/MacOS/mead-mon ./cmd/mead-mon
+
       - name: Zip app bundle (arm64)
         working-directory: build/bin
         run: ditto -c -k --sequesterRsrc --keepParent mead.app "mead-${{ needs.release-please.outputs.tag_name }}-macos-arm64.zip"
@@ -123,6 +129,9 @@ jobs:
       # flags needed, even though this is a Cgo/webview app.
       - name: Build (amd64)
         run: wails build -platform darwin/amd64 -ldflags "-X mead/internal/app.Version=${{ steps.version.outputs.version }}"
+
+      - name: Bundle menu bar app (amd64)
+        run: CGO_ENABLED=1 GOARCH=amd64 go build -ldflags "-s -w" -o build/bin/mead.app/Contents/MacOS/mead-mon ./cmd/mead-mon
 
       - name: Zip app bundle (amd64)
         working-directory: build/bin
