@@ -1,4 +1,7 @@
 name: Release
+# Every push to master runs this, but only the release PR's merge publishes
+# anything, so say which kind of run it is.
+run-name: "${{ startsWith(github.event.head_commit.message, 'chore(master): release') && 'Publish' || 'Update release PR' }}: ${{ github.event.head_commit.message }}"
 
 on:
   push:
