@@ -4,7 +4,7 @@ import (
 	"context"
 	"log"
 
-	"github.com/getlantern/systray"
+	"fyne.io/systray"
 )
 
 func main() {
