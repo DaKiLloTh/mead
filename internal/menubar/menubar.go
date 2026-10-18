@@ -3,8 +3,10 @@
 // Release builds ship mead-mon inside the app bundle, next to mead's own
 // binary (mead.app/Contents/MacOS/mead-mon). Turning it on writes a per-user
 // LaunchAgent so macOS starts it at login, and starts it now. Turning it off
-// stops it and removes the LaunchAgent. It's off until the user turns it on
-// in Settings.
+// stops it and removes the LaunchAgent, from the toggle in Settings. It's on
+// by default: the first time a build that bundles it starts, mead turns it
+// on once (EnableByDefaultOnce), and after that it's whatever the user last
+// chose.
 //
 // A LaunchAgent rather than SMAppService: SMAppService needs a signed helper
 // bundle, and mead's builds are unsigned. A LaunchAgent works unsigned, and
@@ -38,6 +40,10 @@ type Status struct {
 type Agent struct {
 	// launchAgentsDir is ~/Library/LaunchAgents.
 	launchAgentsDir string
+	// defaultMarker records that the on-by-default step has run, so turning
+	// it off sticks. Kept apart from store.json so clearing or importing
+	// user data doesn't switch it back on.
+	defaultMarker string
 	// helper is the absolute path to the bundled mead-mon.
 	helper string
 	uid    int
@@ -60,8 +66,13 @@ func NewAgent() (*Agent, error) {
 	if resolved, err := filepath.EvalSymlinks(exe); err == nil {
 		exe = resolved
 	}
+	configDir, err := os.UserConfigDir()
+	if err != nil {
+		return nil, err
+	}
 	return &Agent{
 		launchAgentsDir: filepath.Join(home, "Library", "LaunchAgents"),
+		defaultMarker:   filepath.Join(configDir, "mead", "menubar-default-applied"),
 		helper:          HelperPath(exe),
 		uid:             os.Getuid(),
 		launchctl: func(args ...string) error {
@@ -145,6 +156,29 @@ func (a *Agent) RepairIfMoved() error {
 		return nil
 	}
 	if _, err := os.Stat(a.helper); err != nil {
+		return nil
+	}
+	return a.Enable()
+}
+
+// EnableByDefaultOnce turns the menu bar companion on the first time a build
+// that bundles it starts. It records that it ran before enabling, so a
+// failed enable isn't retried on every launch and a later "off" sticks.
+// Builds without the helper (wails dev, Linux) leave the marker alone.
+func (a *Agent) EnableByDefaultOnce() error {
+	if _, err := os.Stat(a.defaultMarker); err == nil {
+		return nil
+	}
+	if !a.Status().Available {
+		return nil
+	}
+	if err := os.MkdirAll(filepath.Dir(a.defaultMarker), 0o755); err != nil {
+		return err
+	}
+	if err := os.WriteFile(a.defaultMarker, nil, 0o644); err != nil {
+		return err
+	}
+	if a.Status().Enabled {
 		return nil
 	}
 	return a.Enable()

@@ -37,6 +37,7 @@ func newTestAgent(t *testing.T, withHelper bool) (*Agent, *fakeLaunchctl) {
 	f := &fakeLaunchctl{}
 	return &Agent{
 		launchAgentsDir: filepath.Join(dir, "LaunchAgents"),
+		defaultMarker:   filepath.Join(dir, "config", "mead", "menubar-default-applied"),
 		helper:          helper,
 		uid:             501,
 		launchctl:       f.run,
@@ -214,5 +215,66 @@ func TestNewAgent(t *testing.T) {
 	}
 	if filepath.Base(a.helper) != "mead-mon" || !strings.HasSuffix(a.launchAgentsDir, filepath.Join("Library", "LaunchAgents")) {
 		t.Errorf("agent = %+v", a)
+	}
+}
+
+func TestEnableByDefaultOnceTurnsItOnThenRespectsOff(t *testing.T) {
+	a, f := newTestAgent(t, true)
+
+	if err := a.EnableByDefaultOnce(); err != nil {
+		t.Fatal(err)
+	}
+	if !a.Status().Enabled {
+		t.Fatal("not enabled on first run")
+	}
+
+	if err := a.Disable(); err != nil {
+		t.Fatal(err)
+	}
+	f.calls = nil
+	if err := a.EnableByDefaultOnce(); err != nil {
+		t.Fatal(err)
+	}
+	if a.Status().Enabled || len(f.calls) != 0 {
+		t.Errorf("turned back on after the user switched it off: calls=%v", f.calls)
+	}
+}
+
+func TestEnableByDefaultOnceLeavesAnAlreadyEnabledAgentAlone(t *testing.T) {
+	a, f := newTestAgent(t, true)
+	if err := a.Enable(); err != nil {
+		t.Fatal(err)
+	}
+	f.calls = nil
+	if err := a.EnableByDefaultOnce(); err != nil {
+		t.Fatal(err)
+	}
+	if len(f.calls) != 0 {
+		t.Errorf("launchctl calls = %v, want none", f.calls)
+	}
+}
+
+func TestEnableByDefaultOnceWaitsForABuildWithTheHelper(t *testing.T) {
+	a, f := newTestAgent(t, false)
+	if err := a.EnableByDefaultOnce(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(a.defaultMarker); !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("marker written by a build without the helper: %v", err)
+	}
+	if len(f.calls) != 0 {
+		t.Errorf("launchctl calls = %v, want none", f.calls)
+	}
+}
+
+func TestEnableByDefaultOnceDoesNotRetryAFailedEnable(t *testing.T) {
+	a, f := newTestAgent(t, true)
+	f.fail = map[string]error{"bootstrap": errors.New("boom")}
+	if err := a.EnableByDefaultOnce(); err == nil {
+		t.Fatal("want the bootstrap error")
+	}
+	f.calls = nil
+	if err := a.EnableByDefaultOnce(); err != nil || len(f.calls) != 0 {
+		t.Errorf("second run: err=%v calls=%v, want nothing", err, f.calls)
 	}
 }

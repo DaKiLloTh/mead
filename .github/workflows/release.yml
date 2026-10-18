@@ -92,8 +92,9 @@ jobs:
         run: wails build -ldflags "-X mead/internal/app.Version=${{ steps.version.outputs.version }}"
 
       # The menu bar companion (cmd/mead-mon) ships inside the bundle, next to
-      # mead's own binary, where internal/menubar looks for it. It's off
-      # until the user turns it on in Settings.
+      # mead's own binary, where internal/menubar looks for it. mead turns it
+      # on the first time it starts, and the user can switch it off in
+      # Settings.
       - name: Bundle menu bar app (arm64)
         run: CGO_ENABLED=1 GOARCH=arm64 go build -ldflags "-s -w" -o build/bin/mead.app/Contents/MacOS/mead-mon ./cmd/mead-mon
 
