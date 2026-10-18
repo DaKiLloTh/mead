@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.13.0](https://github.com/DaKiLloTh/mead/compare/v0.12.1...v0.13.0) (2026-10-18)
+
+
+### Features
+
+* mead in the menu bar, switched on in Settings ([#205](https://github.com/DaKiLloTh/mead/issues/205)) ([19ebe4d](https://github.com/DaKiLloTh/mead/commit/19ebe4dc02483855011de49bc3b96a7d3033e948))
+
 ## [0.12.1](https://github.com/DaKiLloTh/mead/compare/v0.12.0...v0.12.1) (2026-10-17)
 
 
