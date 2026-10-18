@@ -64,18 +64,59 @@ build running in CI on every push.
 
 ## Releasing
 
-Releases are versioned and tagged automatically by
-[release-please](https://github.com/googleapis/release-please), driven by
-[Conventional Commits](https://www.conventionalcommits.org) in PR titles
-(enforced by `.github/workflows/pr-title.yml`: `feat:`, `fix:`, `feat!:` /
-a `BREAKING CHANGE:` footer for breaking changes, `docs:`, `chore:`, etc).
-Every merge to `master` updates a standing "Release PR" with the next
-version and changelog. Merging *that* PR is what actually cuts the release.
-`.github/workflows/release.yml` then marks the GitHub Release as a
-pre-release (title prefixed `Pre-Alpha`, every release stays labeled
-pre-alpha until the project is stable), builds `mead.app` for both Apple
-Silicon (arm64, native) and Intel (amd64, cross-compiled), zips each, builds
-a DMG installer for each, and attaches all four to the release.
+Don't create releases by hand. Never use GitHub's "Draft a new release"
+button or push a `v*` tag yourself. The release workflow only runs when the
+release PR is merged, so a hand-made release ships with no builds attached,
+and it also stops release-please from creating that version later.
+
+### To cut a release
+
+1. Open the PR titled **`chore(master): release X.Y.Z`** (from the
+   `release-please--branches--master` branch). There's always one open if
+   anything releasable has merged since the last release.
+2. Check its version and changelog. Wait for CI to pass.
+3. Squash-merge it.
+
+That's it. `.github/workflows/release.yml` then runs automatically (about
+4 minutes) and:
+
+- creates the `vX.Y.Z` tag and GitHub Release, marked as a pre-release
+  titled `Pre-Alpha vX.Y.Z`
+- builds `mead.app` for Apple Silicon (arm64) and Intel (amd64), and
+  attaches a zip and a DMG for each
+- adds the Gatekeeper install notes to the release body
+- mirrors the files to `DaKiLloTh/homebrew-mead` and bumps the cask (needs
+  the `HOMEBREW_TAP_TOKEN` secret, and skips with a warning without it)
+
+Follow it with `gh run watch` or in the Actions tab.
+
+### How the version is chosen
+
+PRs are squash-merged, so each PR title becomes a commit on `master`. Titles
+must be [Conventional Commits](https://www.conventionalcommits.org)
+(`.github/workflows/pr-title.yml` enforces this).
+[release-please](https://github.com/googleapis/release-please) reads them
+and keeps the release PR up to date:
+
+| PR title | Effect while below 1.0 |
+| --- | --- |
+| `fix: ...` | patch bump (0.12.0 → 0.12.1) |
+| `feat: ...` | minor bump (0.12.0 → 0.13.0) |
+| `feat!: ...` or a `BREAKING CHANGE:` footer | minor bump |
+| `docs:`, `chore:`, `refactor:`, `test:`, `ci:` | no release, and not in the changelog |
+
+If only `refactor:`/`chore:`-type PRs have merged, there's no release PR,
+and there's nothing to release.
+
+### If a release went wrong
+
+- **A hand-made release or tag exists for the version the release PR
+  wants:** delete it with `gh release delete vX.Y.Z --cleanup-tag --yes`,
+  then merge the release PR.
+- **The release PR merged but the build failed for a flaky reason:** re-run
+  the failed jobs from the Actions tab. The upload uses `--clobber`, so
+  that's safe. A re-run builds the tag, so a code fix has to go out as the
+  next release instead.
 
 Release builds are unsigned (no Apple Developer ID in this project), so
 Gatekeeper will block a plain double-click. See the release notes on each
