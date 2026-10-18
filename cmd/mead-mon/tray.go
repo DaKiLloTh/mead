@@ -3,7 +3,7 @@ package main
 import (
 	_ "embed"
 
-	"github.com/getlantern/systray"
+	"fyne.io/systray"
 )
 
 // The menu bar glyphs: mead's mug as single-color template images, so macOS

@@ -17,7 +17,7 @@ Rather than restating #105's own bullet points, this is a real inventory:
 every macOS-specific call, path and library the current codebase makes, found
 by grepping `internal/`, `cmd/mead-mon/` and `frontend/src/` for the actual
 mechanisms (`osascript`, `codesign`, `tmutil`, hardcoded `/Applications` and
-`~/Library` paths, the `mas` binary, `getlantern/systray`, Wails' `mac.Options`),
+`~/Library` paths, the `mas` binary, `fyne.io/systray`, Wails' `mac.Options`),
 not by assumption.
 
 ## What already works today, unmodified
@@ -39,7 +39,7 @@ scope of the actual work is clear:
   fully cross-platform in the Go standard library (resolves to
   `~/.config/mead` on Linux, `~/Library/Application Support/mead` on macOS,
   with no code change needed).
-- **`getlantern/systray`** (mead-mon's tray icon) has a real Linux (GTK/
+- **`fyne.io/systray`** (mead-mon's tray icon) has a real Linux (GTK/
   AppIndicator via D-Bus) and Windows backend, not just macOS. `go.mod`
   already carries `github.com/godbus/dbus/v5` as an indirect dependency of
   it. The tray icon itself does not need porting.
