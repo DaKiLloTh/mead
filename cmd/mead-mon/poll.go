@@ -6,7 +6,7 @@ import (
 	"os/exec"
 	"time"
 
-	"github.com/getlantern/systray"
+	"fyne.io/systray"
 
 	"mead/internal/brew"
 )

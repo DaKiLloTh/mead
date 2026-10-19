@@ -1,4 +1,7 @@
 name: Release
+# Every push to master runs this, but only the release PR's merge publishes
+# anything, so say which kind of run it is.
+run-name: "${{ startsWith(github.event.head_commit.message, 'chore(master): release') && 'Publish' || 'Update release PR' }}: ${{ github.event.head_commit.message }}"
 
 on:
   push:
@@ -91,12 +94,12 @@ jobs:
       - name: Build (arm64)
         run: wails build -ldflags "-X mead/internal/app.Version=${{ steps.version.outputs.version }}"
 
-      # The menu bar companion (cmd/mead-mon) ships inside the bundle, next to
-      # mead's own binary, where internal/menubar looks for it. mead turns it
-      # on the first time it starts, and the user can switch it off in
-      # Settings.
+      # The menu bar companion (cmd/mead-mon) ships as a helper app inside
+      # the bundle, where internal/menubar looks for it (see the script for
+      # why it needs its own .app). mead turns it on the first time it
+      # starts, and the user can switch it off in Settings.
       - name: Bundle menu bar app (arm64)
-        run: CGO_ENABLED=1 GOARCH=arm64 go build -ldflags "-s -w" -o build/bin/mead.app/Contents/MacOS/mead-mon ./cmd/mead-mon
+        run: scripts/bundle-menubar.sh build/bin/mead.app arm64 "${{ steps.version.outputs.version }}"
 
       - name: Zip app bundle (arm64)
         working-directory: build/bin
@@ -132,7 +135,7 @@ jobs:
         run: wails build -platform darwin/amd64 -ldflags "-X mead/internal/app.Version=${{ steps.version.outputs.version }}"
 
       - name: Bundle menu bar app (amd64)
-        run: CGO_ENABLED=1 GOARCH=amd64 go build -ldflags "-s -w" -o build/bin/mead.app/Contents/MacOS/mead-mon ./cmd/mead-mon
+        run: scripts/bundle-menubar.sh build/bin/mead.app amd64 "${{ steps.version.outputs.version }}"
 
       - name: Zip app bundle (amd64)
         working-directory: build/bin

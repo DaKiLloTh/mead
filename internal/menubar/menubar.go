@@ -1,7 +1,8 @@
 // Package menubar turns mead's menu bar companion (cmd/mead-mon) on and off.
 //
-// Release builds ship mead-mon inside the app bundle, next to mead's own
-// binary (mead.app/Contents/MacOS/mead-mon). Turning it on writes a per-user
+// Release builds ship mead-mon as its own helper app inside mead's bundle
+// (mead.app/Contents/Library/LoginItems/mead-mon.app, built by
+// scripts/bundle-menubar.sh). Turning it on writes a per-user
 // LaunchAgent so macOS starts it at login, and starts it now. Turning it off
 // stops it and removes the LaunchAgent, from the toggle in Settings. It's on
 // by default: the first time a build that bundles it starts, mead turns it
@@ -26,8 +27,10 @@ import (
 // Label is the LaunchAgent's launchd label, and its plist's file name.
 const Label = "app.mead.menubar"
 
-// helperName is mead-mon's file name inside the bundle.
-const helperName = "mead-mon"
+// helperApp is mead-mon's helper app, relative to mead's Contents folder.
+// Its own Info.plist gives it its own identity (app.mead.menubar) and keeps
+// it out of the Dock.
+var helperApp = filepath.Join("Library", "LoginItems", "mead-mon.app")
 
 // Status says whether this build ships the menu bar companion, and whether
 // it's turned on.
@@ -44,7 +47,7 @@ type Agent struct {
 	// it off sticks. Kept apart from store.json so clearing or importing
 	// user data doesn't switch it back on.
 	defaultMarker string
-	// helper is the absolute path to the bundled mead-mon.
+	// helper is the absolute path to the bundled mead-mon executable.
 	helper string
 	uid    int
 	// launchctl runs launchctl with the given arguments. A field so tests
@@ -85,9 +88,11 @@ func NewAgent() (*Agent, error) {
 	}, nil
 }
 
-// HelperPath is where mead-mon sits relative to mead's own executable.
+// HelperPath is mead-mon's executable, given mead's own
+// (mead.app/Contents/MacOS/mead).
 func HelperPath(meadExecutable string) string {
-	return filepath.Join(filepath.Dir(meadExecutable), helperName)
+	contents := filepath.Dir(filepath.Dir(meadExecutable))
+	return filepath.Join(contents, helperApp, "Contents", "MacOS", "mead-mon")
 }
 
 func (a *Agent) plistPath() string {
@@ -146,7 +151,8 @@ func (a *Agent) SetEnabled(on bool) error {
 
 // RepairIfMoved re-enables the LaunchAgent when it's on but points somewhere
 // other than this mead's bundled helper, e.g. after the app was moved or
-// replaced by a copy elsewhere. Called at startup.
+// replaced by a copy elsewhere, or after an update moved the helper inside
+// the bundle. Called at startup.
 func (a *Agent) RepairIfMoved() error {
 	current, err := os.ReadFile(a.plistPath())
 	if err != nil {
