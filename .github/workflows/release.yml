@@ -95,8 +95,9 @@ jobs:
         run: wails build -ldflags "-X mead/internal/app.Version=${{ steps.version.outputs.version }}"
 
       # The menu bar companion (cmd/mead-mon) ships as a helper app inside
-      # the bundle, where internal/menubar looks for it. See the script for
-      # why it needs its own .app.
+      # the bundle, where internal/menubar looks for it (see the script for
+      # why it needs its own .app). mead turns it on the first time it
+      # starts, and the user can switch it off in Settings.
       - name: Bundle menu bar app (arm64)
         run: scripts/bundle-menubar.sh build/bin/mead.app arm64 "${{ steps.version.outputs.version }}"
 

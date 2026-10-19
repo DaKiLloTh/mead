@@ -70,6 +70,9 @@ func (a *App) Startup(ctx context.Context) {
 		if err := agent.RepairIfMoved(); err != nil {
 			log.Printf("menu bar: repairing launch agent: %v", err)
 		}
+		if err := agent.EnableByDefaultOnce(); err != nil {
+			log.Printf("menu bar: turning on by default: %v", err)
+		}
 	}
 }
 
