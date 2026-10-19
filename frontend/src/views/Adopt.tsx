@@ -4,6 +4,7 @@ import { api, AdoptCandidate } from '../lib/api'
 import { useJobs } from '../context/JobsContext'
 import { useConfirm } from '../context/ConfirmContext'
 import { bump } from '../context/RefreshSignal'
+import { adoptSignal, markAdopted, scanAdoptable } from '../context/AdoptSignal'
 import { DownloadIcon, ImportIcon, AlertIcon, CheckIcon } from '../components/Icons'
 import PackageDetailModal, { DetailTarget } from '../components/PackageDetailModal'
 import ErrorAlert from '../components/ErrorAlert'
@@ -24,24 +25,9 @@ export default function Adopt() {
   const { t } = useTranslation()
   const { runAction } = useJobs()
   const confirm = useConfirm()
-  const candidates = useSignal<AdoptCandidate[] | null>(null)
-  const loading = useSignal(false)
-  const error = useSignal<string | null>(null)
+  const { items: candidates, scanning, error } = adoptSignal.value
   const adopting = useSignal<string | null>(null)
   const detail = useSignal<DetailTarget | null>(null)
-
-  async function scan() {
-    loading.value = true
-    error.value = null
-    try {
-      const results = await api.scanAdoptableApps()
-      candidates.value = results
-    } catch (e) {
-      error.value = String(e)
-    } finally {
-      loading.value = false
-    }
-  }
 
   async function adopt(c: AdoptCandidate) {
     const force = needsForceAdopt(c)
@@ -76,7 +62,7 @@ export default function Adopt() {
     adopting.value = c.caskToken
     await runAction(() => api.adoptCask(c.caskToken, force))
     adopting.value = null
-    candidates.value = candidates.value?.filter((x) => x.caskToken !== c.caskToken) ?? null
+    markAdopted(c.caskToken)
     bump()
   }
 
@@ -87,24 +73,22 @@ export default function Adopt() {
         <Trans i18nKey="adopt.subtitle" components={{ path: <span className="font-mono" /> } as any} />
       </p>
 
-      <button className="btn btn-sm btn-primary mb-4" disabled={loading.value} onClick={scan}>
-        {loading.value ? <span className="loading loading-spinner loading-xs" /> : <ImportIcon className="size-4" />}
-        {t('adopt.scanButton')}
+      <button className="btn btn-sm btn-primary mb-4" disabled={scanning} onClick={scanAdoptable}>
+        {scanning ? <span className="loading loading-spinner loading-xs" /> : <ImportIcon className="size-4" />}
+        {candidates ? t('adopt.rescanButton') : t('adopt.scanButton')}
       </button>
 
-      {loading.value && <p className="text-sm text-base-content/50">{t('adopt.scanningHint')}</p>}
+      {scanning && <p className="text-sm text-base-content/50">{t('adopt.scanningHint')}</p>}
 
-      {error.value && !loading.value && (
-        <ErrorAlert title={t('adopt.scanFailedTitle')} message={error.value} className="text-sm mb-4" />
-      )}
+      {error && !scanning && <ErrorAlert title={t('adopt.scanFailedTitle')} message={error} className="text-sm mb-4" />}
 
-      {candidates.value && !loading.value && (
+      {candidates && !scanning && (
         <>
-          {candidates.value.length === 0 ? (
+          {candidates.length === 0 ? (
             <div className="alert alert-success alert-soft text-sm">{t('adopt.nothingToAdopt')}</div>
           ) : (
             <div className="flex flex-col gap-3">
-              {candidates.value.map((c) => {
+              {candidates.map((c) => {
                 const versionsDiffer = needsForceAdopt(c)
                 const adoptLabel = c.possibleDowngrade
                   ? t('adopt.adoptAndDowngradeButton')
