@@ -19,6 +19,14 @@ go build ./cmd/mead-mon
 
 This produces a `mead-mon` binary in the current directory.
 
+Releases ship it as a helper app inside mead's bundle, at
+`mead.app/Contents/Library/LoginItems/mead-mon.app`, built by
+`scripts/bundle-menubar.sh`. Its own `Info.plist` (this folder) gives it its
+own identity (`app.mead.menubar`) and marks it menu bar only. Run loose from
+`mead.app/Contents/MacOS`, macOS would treat it as mead itself: a Dock tile,
+a second "mead" in Activity Monitor, and `open -a mead` bringing it forward
+instead of launching mead.
+
 ## Running
 
 ```

@@ -25,7 +25,7 @@ func (f *fakeLaunchctl) run(args ...string) error {
 func newTestAgent(t *testing.T, withHelper bool) (*Agent, *fakeLaunchctl) {
 	t.Helper()
 	dir := t.TempDir()
-	helper := filepath.Join(dir, "mead.app", "Contents", "MacOS", "mead-mon")
+	helper := HelperPath(filepath.Join(dir, "mead.app", "Contents", "MacOS", "mead"))
 	if withHelper {
 		if err := os.MkdirAll(filepath.Dir(helper), 0o755); err != nil {
 			t.Fatal(err)
@@ -45,7 +45,7 @@ func newTestAgent(t *testing.T, withHelper bool) (*Agent, *fakeLaunchctl) {
 
 func TestHelperPath(t *testing.T) {
 	got := HelperPath("/Applications/mead.app/Contents/MacOS/mead")
-	if got != "/Applications/mead.app/Contents/MacOS/mead-mon" {
+	if got != "/Applications/mead.app/Contents/Library/LoginItems/mead-mon.app/Contents/MacOS/mead-mon" {
 		t.Errorf("HelperPath = %q", got)
 	}
 }
@@ -177,6 +177,19 @@ func TestRepairIfMoved(t *testing.T) {
 	if err := a.RepairIfMoved(); err != nil || len(f.calls) != 0 {
 		t.Fatalf("current: err=%v calls=%v", err, f.calls)
 	}
+
+	// On but pointing at the pre-0.14 loose helper: rewritten and restarted.
+	if err := os.WriteFile(a.plistPath(), Plist("/Applications/mead.app/Contents/MacOS/mead-mon"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	f.calls = nil
+	if err := a.RepairIfMoved(); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := os.ReadFile(a.plistPath()); string(got) != string(Plist(a.helper)) {
+		t.Errorf("old layout not repaired: %s", got)
+	}
+	f.calls = nil
 
 	// On but pointing at an old location: rewritten and restarted.
 	if err := os.WriteFile(a.plistPath(), Plist("/Volumes/old/mead.app/Contents/MacOS/mead-mon"), 0o644); err != nil {
