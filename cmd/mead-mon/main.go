@@ -11,6 +11,8 @@ func main() {
 	cfg := LoadConfig()
 	log.Printf("mead-mon: checking every %d minutes (greedy=%v)", cfg.IntervalMinutes, cfg.Greedy)
 
+	hideFromDock()
+
 	ctx, cancel := context.WithCancel(context.Background())
 
 	systray.Run(func() {
