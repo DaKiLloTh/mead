@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.14.0](https://github.com/DaKiLloTh/mead/compare/v0.13.0...v0.14.0) (2026-10-19)
+
+
+### Features
+
+* menu bar app is on by default ([#208](https://github.com/DaKiLloTh/mead/issues/208)) ([8fa1595](https://github.com/DaKiLloTh/mead/commit/8fa1595c2702a6012f6aade59a9fe2c1183e2c5a))
+
+
+### Bug Fixes
+
+* Adopt remembers its scan results and offers a rescan ([#202](https://github.com/DaKiLloTh/mead/issues/202)) ([34046d3](https://github.com/DaKiLloTh/mead/commit/34046d371e0b8c5162a8da224580ef0cf457a4a0))
+* ship the menu bar app as its own helper app ([#211](https://github.com/DaKiLloTh/mead/issues/211)) ([0bd884d](https://github.com/DaKiLloTh/mead/commit/0bd884d3d1c9fdd648d15475c9e3802a2c0d80dd))
+
+
+### Performance Improvements
+
+* lighter mead-mon by switching to fyne.io/systray ([#207](https://github.com/DaKiLloTh/mead/issues/207)) ([aaffafe](https://github.com/DaKiLloTh/mead/commit/aaffafe2e9e802330b2f9ba7641f53daddc9b66b))
+
 ## [0.13.0](https://github.com/DaKiLloTh/mead/compare/v0.12.1...v0.13.0) (2026-10-18)
 
 
